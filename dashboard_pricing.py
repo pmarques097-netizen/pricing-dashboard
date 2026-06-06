@@ -687,17 +687,65 @@ with c1:
         "Quantidade"
     ]
 
+    # Remove SEM CUSTO do gráfico
+    rec_grafico = rec[
+        rec["Recomendacao"] != "SEM CUSTO"
+    ].copy()
+
     fig = px.bar(
-        rec,
+        rec_grafico,
         x="Recomendacao",
         y="Quantidade",
+        text="Quantidade",
         title="Distribuição Recomendações"
+    )
+
+    fig.update_traces(
+        textposition="outside"
     )
 
     st.plotly_chart(
         fig,
         width="stretch",
         key="grafico_recomendacoes"
+    )
+
+    # Ações recomendadas
+    st.subheader(
+        "📋 Ações Recomendadas"
+    )
+
+    acoes = {
+        "SUBIR PREÇO URGENTE":
+            "Produtos muito abaixo do mercado. Reajustar imediatamente.",
+        "SUBIR PREÇO":
+            "Produtos abaixo do mercado com oportunidade de ganho.",
+        "MANTER":
+            "Preço alinhado ao mercado. Monitorar concorrência.",
+        "COMPETITIVO":
+            "Preço agressivo. Avaliar margem e estratégia comercial.",
+        "ANALISAR REDUÇÃO":
+            "Preço elevado frente ao mercado. Revisar posicionamento.",
+        "SEM CUSTO":
+            "Produto sem custo cadastrado. Necessário saneamento do cadastro."
+    }
+
+    acoes_df = rec.copy()
+
+    acoes_df["Ação Recomendada"] = (
+        acoes_df["Recomendacao"]
+        .map(acoes)
+    )
+
+    st.dataframe(
+        acoes_df[
+            [
+                "Recomendacao",
+                "Quantidade",
+                "Ação Recomendada"
+            ]
+        ],
+        width="stretch"
     )
 
 with c2:
