@@ -1,63 +1,97 @@
 import pandas as pd
-import os
+from pathlib import Path
 
 
-def carregar_pasta_excel(pasta):
+BASE_DIR = Path(__file__).resolve().parent
+
+
+def limpar_colunas(df):
+
+    if df.empty:
+        return df
+
+    df.columns = (
+        df.columns
+        .astype(str)
+        .str.strip()
+    )
+
+    return df
+
+
+def carregar_pasta_excel(nome_pasta, header=0):
+
+    pasta = BASE_DIR / nome_pasta
 
     dfs = []
 
-    if not os.path.exists(pasta):
-        return pd.DataFrame()
+    if not pasta.exists():
 
-    for arquivo in os.listdir(pasta):
-
-        caminho = os.path.join(
-            pasta,
-            arquivo
+        print(
+            f"Pasta não encontrada: {pasta}"
         )
 
-        if arquivo.lower().endswith(".xlsx"):
+        return pd.DataFrame()
 
-            try:
-                df = pd.read_excel(caminho)
-                df["Arquivo_Origem"] = arquivo
-                dfs.append(df)
-            except Exception:
-                pass
+    arquivos = []
 
-        elif arquivo.lower().endswith(".xls"):
+    arquivos.extend(
+        list(pasta.glob("*.xlsx"))
+    )
 
-            try:
-                df = pd.read_excel(caminho)
-                df["Arquivo_Origem"] = arquivo
-                dfs.append(df)
-            except Exception:
-                pass
+    arquivos.extend(
+        list(pasta.glob("*.xls"))
+    )
 
-        elif arquivo.lower().endswith(".csv"):
+    arquivos.extend(
+        list(pasta.glob("*.csv"))
+    )
 
-            try:
-                df = pd.read_csv(
-                    caminho,
-                    sep=None,
-                    engine="python",
-                    encoding="utf-8"
+    for arquivo in arquivos:
+
+        try:
+
+            if arquivo.suffix.lower() in [".xlsx", ".xls"]:
+
+                df = pd.read_excel(
+                    arquivo,
+                    header=header
                 )
-                df["Arquivo_Origem"] = arquivo
-                dfs.append(df)
-            except Exception:
+
+            elif arquivo.suffix.lower() == ".csv":
 
                 try:
+
                     df = pd.read_csv(
-                        caminho,
+                        arquivo,
+                        sep=None,
+                        engine="python",
+                        encoding="utf-8"
+                    )
+
+                except Exception:
+
+                    df = pd.read_csv(
+                        arquivo,
                         sep=None,
                         engine="python",
                         encoding="latin1"
                     )
-                    df["Arquivo_Origem"] = arquivo
-                    dfs.append(df)
-                except Exception:
-                    pass
+
+            else:
+                continue
+
+            df["Arquivo_Origem"] = arquivo.name
+
+            df = limpar_colunas(df)
+
+            dfs.append(df)
+
+        except Exception as erro:
+
+            print(
+                f"Erro ao ler {arquivo.name}: {erro}"
+            )
 
     if len(dfs) == 0:
         return pd.DataFrame()
@@ -67,11 +101,7 @@ def carregar_pasta_excel(pasta):
         ignore_index=True
     )
 
-    base.columns = (
-        base.columns
-        .astype(str)
-        .str.strip()
-    )
+    base = limpar_colunas(base)
 
     return base
 
@@ -79,11 +109,14 @@ def carregar_pasta_excel(pasta):
 def carregar_historico():
 
     historico = carregar_pasta_excel(
-        "VENDA_TESTE"
+        "VENDA_TESTE",
+        header=0
     )
 
     if historico.empty:
         return pd.DataFrame()
+
+    historico = limpar_colunas(historico)
 
     if "Data Emissão" in historico.columns:
 
@@ -98,49 +131,15 @@ def carregar_historico():
 
 def carregar_compra():
 
-    pasta = "COMPRA_TESTE"
-
-    dfs = []
-
-    if not os.path.exists(pasta):
-        return pd.DataFrame()
-
-    for arquivo in os.listdir(pasta):
-
-        caminho = os.path.join(
-            pasta,
-            arquivo
-        )
-
-        if arquivo.lower().endswith((".xlsx", ".xls")):
-
-            try:
-
-                df = pd.read_excel(
-                    caminho,
-                    header=2
-                )
-
-                df["Arquivo_Origem"] = arquivo
-
-                dfs.append(df)
-
-            except Exception:
-                pass
-
-    if len(dfs) == 0:
-        return pd.DataFrame()
-
-    compra = pd.concat(
-        dfs,
-        ignore_index=True
+    compra = carregar_pasta_excel(
+        "COMPRA_TESTE",
+        header=2
     )
 
-    compra.columns = (
-        compra.columns
-        .astype(str)
-        .str.strip()
-    )
+    if compra.empty:
+        return pd.DataFrame()
+
+    compra = limpar_colunas(compra)
 
     compra = compra.rename(
         columns={
@@ -157,14 +156,16 @@ def carregar_compra():
 def carregar_venda_rede():
 
     return carregar_pasta_excel(
-        "VENDA_FINAL_TESTE"
+        "VENDA_FINAL_TESTE",
+        header=0
     )
 
 
 def carregar_estoque():
 
     return carregar_pasta_excel(
-        "ESTOQUE_TESTE"
+        "ESTOQUE_TESTE",
+        header=0
     )
 
 
@@ -200,7 +201,12 @@ def identificar_rede(nome):
         "ARAÚJO": "Araujo",
         "DROGAL": "Drogal",
         "DROGASMIL": "Drogasmil",
-        "GLOBO": "Globo"
+        "GLOBO": "Globo",
+        "ZANOL": "Zanol e Thomaz",
+        "THOMAZ": "Zanol e Thomaz",
+        "TRIANGULO": "Triangulo",
+        "TRIÂNGULO": "Triangulo",
+        "BRASIFARMA": "Brasifarma"
     }
 
     for chave, rede in regras.items():
@@ -242,6 +248,7 @@ def identificar_rede(nome):
     resumo = nome_base
 
     for palavra in remover:
+
         resumo = resumo.replace(
             palavra,
             " "
@@ -281,7 +288,11 @@ def curva_abc(df):
         ["Ganho_Potencial"]
         .sum()
         .reset_index()
-        .rename(columns={produto_col: "Produto"})
+        .rename(
+            columns={
+                produto_col: "Produto"
+            }
+        )
         .sort_values(
             "Ganho_Potencial",
             ascending=False

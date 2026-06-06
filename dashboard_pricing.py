@@ -118,6 +118,27 @@ compra = carregar_compra()
 venda_rede = carregar_venda_rede()
 estoque = carregar_estoque()
 
+
+# --------------------------------------------------
+# DIAGNOSTICO DE BASES
+# --------------------------------------------------
+
+with st.sidebar.expander("Diagnóstico das bases"):
+
+    st.write("VENDA_TESTE:", historico.shape)
+    st.write("VENDA_FINAL_TESTE:", venda_rede.shape)
+    st.write("ESTOQUE_TESTE:", estoque.shape)
+
+    if not historico.empty:
+        st.write("Colunas mercado:", historico.columns.tolist())
+
+    if not venda_rede.empty:
+        st.write("Colunas venda rede:", venda_rede.columns.tolist())
+
+    if not estoque.empty:
+        st.write("Colunas estoque:", estoque.columns.tolist())
+
+
 # --------------------------------------------------
 # PADRONIZAR COLUNAS
 # --------------------------------------------------
