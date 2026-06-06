@@ -9,12 +9,17 @@ import plotly.express as px
 def moeda_br(valor):
 
     try:
+
+        if pd.isna(valor):
+            return ""
+
         return (
             f"R$ {float(valor):,.2f}"
             .replace(",", "X")
             .replace(".", ",")
             .replace("X", ".")
         )
+
     except Exception:
         return ""
 
@@ -22,12 +27,17 @@ def moeda_br(valor):
 def numero_br(valor):
 
     try:
+
+        if pd.isna(valor):
+            return ""
+
         return (
             f"{float(valor):,.2f}"
             .replace(",", "X")
             .replace(".", ",")
             .replace("X", ".")
         )
+
     except Exception:
         return ""
 
@@ -35,12 +45,17 @@ def numero_br(valor):
 def percentual_br(valor):
 
     try:
+
+        if pd.isna(valor):
+            return ""
+
         return (
             f"{float(valor):,.2f}%"
             .replace(",", "X")
             .replace(".", ",")
             .replace("X", ".")
         )
+
     except Exception:
         return ""
 
@@ -97,7 +112,7 @@ except:
     pass
 
 st.title(
-    "📊 Eirox Pricing Enterprise"
+    "📊 Eirox - Ferramenta de Inteligência de Pricing (consulta e comparação de preços concorrência)"
 )
 
 # --------------------------------------------------
@@ -790,48 +805,153 @@ with c1:
         df_filtrado["Recomendacao"] == recomendacao_selecionada
     ].copy()
 
-    if not produtos_recomendacao.empty:
+    if "EAN" in produtos_recomendacao.columns:
 
-        if "EAN" in produtos_recomendacao.columns:
+        produtos_recomendacao["EAN"] = (
+            produtos_recomendacao["EAN"]
+            .astype(str)
+            .str.replace(".0", "", regex=False)
+            .str.strip()
+        )
 
-            produtos_recomendacao["EAN"] = (
-                produtos_recomendacao["EAN"]
-                .astype(str)
-                .str.replace(".0", "", regex=False)
-                .str.strip()
+    # --------------------------------------------------
+    # CRUZAR COM SIMULADOR PELO EAN
+    # --------------------------------------------------
+
+    if (
+        "simulacao_global" in globals()
+        and not simulacao_global.empty
+        and "EAN" in produtos_recomendacao.columns
+    ):
+
+        simulador_base = simulacao_global.copy()
+
+        simulador_base["EAN"] = (
+            simulador_base["EAN"]
+            .astype(str)
+            .str.replace(".0", "", regex=False)
+            .str.strip()
+        )
+
+        cadastro_produtos = (
+            produtos_recomendacao
+            .drop_duplicates(
+                subset=[
+                    "EAN"
+                ]
             )
+            .copy()
+        )
 
-        # Enriquecer com os dados do simulador, quando disponíveis
-        if (
-            "simulacao_global" in globals()
-            and not simulacao_global.empty
-            and "EAN" in produtos_recomendacao.columns
-        ):
+        colunas_cadastro = []
 
-            simulador_cols = [
-                "EAN",
-                "Qtd_Vendida_Mes_Anterior",
-                "Venda_Preco_Antigo",
-                "Preco_Atual",
-                "Preco_Sugerido_Mercado",
-                "Venda_Projetada_Preco_Sugerido",
-                "Ganho_Unitario",
-                "Ganho_Potencial_Simulador"
-            ]
+        for coluna in [
+            "EAN",
+            "Descricao_Unica",
+            "Produto",
+            "Laboratório",
+            "Família",
+            "CURVA",
+            "Recomendacao",
+            "Margem_%",
+            "Lucro_Unitario",
+            "Preco_Medio"
+        ]:
 
-            simulador_cols = [
-                coluna
-                for coluna in simulador_cols
-                if coluna in simulacao_global.columns
-            ]
+            if coluna in cadastro_produtos.columns:
+                colunas_cadastro.append(coluna)
 
-            produtos_recomendacao = produtos_recomendacao.merge(
-                simulacao_global[simulador_cols],
-                on="EAN",
-                how="left"
-            )
+        produtos_detalhe = simulador_base.merge(
+            cadastro_produtos[colunas_cadastro],
+            on="EAN",
+            how="inner"
+        )
 
-        colunas_base = []
+        produtos_detalhe = produtos_detalhe.sort_values(
+            "Ganho_Potencial_Simulador",
+            ascending=False
+        )
+
+    else:
+
+        produtos_detalhe = pd.DataFrame()
+
+    if not produtos_detalhe.empty:
+
+        # --------------------------------------------------
+        # AJUSTES DE QUALIDADE DAS COLUNAS
+        # --------------------------------------------------
+
+        produtos_detalhe = produtos_detalhe.copy()
+
+        # Se existir Produto_Simulador, usa como descrição principal quando Produto estiver vazio
+        if "Produto_Simulador" in produtos_detalhe.columns:
+
+            if "Produto" not in produtos_detalhe.columns:
+
+                produtos_detalhe["Produto"] = produtos_detalhe["Produto_Simulador"]
+
+            else:
+
+                produtos_detalhe["Produto"] = (
+                    produtos_detalhe["Produto"]
+                    .fillna(produtos_detalhe["Produto_Simulador"])
+                )
+
+        # Trocar None/nan por vazio nas colunas textuais
+        for coluna in [
+            "Descricao_Unica",
+            "Produto",
+            "Laboratório",
+            "Família",
+            "CURVA",
+            "Recomendacao"
+        ]:
+
+            if coluna in produtos_detalhe.columns:
+
+                produtos_detalhe[coluna] = (
+                    produtos_detalhe[coluna]
+                    .fillna("")
+                    .astype(str)
+                    .replace(
+                        {
+                            "None": "",
+                            "nan": "",
+                            "NaN": ""
+                        }
+                    )
+                )
+
+        # Remove colunas cadastrais que vieram totalmente vazias
+        for coluna in [
+            "Laboratório",
+            "Família",
+            "CURVA",
+            "Margem_%",
+            "Lucro_Unitario"
+        ]:
+
+            if coluna in produtos_detalhe.columns:
+
+                serie_limpa = (
+                    produtos_detalhe[coluna]
+                    .replace("", pd.NA)
+                )
+
+                if serie_limpa.isna().all():
+
+                    produtos_detalhe = produtos_detalhe.drop(
+                        columns=[
+                            coluna
+                        ]
+                    )
+
+        # --------------------------------------------------
+        # COLUNAS PARA EXIBIÇÃO
+        # --------------------------------------------------
+
+        colunas_exibir = []
 
         for coluna in [
             "EAN",
@@ -848,18 +968,20 @@ with c1:
             "Venda_Projetada_Preco_Sugerido",
             "Ganho_Unitario",
             "Ganho_Potencial_Simulador",
-            "Ganho_Potencial",
             "Margem_%",
             "Lucro_Unitario",
             "Preco_Medio"
         ]:
 
-            if coluna in produtos_recomendacao.columns:
-                colunas_base.append(coluna)
+            if coluna in produtos_detalhe.columns:
+                colunas_exibir.append(coluna)
 
-        produtos_exibir = produtos_recomendacao[colunas_base].copy()
+        produtos_exibir = produtos_detalhe[colunas_exibir].copy()
 
-        # Formatar padrão Brasil
+        # --------------------------------------------------
+        # FORMATAR PADRÃO BRASIL
+        # --------------------------------------------------
+
         for coluna in [
             "Venda_Preco_Antigo",
             "Preco_Atual",
@@ -867,7 +989,6 @@ with c1:
             "Venda_Projetada_Preco_Sugerido",
             "Ganho_Unitario",
             "Ganho_Potencial_Simulador",
-            "Ganho_Potencial",
             "Lucro_Unitario",
             "Preco_Medio"
         ]:
@@ -884,13 +1005,31 @@ with c1:
                 .apply(numero_br)
             )
 
+        # Limpeza final para não exibir None/nan
+        produtos_exibir = (
+            produtos_exibir
+            .replace(
+                {
+                    "None": "",
+                    "nan": "",
+                    "NaN": "",
+                    "R$ nan": "",
+                    "nan%": ""
+                }
+            )
+            .fillna("")
+        )
+
         st.dataframe(
             produtos_exibir,
             width="stretch"
         )
 
-        # Exportação da recomendação selecionada
-        exportar_recomendacao = produtos_recomendacao[colunas_base].copy()
+        # --------------------------------------------------
+        # EXPORTAÇÃO DA RECOMENDAÇÃO
+        # --------------------------------------------------
+
+        exportar_recomendacao = produtos_detalhe[colunas_exibir].copy()
 
         for coluna in [
             "Venda_Preco_Antigo",
@@ -899,7 +1038,6 @@ with c1:
             "Venda_Projetada_Preco_Sugerido",
             "Ganho_Unitario",
             "Ganho_Potencial_Simulador",
-            "Ganho_Potencial",
             "Lucro_Unitario",
             "Preco_Medio"
         ]:
@@ -915,6 +1053,20 @@ with c1:
                 exportar_recomendacao["Qtd_Vendida_Mes_Anterior"]
                 .apply(numero_br)
             )
+
+        exportar_recomendacao = (
+            exportar_recomendacao
+            .replace(
+                {
+                    "None": "",
+                    "nan": "",
+                    "NaN": "",
+                    "R$ nan": "",
+                    "nan%": ""
+                }
+            )
+            .fillna("")
+        )
 
         csv_recomendacao = (
             exportar_recomendacao
@@ -935,8 +1087,9 @@ with c1:
 
     else:
 
-        st.info(
-            "Não há produtos para a recomendação selecionada."
+        st.warning(
+            "Não há produtos dessa recomendação com dados completos no Simulador. "
+            "Isso ocorre quando o EAN não existe na venda da rede ou não teve venda no período."
         )
 
 with c2:
@@ -1318,10 +1471,95 @@ if (
         "🗺️ Mapa Farmácias"
     )
 
-    st.map(
-        historico[
-            ["lat","lon"]
-        ].dropna()
+    mapa_df = historico.copy()
+
+    mapa_df["lat"] = pd.to_numeric(
+        mapa_df["lat"],
+        errors="coerce"
+    )
+
+    mapa_df["lon"] = pd.to_numeric(
+        mapa_df["lon"],
+        errors="coerce"
+    )
+
+    mapa_df = mapa_df.dropna(
+        subset=[
+            "lat",
+            "lon"
+        ]
+    )
+
+    mapa_df["Tipo_Loja"] = "Concorrência"
+
+    if "Farmácia" in mapa_df.columns:
+
+        nome_farmacia = (
+            mapa_df["Farmácia"]
+            .astype(str)
+            .str.upper()
+        )
+
+        mapa_df.loc[
+            nome_farmacia.str.contains(
+                "ZANOL E THOMAZ LTDA",
+                na=False
+            ),
+            "Tipo_Loja"
+        ] = "Zanol e Thomaz"
+
+        mapa_df.loc[
+            nome_farmacia.str.contains(
+                "TRIANGULO DROGARIA LTDA",
+                na=False
+            ),
+            "Tipo_Loja"
+        ] = "Triangulo Drogaria"
+
+    hover_cols = []
+
+    for coluna in [
+        "Farmácia",
+        "Produto",
+        "Preço (R$)",
+        "Rede",
+        "Data Emissão"
+    ]:
+
+        if coluna in mapa_df.columns:
+            hover_cols.append(coluna)
+
+    fig_mapa = px.scatter_mapbox(
+        mapa_df,
+        lat="lat",
+        lon="lon",
+        color="Tipo_Loja",
+        color_discrete_map={
+            "Concorrência": "red",
+            "Zanol e Thomaz": "yellow",
+            "Triangulo Drogaria": "blue"
+        },
+        hover_name="Farmácia" if "Farmácia" in mapa_df.columns else None,
+        hover_data=hover_cols,
+        zoom=11,
+        height=550
+    )
+
+    fig_mapa.update_layout(
+        mapbox_style="carto-darkmatter",
+        margin={
+            "r": 0,
+            "t": 0,
+            "l": 0,
+            "b": 0
+        },
+        legend_title_text="Tipo de Loja"
+    )
+
+    st.plotly_chart(
+        fig_mapa,
+        width="stretch",
+        key="mapa_farmacias_cores"
     )
 
 # --------------------------------------------------
