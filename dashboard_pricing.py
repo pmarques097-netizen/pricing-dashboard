@@ -118,27 +118,6 @@ compra = carregar_compra()
 venda_rede = carregar_venda_rede()
 estoque = carregar_estoque()
 
-
-# --------------------------------------------------
-# DIAGNOSTICO DE BASES
-# --------------------------------------------------
-
-with st.sidebar.expander("Diagnóstico das bases"):
-
-    st.write("VENDA_TESTE:", historico.shape)
-    st.write("VENDA_FINAL_TESTE:", venda_rede.shape)
-    st.write("ESTOQUE_TESTE:", estoque.shape)
-
-    if not historico.empty:
-        st.write("Colunas mercado:", historico.columns.tolist())
-
-    if not venda_rede.empty:
-        st.write("Colunas venda rede:", venda_rede.columns.tolist())
-
-    if not estoque.empty:
-        st.write("Colunas estoque:", estoque.columns.tolist())
-
-
 # --------------------------------------------------
 # PADRONIZAR COLUNAS
 # --------------------------------------------------
@@ -760,7 +739,7 @@ st.subheader(
 abc = curva_abc(df_filtrado)
 
 # --------------------------------------------------
-# MENOR PREÇO, REDE E FARMÁCIA POR DESCRIÇÃO ÚNICA
+# MENOR PREÇO, REDE, FARMÁCIA E DATA DA PESQUISA
 # --------------------------------------------------
 
 if (
@@ -773,15 +752,28 @@ if (
 
     hist_abc = historico.copy()
 
-    hist_abc["Rede"] = (
-        hist_abc["Farmácia"]
-        .apply(identificar_rede)
-    )
+    if "Rede" not in hist_abc.columns:
+        hist_abc["Rede"] = (
+            hist_abc["Farmácia"]
+            .apply(identificar_rede)
+        )
 
     hist_abc["Preço (R$)"] = pd.to_numeric(
         hist_abc["Preço (R$)"],
         errors="coerce"
     )
+
+    if "Data Emissão" in hist_abc.columns:
+
+        hist_abc["Data Emissão"] = pd.to_datetime(
+            hist_abc["Data Emissão"],
+            errors="coerce",
+            dayfirst=True
+        )
+
+    else:
+
+        hist_abc["Data Emissão"] = pd.NaT
 
     hist_abc = hist_abc.dropna(
         subset=[
@@ -805,7 +797,8 @@ if (
                 "Descricao_Unica",
                 "Preço (R$)",
                 "Rede",
-                "Farmácia"
+                "Farmácia",
+                "Data Emissão"
             ]
         ]
         .rename(
@@ -813,7 +806,8 @@ if (
                 "Descricao_Unica": "Produto",
                 "Preço (R$)": "Menor_Preco",
                 "Rede": "Rede_Menor_Preco",
-                "Farmácia": "Farmacia_Menor_Preco"
+                "Farmácia": "Farmacia_Menor_Preco",
+                "Data Emissão": "Data_Pesquisa"
             }
         )
     )
@@ -831,7 +825,8 @@ if (
 for coluna in [
     "Menor_Preco",
     "Rede_Menor_Preco",
-    "Farmacia_Menor_Preco"
+    "Farmacia_Menor_Preco",
+    "Data_Pesquisa"
 ]:
 
     if coluna not in abc.columns:
@@ -843,23 +838,17 @@ for coluna in [
 
 if "Ganho_Potencial" in abc.columns:
 
-    abc["Ganho_Potencial"] = (
-        pd.to_numeric(
-            abc["Ganho_Potencial"],
-            errors="coerce"
-        )
-        .round(2)
-    )
+    abc["Ganho_Potencial"] = pd.to_numeric(
+        abc["Ganho_Potencial"],
+        errors="coerce"
+    ).round(2)
 
 if "Menor_Preco" in abc.columns:
 
-    abc["Menor_Preco"] = (
-        pd.to_numeric(
-            abc["Menor_Preco"],
-            errors="coerce"
-        )
-        .round(2)
-    )
+    abc["Menor_Preco"] = pd.to_numeric(
+        abc["Menor_Preco"],
+        errors="coerce"
+    ).round(2)
 
 if "Perc_Acum" in abc.columns:
 
@@ -872,19 +861,39 @@ if "Perc_Acum" in abc.columns:
     ).round(2)
 
 # --------------------------------------------------
-# EXIBIÇÃO
+# EXIBIÇÃO BRASIL
 # --------------------------------------------------
 
 abc_exibir = abc.copy()
 
 if "Ganho_Potencial" in abc_exibir.columns:
-    abc_exibir["Ganho_Potencial"] = abc_exibir["Ganho_Potencial"].apply(moeda_br)
+    abc_exibir["Ganho_Potencial"] = (
+        abc_exibir["Ganho_Potencial"]
+        .apply(moeda_br)
+    )
 
 if "Menor_Preco" in abc_exibir.columns:
-    abc_exibir["Menor_Preco"] = abc_exibir["Menor_Preco"].apply(moeda_br)
+    abc_exibir["Menor_Preco"] = (
+        abc_exibir["Menor_Preco"]
+        .apply(moeda_br)
+    )
 
 if "Perc_Acum" in abc_exibir.columns:
-    abc_exibir["Perc_Acum"] = abc_exibir["Perc_Acum"].apply(percentual_br)
+    abc_exibir["Perc_Acum"] = (
+        abc_exibir["Perc_Acum"]
+        .apply(percentual_br)
+    )
+
+if "Data_Pesquisa" in abc_exibir.columns:
+    abc_exibir["Data_Pesquisa"] = (
+        pd.to_datetime(
+            abc_exibir["Data_Pesquisa"],
+            errors="coerce",
+            dayfirst=True
+        )
+        .dt.strftime("%d/%m/%Y")
+        .fillna("")
+    )
 
 st.dataframe(
     abc_exibir[
@@ -894,6 +903,7 @@ st.dataframe(
             "Menor_Preco",
             "Rede_Menor_Preco",
             "Farmacia_Menor_Preco",
+            "Data_Pesquisa",
             "Perc_Acum",
             "ABC"
         ]
