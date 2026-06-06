@@ -2,6 +2,29 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
+
+st.markdown(
+    """
+    <style>
+        .block-container {
+            max-width: 100% !important;
+            padding-left: 1.5rem !important;
+            padding-right: 1.5rem !important;
+        }
+
+        div[data-testid="stDataFrame"] {
+            width: 100% !important;
+        }
+
+        div[data-testid="stDataFrame"] > div {
+            width: 100% !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
 # --------------------------------------------------
 # FORMATACAO BRASIL
 # --------------------------------------------------
@@ -79,6 +102,24 @@ st.set_page_config(
 )
 
 # --------------------------------------------------
+
+st.markdown(
+    """
+    <style>
+        .block-container {
+            max-width: 100% !important;
+            padding-left: 1.5rem !important;
+            padding-right: 1.5rem !important;
+        }
+
+        div[data-testid="stDataFrame"] {
+            width: 100% !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # CSS
 # --------------------------------------------------
 
@@ -111,9 +152,23 @@ try:
 except:
     pass
 
-st.title(
-    "📊 Eirox - Ferramenta de Inteligência de Pricing (consulta e comparação de preços concorrência)"
+st.markdown(
+    """
+    <h1 style='margin-bottom:0px;'>
+        📊 Eirox - Ferramenta de Inteligência de Pricing
+    </h1>
+
+    <h4 style='
+        margin-top:0px;
+        color:#B0B0B0;
+        font-weight:400;
+    '>
+        Consulta e comparação de preços concorrência
+    </h4>
+    """,
+    unsafe_allow_html=True
 )
+
 
 # --------------------------------------------------
 # DADOS
@@ -564,6 +619,17 @@ if not simulacao_global.empty and "EAN" in df.columns:
 # FILTROS
 # --------------------------------------------------
 
+try:
+
+    st.sidebar.image(
+        "logo eirox.png",
+        width=220
+    )
+
+except Exception:
+
+    pass
+
 st.sidebar.header("Filtros")
 
 laboratorio = st.sidebar.multiselect(
@@ -725,373 +791,6 @@ with c1:
         key="grafico_recomendacoes"
     )
 
-    # Ações recomendadas
-    st.subheader(
-        "📋 Ações Recomendadas"
-    )
-
-    acoes = {
-        "SUBIR PREÇO URGENTE":
-            "Produtos muito abaixo do mercado. Reajustar imediatamente.",
-        "SUBIR PREÇO":
-            "Produtos abaixo do mercado com oportunidade de ganho.",
-        "MANTER":
-            "Preço alinhado ao mercado. Monitorar concorrência.",
-        "COMPETITIVO":
-            "Preço agressivo. Avaliar margem e estratégia comercial.",
-        "ANALISAR REDUÇÃO":
-            "Preço elevado frente ao mercado. Revisar posicionamento.",
-        "SEM CUSTO":
-            "Produto sem custo cadastrado. Necessário saneamento do cadastro."
-    }
-
-    acoes_df = rec.copy()
-
-    acoes_df["Ação Recomendada"] = (
-        acoes_df["Recomendacao"]
-        .map(acoes)
-    )
-
-    # Quadro interativo de recomendações
-    selecao_recomendacao = st.dataframe(
-        acoes_df[
-            [
-                "Recomendacao",
-                "Quantidade",
-                "Ação Recomendada"
-            ]
-        ],
-        width="stretch",
-        key="tabela_acoes_recomendadas",
-        on_select="rerun",
-        selection_mode="single-row"
-    )
-
-    recomendacao_selecionada = None
-
-    try:
-
-        linhas_selecionadas = (
-            selecao_recomendacao
-            .selection
-            .rows
-        )
-
-        if linhas_selecionadas:
-
-            recomendacao_selecionada = (
-                acoes_df
-                .iloc[linhas_selecionadas[0]]
-                ["Recomendacao"]
-            )
-
-    except Exception:
-
-        recomendacao_selecionada = None
-
-    if recomendacao_selecionada is None:
-
-        recomendacao_selecionada = st.selectbox(
-            "Selecione a recomendação para detalhar",
-            acoes_df["Recomendacao"].tolist(),
-            key="select_recomendacao_detalhe"
-        )
-
-    st.subheader(
-        f"🔎 Produtos da recomendação: {recomendacao_selecionada}"
-    )
-
-    produtos_recomendacao = df_filtrado[
-        df_filtrado["Recomendacao"] == recomendacao_selecionada
-    ].copy()
-
-    if "EAN" in produtos_recomendacao.columns:
-
-        produtos_recomendacao["EAN"] = (
-            produtos_recomendacao["EAN"]
-            .astype(str)
-            .str.replace(".0", "", regex=False)
-            .str.strip()
-        )
-
-    # --------------------------------------------------
-    # CRUZAR COM SIMULADOR PELO EAN
-    # --------------------------------------------------
-
-    if (
-        "simulacao_global" in globals()
-        and not simulacao_global.empty
-        and "EAN" in produtos_recomendacao.columns
-    ):
-
-        simulador_base = simulacao_global.copy()
-
-        simulador_base["EAN"] = (
-            simulador_base["EAN"]
-            .astype(str)
-            .str.replace(".0", "", regex=False)
-            .str.strip()
-        )
-
-        cadastro_produtos = (
-            produtos_recomendacao
-            .drop_duplicates(
-                subset=[
-                    "EAN"
-                ]
-            )
-            .copy()
-        )
-
-        colunas_cadastro = []
-
-        for coluna in [
-            "EAN",
-            "Descricao_Unica",
-            "Produto",
-            "Laboratório",
-            "Família",
-            "CURVA",
-            "Recomendacao",
-            "Margem_%",
-            "Lucro_Unitario",
-            "Preco_Medio"
-        ]:
-
-            if coluna in cadastro_produtos.columns:
-                colunas_cadastro.append(coluna)
-
-        produtos_detalhe = simulador_base.merge(
-            cadastro_produtos[colunas_cadastro],
-            on="EAN",
-            how="inner"
-        )
-
-        produtos_detalhe = produtos_detalhe.sort_values(
-            "Ganho_Potencial_Simulador",
-            ascending=False
-        )
-
-    else:
-
-        produtos_detalhe = pd.DataFrame()
-
-    if not produtos_detalhe.empty:
-
-        # --------------------------------------------------
-        # AJUSTES DE QUALIDADE DAS COLUNAS
-        # --------------------------------------------------
-
-        produtos_detalhe = produtos_detalhe.copy()
-
-        # Se existir Produto_Simulador, usa como descrição principal quando Produto estiver vazio
-        if "Produto_Simulador" in produtos_detalhe.columns:
-
-            if "Produto" not in produtos_detalhe.columns:
-
-                produtos_detalhe["Produto"] = produtos_detalhe["Produto_Simulador"]
-
-            else:
-
-                produtos_detalhe["Produto"] = (
-                    produtos_detalhe["Produto"]
-                    .fillna(produtos_detalhe["Produto_Simulador"])
-                )
-
-        # Trocar None/nan por vazio nas colunas textuais
-        for coluna in [
-            "Descricao_Unica",
-            "Produto",
-            "Laboratório",
-            "Família",
-            "CURVA",
-            "Recomendacao"
-        ]:
-
-            if coluna in produtos_detalhe.columns:
-
-                produtos_detalhe[coluna] = (
-                    produtos_detalhe[coluna]
-                    .fillna("")
-                    .astype(str)
-                    .replace(
-                        {
-                            "None": "",
-                            "nan": "",
-                            "NaN": ""
-                        }
-                    )
-                )
-
-        # Remove colunas cadastrais que vieram totalmente vazias
-        for coluna in [
-            "Laboratório",
-            "Família",
-            "CURVA",
-            "Margem_%",
-            "Lucro_Unitario"
-        ]:
-
-            if coluna in produtos_detalhe.columns:
-
-                serie_limpa = (
-                    produtos_detalhe[coluna]
-                    .replace("", pd.NA)
-                )
-
-                if serie_limpa.isna().all():
-
-                    produtos_detalhe = produtos_detalhe.drop(
-                        columns=[
-                            coluna
-                        ]
-                    )
-
-        # --------------------------------------------------
-        # COLUNAS PARA EXIBIÇÃO
-        # --------------------------------------------------
-
-        colunas_exibir = []
-
-        for coluna in [
-            "EAN",
-            "Descricao_Unica",
-            "Produto",
-            "Laboratório",
-            "Família",
-            "CURVA",
-            "Recomendacao",
-            "Qtd_Vendida_Mes_Anterior",
-            "Venda_Preco_Antigo",
-            "Preco_Atual",
-            "Preco_Sugerido_Mercado",
-            "Venda_Projetada_Preco_Sugerido",
-            "Ganho_Unitario",
-            "Ganho_Potencial_Simulador",
-            "Margem_%",
-            "Lucro_Unitario",
-            "Preco_Medio"
-        ]:
-
-            if coluna in produtos_detalhe.columns:
-                colunas_exibir.append(coluna)
-
-        produtos_exibir = produtos_detalhe[colunas_exibir].copy()
-
-        # --------------------------------------------------
-        # FORMATAR PADRÃO BRASIL
-        # --------------------------------------------------
-
-        for coluna in [
-            "Venda_Preco_Antigo",
-            "Preco_Atual",
-            "Preco_Sugerido_Mercado",
-            "Venda_Projetada_Preco_Sugerido",
-            "Ganho_Unitario",
-            "Ganho_Potencial_Simulador",
-            "Lucro_Unitario",
-            "Preco_Medio"
-        ]:
-
-            if coluna in produtos_exibir.columns:
-                produtos_exibir[coluna] = produtos_exibir[coluna].apply(moeda_br)
-
-        if "Margem_%" in produtos_exibir.columns:
-            produtos_exibir["Margem_%"] = produtos_exibir["Margem_%"].apply(percentual_br)
-
-        if "Qtd_Vendida_Mes_Anterior" in produtos_exibir.columns:
-            produtos_exibir["Qtd_Vendida_Mes_Anterior"] = (
-                produtos_exibir["Qtd_Vendida_Mes_Anterior"]
-                .apply(numero_br)
-            )
-
-        # Limpeza final para não exibir None/nan
-        produtos_exibir = (
-            produtos_exibir
-            .replace(
-                {
-                    "None": "",
-                    "nan": "",
-                    "NaN": "",
-                    "R$ nan": "",
-                    "nan%": ""
-                }
-            )
-            .fillna("")
-        )
-
-        st.dataframe(
-            produtos_exibir,
-            width="stretch"
-        )
-
-        # --------------------------------------------------
-        # EXPORTAÇÃO DA RECOMENDAÇÃO
-        # --------------------------------------------------
-
-        exportar_recomendacao = produtos_detalhe[colunas_exibir].copy()
-
-        for coluna in [
-            "Venda_Preco_Antigo",
-            "Preco_Atual",
-            "Preco_Sugerido_Mercado",
-            "Venda_Projetada_Preco_Sugerido",
-            "Ganho_Unitario",
-            "Ganho_Potencial_Simulador",
-            "Lucro_Unitario",
-            "Preco_Medio"
-        ]:
-
-            if coluna in exportar_recomendacao.columns:
-                exportar_recomendacao[coluna] = exportar_recomendacao[coluna].apply(moeda_br)
-
-        if "Margem_%" in exportar_recomendacao.columns:
-            exportar_recomendacao["Margem_%"] = exportar_recomendacao["Margem_%"].apply(percentual_br)
-
-        if "Qtd_Vendida_Mes_Anterior" in exportar_recomendacao.columns:
-            exportar_recomendacao["Qtd_Vendida_Mes_Anterior"] = (
-                exportar_recomendacao["Qtd_Vendida_Mes_Anterior"]
-                .apply(numero_br)
-            )
-
-        exportar_recomendacao = (
-            exportar_recomendacao
-            .replace(
-                {
-                    "None": "",
-                    "nan": "",
-                    "NaN": "",
-                    "R$ nan": "",
-                    "nan%": ""
-                }
-            )
-            .fillna("")
-        )
-
-        csv_recomendacao = (
-            exportar_recomendacao
-            .to_csv(
-                index=False,
-                sep=";"
-            )
-            .encode("utf-8-sig")
-        )
-
-        st.download_button(
-            "📥 Exportar produtos da recomendação",
-            csv_recomendacao,
-            f"produtos_{recomendacao_selecionada.lower().replace(' ', '_')}.csv",
-            "text/csv",
-            key="exportar_recomendacao"
-        )
-
-    else:
-
-        st.warning(
-            "Não há produtos dessa recomendação com dados completos no Simulador. "
-            "Isso ocorre quando o EAN não existe na venda da rede ou não teve venda no período."
-        )
-
 with c2:
 
     top_lab = (
@@ -1121,6 +820,487 @@ with c2:
     )
 
 # --------------------------------------------------
+
+# Ações recomendadas
+st.subheader(
+    "📋 Ações Recomendadas"
+)
+
+acoes = {
+    "SUBIR PREÇO URGENTE":
+        "Produtos muito abaixo do mercado. Reajustar imediatamente.",
+    "SUBIR PREÇO":
+        "Produtos abaixo do mercado com oportunidade de ganho.",
+    "MANTER":
+        "Preço alinhado ao mercado. Monitorar concorrência.",
+    "COMPETITIVO":
+        "Preço agressivo. Avaliar margem e estratégia comercial.",
+    "ANALISAR REDUÇÃO":
+        "Preço elevado frente ao mercado. Revisar posicionamento.",
+    "SEM CUSTO":
+        "Produto sem custo cadastrado. Necessário saneamento do cadastro."
+}
+
+acoes_df = rec.copy()
+
+acoes_df["Ação Recomendada"] = (
+    acoes_df["Recomendacao"]
+    .map(acoes)
+)
+
+# Quadro interativo de recomendações
+selecao_recomendacao = st.dataframe(
+    acoes_df[
+        [
+            "Recomendacao",
+            "Quantidade",
+            "Ação Recomendada"
+        ]
+    ],
+    width="stretch",
+    key="tabela_acoes_recomendadas",
+    on_select="rerun",
+    selection_mode="single-row"
+)
+
+recomendacao_selecionada = None
+
+try:
+
+    linhas_selecionadas = (
+        selecao_recomendacao
+        .selection
+        .rows
+    )
+
+    if linhas_selecionadas:
+
+        recomendacao_selecionada = (
+            acoes_df
+            .iloc[linhas_selecionadas[0]]
+            ["Recomendacao"]
+        )
+
+except Exception:
+
+    recomendacao_selecionada = None
+
+if recomendacao_selecionada is None:
+
+    lista_recomendacoes = acoes_df["Recomendacao"].tolist()
+
+    indice_recomendacao_padrao = 0
+
+    if "SUBIR PREÇO" in lista_recomendacoes:
+        indice_recomendacao_padrao = lista_recomendacoes.index("SUBIR PREÇO")
+
+    recomendacao_selecionada = st.selectbox(
+        "Selecione a recomendação para detalhar",
+        lista_recomendacoes,
+        index=indice_recomendacao_padrao,
+        key="select_recomendacao_detalhe"
+    )
+
+st.subheader(
+    f"🔎 Produtos da recomendação: {recomendacao_selecionada}"
+)
+
+produtos_recomendacao = df_filtrado[
+    df_filtrado["Recomendacao"] == recomendacao_selecionada
+].copy()
+
+if "EAN" in produtos_recomendacao.columns:
+
+    produtos_recomendacao["EAN"] = (
+        produtos_recomendacao["EAN"]
+        .astype(str)
+        .str.replace(".0", "", regex=False)
+        .str.strip()
+    )
+
+# --------------------------------------------------
+# CRUZAR COM SIMULADOR PELO EAN
+# --------------------------------------------------
+
+if (
+    "simulacao_global" in globals()
+    and not simulacao_global.empty
+    and "EAN" in produtos_recomendacao.columns
+):
+
+    simulador_base = simulacao_global.copy()
+
+    simulador_base["EAN"] = (
+        simulador_base["EAN"]
+        .astype(str)
+        .str.replace(".0", "", regex=False)
+        .str.strip()
+    )
+
+    cadastro_produtos = (
+        produtos_recomendacao
+        .drop_duplicates(
+            subset=[
+                "EAN"
+            ]
+        )
+        .copy()
+    )
+
+    colunas_cadastro = []
+
+    for coluna in [
+        "EAN",
+        "Descricao_Unica",
+        "Produto",
+        "Laboratório",
+        "Família",
+        "CURVA",
+        "Recomendacao",
+        "Margem_%",
+        "Lucro_Unitario",
+        "Preco_Medio"
+    ]:
+
+        if coluna in cadastro_produtos.columns:
+            colunas_cadastro.append(coluna)
+
+    produtos_detalhe = simulador_base.merge(
+        cadastro_produtos[colunas_cadastro],
+        on="EAN",
+        how="inner"
+    )
+
+    # --------------------------------------------------
+    # MENOR PREÇO E LOJA COM MENOR PREÇO
+    # --------------------------------------------------
+
+    if (
+        not historico.empty
+        and "Preço (R$)" in historico.columns
+        and "Farmácia" in historico.columns
+    ):
+
+        hist_menor = historico.copy()
+
+        if "EAN" not in hist_menor.columns and "EAN (GTIN)" in hist_menor.columns:
+            hist_menor["EAN"] = hist_menor["EAN (GTIN)"]
+
+        if "EAN" in hist_menor.columns:
+
+            hist_menor["EAN"] = (
+                hist_menor["EAN"]
+                .astype(str)
+                .str.replace(".0", "", regex=False)
+                .str.strip()
+            )
+
+            hist_menor["Preço (R$)"] = pd.to_numeric(
+                hist_menor["Preço (R$)"],
+                errors="coerce"
+            )
+
+            hist_menor = hist_menor.dropna(
+                subset=[
+                    "EAN",
+                    "Preço (R$)"
+                ]
+            )
+
+            idx_menor_preco = (
+                hist_menor
+                .groupby("EAN")
+                ["Preço (R$)"]
+                .idxmin()
+            )
+
+            menor_preco_loja = (
+                hist_menor
+                .loc[
+                    idx_menor_preco,
+                    [
+                        "EAN",
+                        "Preço (R$)",
+                        "Farmácia"
+                    ]
+                ]
+                .rename(
+                    columns={
+                        "Preço (R$)": "Menor_Preco",
+                        "Farmácia": "Loja_Menor_Preco"
+                    }
+                )
+            )
+
+            produtos_detalhe = produtos_detalhe.merge(
+                menor_preco_loja,
+                on="EAN",
+                how="left"
+            )
+
+    produtos_detalhe = produtos_detalhe.sort_values(
+        "Ganho_Potencial_Simulador",
+        ascending=False
+    )
+
+else:
+
+    produtos_detalhe = pd.DataFrame()
+
+if not produtos_detalhe.empty:
+
+    # --------------------------------------------------
+    # AJUSTES DE QUALIDADE DAS COLUNAS
+    # --------------------------------------------------
+
+    produtos_detalhe = produtos_detalhe.copy()
+
+    # Se existir Produto_Simulador, usa como descrição principal quando Produto estiver vazio
+    if "Produto_Simulador" in produtos_detalhe.columns:
+
+        if "Produto" not in produtos_detalhe.columns:
+
+            produtos_detalhe["Produto"] = produtos_detalhe["Produto_Simulador"]
+
+        else:
+
+            produtos_detalhe["Produto"] = (
+                produtos_detalhe["Produto"]
+                .fillna(produtos_detalhe["Produto_Simulador"])
+            )
+
+    # Trocar None/nan por vazio nas colunas textuais
+    for coluna in [
+        "Descricao_Unica",
+        "Produto",
+        "Laboratório",
+        "Família",
+        "CURVA",
+        "Recomendacao"
+    ]:
+
+        if coluna in produtos_detalhe.columns:
+
+            produtos_detalhe[coluna] = (
+                produtos_detalhe[coluna]
+                .fillna("")
+                .astype(str)
+                .replace(
+                    {
+                        "None": "",
+                        "nan": "",
+                        "NaN": ""
+                    }
+                )
+            )
+
+    # Remove colunas cadastrais que vieram totalmente vazias
+    for coluna in [
+        "Laboratório",
+        "Família",
+        "CURVA",
+        "Margem_%",
+        "Lucro_Unitario"
+    ]:
+
+        if coluna in produtos_detalhe.columns:
+
+            serie_limpa = (
+                produtos_detalhe[coluna]
+                .replace("", pd.NA)
+            )
+
+            if serie_limpa.isna().all():
+
+                produtos_detalhe = produtos_detalhe.drop(
+                    columns=[
+                        coluna
+                    ]
+                )
+
+    # --------------------------------------------------
+    # COLUNAS PARA EXIBIÇÃO
+    # --------------------------------------------------
+
+    colunas_exibir = []
+
+    for coluna in [
+        "EAN",
+        "Produto",
+        "Laboratório",
+        "Família",
+        "CURVA",
+        "Recomendacao",
+        "Qtd_Vendida_Mes_Anterior",
+        "Venda_Preco_Antigo",
+        "Preco_Atual",
+        "Preco_Sugerido_Mercado",
+        "Venda_Projetada_Preco_Sugerido",
+        "Ganho_Unitario",
+        "Ganho_Potencial_Simulador",
+        "Menor_Preco",
+        "Loja_Menor_Preco",
+        "Margem_%",
+        "Lucro_Unitario",
+        "Preco_Medio"
+    ]:
+
+        if coluna in produtos_detalhe.columns:
+            colunas_exibir.append(coluna)
+
+    produtos_exibir = produtos_detalhe[colunas_exibir].copy()
+
+    # --------------------------------------------------
+    # FORMATAR PADRÃO BRASIL
+    # --------------------------------------------------
+
+    for coluna in [
+        "Venda_Preco_Antigo",
+        "Preco_Atual",
+        "Preco_Sugerido_Mercado",
+        "Venda_Projetada_Preco_Sugerido",
+        "Ganho_Unitario",
+        "Ganho_Potencial_Simulador",
+        "Menor_Preco",
+        "Lucro_Unitario",
+        "Preco_Medio"
+    ]:
+
+        if coluna in produtos_exibir.columns:
+            produtos_exibir[coluna] = produtos_exibir[coluna].apply(moeda_br)
+
+    if "Margem_%" in produtos_exibir.columns:
+        produtos_exibir["Margem_%"] = produtos_exibir["Margem_%"].apply(percentual_br)
+
+    if "Qtd_Vendida_Mes_Anterior" in produtos_exibir.columns:
+        produtos_exibir["Qtd_Vendida_Mes_Anterior"] = (
+            produtos_exibir["Qtd_Vendida_Mes_Anterior"]
+            .apply(numero_br)
+        )
+
+    # Limpeza final para não exibir None/nan
+    produtos_exibir = (
+        produtos_exibir
+        .replace(
+            {
+                "None": "",
+                "nan": "",
+                "NaN": "",
+                "R$ nan": "",
+                "nan%": ""
+            }
+        )
+        .fillna("")
+    )
+
+    produtos_exibir = produtos_exibir.rename(
+        columns={
+            "Preco_Atual": "Preço Atual",
+            "Preco_Sugerido_Mercado": "Preço Sugerido Mercado",
+            "Venda_Preco_Antigo": "Venda Preço Antigo",
+            "Venda_Projetada_Preco_Sugerido": "Venda Projetada Preço Sugerido",
+            "Ganho_Unitario": "Ganho Unitário",
+            "Ganho_Potencial_Simulador": "Ganho Produto",
+            "Menor_Preco": "Menor Preço",
+            "Loja_Menor_Preco": "Loja Menor Preço",
+            "Qtd_Vendida_Mes_Anterior": "Qtd Vendida Mês Anterior",
+            "Preco_Medio": "Preço Médio",
+            "Margem_%": "Margem %",
+            "Lucro_Unitario": "Lucro Unitário"
+        }
+    )
+
+    st.dataframe(
+        produtos_exibir,
+        use_container_width=True,
+        height=420
+    )
+
+    # --------------------------------------------------
+    # EXPORTAÇÃO DA RECOMENDAÇÃO
+    # --------------------------------------------------
+
+    exportar_recomendacao = produtos_detalhe[colunas_exibir].copy()
+
+    for coluna in [
+        "Venda_Preco_Antigo",
+        "Preco_Atual",
+        "Preco_Sugerido_Mercado",
+        "Venda_Projetada_Preco_Sugerido",
+        "Ganho_Unitario",
+        "Ganho_Potencial_Simulador",
+        "Menor_Preco",
+        "Lucro_Unitario",
+        "Preco_Medio"
+    ]:
+
+        if coluna in exportar_recomendacao.columns:
+            exportar_recomendacao[coluna] = exportar_recomendacao[coluna].apply(moeda_br)
+
+    if "Margem_%" in exportar_recomendacao.columns:
+        exportar_recomendacao["Margem_%"] = exportar_recomendacao["Margem_%"].apply(percentual_br)
+
+    if "Qtd_Vendida_Mes_Anterior" in exportar_recomendacao.columns:
+        exportar_recomendacao["Qtd_Vendida_Mes_Anterior"] = (
+            exportar_recomendacao["Qtd_Vendida_Mes_Anterior"]
+            .apply(numero_br)
+        )
+
+    exportar_recomendacao = (
+        exportar_recomendacao
+        .replace(
+            {
+                "None": "",
+                "nan": "",
+                "NaN": "",
+                "R$ nan": "",
+                "nan%": ""
+            }
+        )
+        .fillna("")
+    )
+
+    exportar_recomendacao = exportar_recomendacao.rename(
+        columns={
+            "Preco_Atual": "Preço Atual",
+            "Preco_Sugerido_Mercado": "Preço Sugerido Mercado",
+            "Venda_Preco_Antigo": "Venda Preço Antigo",
+            "Venda_Projetada_Preco_Sugerido": "Venda Projetada Preço Sugerido",
+            "Ganho_Unitario": "Ganho Unitário",
+            "Ganho_Potencial_Simulador": "Ganho Produto",
+            "Menor_Preco": "Menor Preço",
+            "Loja_Menor_Preco": "Loja Menor Preço",
+            "Qtd_Vendida_Mes_Anterior": "Qtd Vendida Mês Anterior",
+            "Preco_Medio": "Preço Médio",
+            "Margem_%": "Margem %",
+            "Lucro_Unitario": "Lucro Unitário"
+        }
+    )
+
+    csv_recomendacao = (
+        exportar_recomendacao
+        .to_csv(
+            index=False,
+            sep=";"
+        )
+        .encode("utf-8-sig")
+    )
+
+    st.download_button(
+        "📥 Exportar produtos da recomendação",
+        csv_recomendacao,
+        f"produtos_{recomendacao_selecionada.lower().replace(' ', '_')}.csv",
+        "text/csv",
+        key="exportar_recomendacao"
+    )
+
+else:
+
+    st.warning(
+        "Não há produtos dessa recomendação com dados completos no Simulador. "
+        "Isso ocorre quando o EAN não existe na venda da rede ou não teve venda no período."
+    )
+
 # CURVA ABC
 # --------------------------------------------------
 
@@ -1341,31 +1521,146 @@ st.dataframe(
 )
 
 # --------------------------------------------------
-# HEATMAP
+# MAPA DE CALOR - MARCAS E BAIRROS POR QUANTIDADE DE PESQUISAS
 # --------------------------------------------------
 
 st.subheader(
-    "🔥 Heatmap"
+    "🔥 Mapa de calor"
 )
 
-heat = pd.pivot_table(
-    df_filtrado,
-    values="Ganho_Potencial",
-    index="Família",
-    columns="Laboratório",
-    aggfunc="sum"
-).fillna(0)
+# --------------------------------------------------
+# MAPA DE CALOR POR MARCA
+# --------------------------------------------------
 
-fig = px.imshow(
-    heat,
-    aspect="auto"
-)
+if "Família" in df_filtrado.columns:
 
-st.plotly_chart(
-    fig,
-    width="stretch",
-    key="heatmap"
-)
+    heat_marcas = (
+        df_filtrado
+        .groupby("Família")
+        .size()
+        .reset_index(name="Quantidade_Pesquisas")
+        .sort_values(
+            "Quantidade_Pesquisas",
+            ascending=False
+        )
+        .head(40)
+    )
+
+    heat_marcas["Grupo"] = "Marcas"
+
+    heat_pivot = heat_marcas.pivot_table(
+        values="Quantidade_Pesquisas",
+        index="Grupo",
+        columns="Família",
+        aggfunc="sum",
+        fill_value=0
+    )
+
+    fig = px.imshow(
+        heat_pivot,
+        aspect="auto",
+        text_auto=True,
+        labels={
+            "x": "Marca",
+            "y": "",
+            "color": "Quantidade de Pesquisas"
+        },
+        title="Top 40 Marcas por Quantidade de Pesquisas"
+    )
+
+    fig.update_layout(
+        height=420,
+        xaxis_tickangle=-90,
+        margin={
+            "l": 20,
+            "r": 20,
+            "t": 60,
+            "b": 120
+        }
+    )
+
+    st.plotly_chart(
+        fig,
+        width="stretch",
+        key="heatmap_marcas_quantidade"
+    )
+
+else:
+
+    st.warning(
+        "A coluna Família/Marca não foi encontrada para montar o mapa de calor por marca."
+    )
+
+# --------------------------------------------------
+# MAPA DE CALOR POR BAIRRO
+# --------------------------------------------------
+
+if (
+    not historico.empty
+    and "Bairro" in historico.columns
+):
+
+    heat_bairros = (
+        historico
+        .dropna(
+            subset=[
+                "Bairro"
+            ]
+        )
+        .groupby("Bairro")
+        .size()
+        .reset_index(name="Quantidade_Pesquisas")
+        .sort_values(
+            "Quantidade_Pesquisas",
+            ascending=False
+        )
+        .head(40)
+    )
+
+    heat_bairros["Grupo"] = "Bairros"
+
+    heat_bairros_pivot = heat_bairros.pivot_table(
+        values="Quantidade_Pesquisas",
+        index="Grupo",
+        columns="Bairro",
+        aggfunc="sum",
+        fill_value=0
+    )
+
+    fig_bairro = px.imshow(
+        heat_bairros_pivot,
+        aspect="auto",
+        text_auto=True,
+        labels={
+            "x": "Bairro",
+            "y": "",
+            "color": "Quantidade de Pesquisas"
+        },
+        title="Top 40 Bairros por Quantidade de Pesquisas"
+    )
+
+    fig_bairro.update_layout(
+        height=420,
+        xaxis_tickangle=-90,
+        margin={
+            "l": 20,
+            "r": 20,
+            "t": 60,
+            "b": 120
+        }
+    )
+
+    st.plotly_chart(
+        fig_bairro,
+        width="stretch",
+        key="heatmap_bairros_quantidade"
+    )
+
+else:
+
+    st.warning(
+        "A coluna Bairro não foi encontrada para montar o mapa de calor por bairro."
+    )
 
 # --------------------------------------------------
 # HISTÓRICO
@@ -1442,11 +1737,92 @@ if not historico.empty:
         "Preço (R$)" in hist.columns
     ):
 
+        # --------------------------------------------------
+        # RÓTULOS SEM SOBREPOSIÇÃO
+        # --------------------------------------------------
+
+        hist = hist.sort_values(
+            [
+                "Farmácia",
+                "Data Emissão"
+            ]
+        ).copy()
+
+        hist["Preço_Label"] = ""
+
+        # Mostrar rótulo somente no último ponto de cada farmácia
+        idx_ultimo_ponto = (
+            hist
+            .groupby("Farmácia")
+            ["Data Emissão"]
+            .idxmax()
+        )
+
+        hist.loc[
+            idx_ultimo_ponto,
+            "Preço_Label"
+        ] = (
+            hist.loc[
+                idx_ultimo_ponto,
+                "Preço (R$)"
+            ]
+            .apply(moeda_br)
+        )
+
+        # Se os últimos preços estiverem muito próximos, oculta rótulos repetidos/próximos
+        ultimos = (
+            hist
+            .loc[idx_ultimo_ponto]
+            .sort_values("Preço (R$)")
+            .copy()
+        )
+
+        ultimo_preco_exibido = None
+
+        for idx in ultimos.index:
+
+            preco_atual = ultimos.loc[
+                idx,
+                "Preço (R$)"
+            ]
+
+            if (
+                ultimo_preco_exibido is not None
+                and abs(preco_atual - ultimo_preco_exibido) < 0.75
+            ):
+
+                hist.loc[
+                    idx,
+                    "Preço_Label"
+                ] = ""
+
+            else:
+
+                ultimo_preco_exibido = preco_atual
+
         fig = px.line(
             hist,
             x="Data Emissão",
             y="Preço (R$)",
-            color="Farmácia"
+            color="Farmácia",
+            markers=True,
+            text="Preço_Label"
+        )
+
+        fig.update_traces(
+            mode="lines+markers+text",
+            marker={
+                "size": 6
+            },
+            textposition="top center",
+            textfont={
+                "size": 10
+            }
+        )
+
+        fig.update_layout(
+            yaxis_title="Preço (R$)",
+            xaxis_title="Data Emissão"
         )
 
         st.plotly_chart(
@@ -1461,10 +1837,8 @@ if not historico.empty:
 
 if (
     not historico.empty
-    and
-    "lat" in historico.columns
-    and
-    "lon" in historico.columns
+    and "lat" in historico.columns
+    and "lon" in historico.columns
 ):
 
     st.subheader(
@@ -1490,83 +1864,149 @@ if (
         ]
     )
 
-    mapa_df["Tipo_Loja"] = "Concorrência"
+    if not mapa_df.empty:
 
-    if "Farmácia" in mapa_df.columns:
+        mapa_df["Tipo_Loja"] = "Concorrência"
 
-        nome_farmacia = (
-            mapa_df["Farmácia"]
-            .astype(str)
-            .str.upper()
+        if "Farmácia" in mapa_df.columns:
+
+            nome_farmacia = (
+                mapa_df["Farmácia"]
+                .astype(str)
+                .str.upper()
+            )
+
+            mapa_df.loc[
+                nome_farmacia.str.contains(
+                    "ZANOL E THOMAZ LTDA",
+                    na=False
+                ),
+                "Tipo_Loja"
+            ] = "Zanol e Thomaz"
+
+            mapa_df.loc[
+                nome_farmacia.str.contains(
+                    "TRIANGULO DROGARIA LTDA",
+                    na=False
+                ),
+                "Tipo_Loja"
+            ] = "Triangulo Drogaria"
+
+        if "Preço (R$)" in mapa_df.columns:
+
+            mapa_df["Preço (R$)"] = (
+                pd.to_numeric(
+                    mapa_df["Preço (R$)"],
+                    errors="coerce"
+                )
+                .round(2)
+            )
+
+        centro_lat = mapa_df["lat"].mean()
+        centro_lon = mapa_df["lon"].mean()
+
+        lat_range = mapa_df["lat"].max() - mapa_df["lat"].min()
+        lon_range = mapa_df["lon"].max() - mapa_df["lon"].min()
+
+        maior_range = max(
+            lat_range,
+            lon_range
         )
 
-        mapa_df.loc[
-            nome_farmacia.str.contains(
-                "ZANOL E THOMAZ LTDA",
-                na=False
-            ),
-            "Tipo_Loja"
-        ] = "Zanol e Thomaz"
+        if maior_range < 0.03:
+            zoom_mapa = 12
 
-        mapa_df.loc[
-            nome_farmacia.str.contains(
-                "TRIANGULO DROGARIA LTDA",
-                na=False
-            ),
-            "Tipo_Loja"
-        ] = "Triangulo Drogaria"
+        elif maior_range < 0.08:
+            zoom_mapa = 11
 
-    hover_cols = []
+        elif maior_range < 0.20:
+            zoom_mapa = 10
 
-    for coluna in [
-        "Farmácia",
-        "Produto",
-        "Preço (R$)",
-        "Rede",
-        "Data Emissão"
-    ]:
+        else:
+            zoom_mapa = 9
 
-        if coluna in mapa_df.columns:
-            hover_cols.append(coluna)
+        hover_cols = []
 
-    fig_mapa = px.scatter_mapbox(
-        mapa_df,
-        lat="lat",
-        lon="lon",
-        color="Tipo_Loja",
-        color_discrete_map={
-            "Concorrência": "red",
-            "Zanol e Thomaz": "yellow",
-            "Triangulo Drogaria": "blue"
-        },
-        hover_name="Farmácia" if "Farmácia" in mapa_df.columns else None,
-        hover_data=hover_cols,
-        zoom=11,
-        height=550
-    )
+        for coluna in [
+            "Rede",
+            "Produto",
+            "Preço (R$)",
+            "Data Emissão"
+        ]:
 
-    fig_mapa.update_layout(
-        mapbox_style="carto-darkmatter",
-        margin={
-            "r": 0,
-            "t": 0,
-            "l": 0,
-            "b": 0
-        },
-        legend_title_text="Tipo de Loja"
-    )
+            if coluna in mapa_df.columns:
+                hover_cols.append(coluna)
 
-    st.plotly_chart(
-        fig_mapa,
-        width="stretch",
-        key="mapa_farmacias_cores"
-    )
+        fig_mapa = px.scatter_mapbox(
+            mapa_df,
+            lat="lat",
+            lon="lon",
+            color="Tipo_Loja",
+            color_discrete_map={
+                "Concorrência": "#ff3b30",
+                "Zanol e Thomaz": "#ffd60a",
+                "Triangulo Drogaria": "#0a84ff"
+            },
+            hover_name="Farmácia" if "Farmácia" in mapa_df.columns else None,
+            hover_data=hover_cols,
+            zoom=zoom_mapa,
+            center={
+                "lat": centro_lat,
+                "lon": centro_lon
+            },
+            height=650
+        )
+
+        fig_mapa.update_traces(
+            marker={
+                "size": 11,
+                "opacity": 0.88
+            }
+        )
+
+        fig_mapa.update_layout(
+            mapbox_style="carto-darkmatter",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            margin={
+                "r": 0,
+                "t": 10,
+                "l": 0,
+                "b": 0
+            },
+            legend={
+                "title": {
+                    "text": "Tipo de Loja"
+                },
+                "orientation": "h",
+                "yanchor": "bottom",
+                "y": 1.02,
+                "xanchor": "right",
+                "x": 1
+            }
+        )
+
+        st.plotly_chart(
+            fig_mapa,
+            width="stretch",
+            key="mapa_farmacias_cores"
+        )
+
+    else:
+
+        st.info(
+            "Não há coordenadas válidas para exibir no mapa."
+        )
 
 # --------------------------------------------------
 # MONITORAMENTO POR REDE
 # --------------------------------------------------
 
-if not historico.empty and "Farmácia" in historico.columns:
+if (
+    not historico.empty
+    and "Farmácia" in historico.columns
+    and "Preço (R$)" in historico.columns
+):
 
     st.subheader("🏪 Monitoramento por Rede")
 
@@ -1575,18 +2015,52 @@ if not historico.empty and "Farmácia" in historico.columns:
         .apply(identificar_rede)
     )
 
+    historico["Preço (R$)"] = pd.to_numeric(
+        historico["Preço (R$)"],
+        errors="coerce"
+    )
+
     rede_df = (
         historico
         .groupby("Rede")
-        ["Preço (R$)"]
-        .mean()
+        .agg(
+            Preco_Medio=("Preço (R$)", "mean"),
+            Quantidade_Pesquisas=("Preço (R$)", "count")
+        )
         .reset_index()
     )
 
+    rede_df["Preco_Medio"] = (
+        rede_df["Preco_Medio"]
+        .round(2)
+    )
+
+    rede_df = rede_df.sort_values(
+        "Quantidade_Pesquisas",
+        ascending=False
+    )
+
+    rede_grafico = (
+        rede_df
+        .head(30)
+        .copy()
+    )
+
     fig = px.bar(
-        rede_df,
+        rede_grafico,
         x="Rede",
-        y="Preço (R$)"
+        y="Quantidade_Pesquisas",
+        text="Quantidade_Pesquisas",
+        title="Top 30 Redes por Quantidade de Pesquisas"
+    )
+
+    fig.update_traces(
+        textposition="outside"
+    )
+
+    fig.update_layout(
+        xaxis_title="Rede",
+        yaxis_title="Quantidade de Pesquisas"
     )
 
     st.plotly_chart(
@@ -1599,30 +2073,70 @@ if not historico.empty and "Farmácia" in historico.columns:
 # RANKING CONCORRENTES
 # --------------------------------------------------
 
-if not historico.empty:
+if (
+    not historico.empty
+    and "Farmácia" in historico.columns
+    and "Preço (R$)" in historico.columns
+):
 
     st.subheader(
         "🏆 Ranking Concorrentes"
     )
 
+    historico["Preço (R$)"] = pd.to_numeric(
+        historico["Preço (R$)"],
+        errors="coerce"
+    )
+
     ranking = (
         historico
         .groupby("Farmácia")
-        ["Preço (R$)"]
-        .mean()
-        .reset_index()
-        .sort_values(
-            "Preço (R$)"
+        .agg(
+            Preco_Medio=("Preço (R$)", "mean"),
+            Quantidade_Pesquisas=("Preço (R$)", "count")
         )
+        .reset_index()
+    )
+
+    ranking["Preco_Medio"] = (
+        ranking["Preco_Medio"]
+        .round(2)
+    )
+
+    ranking = ranking.sort_values(
+        [
+            "Quantidade_Pesquisas",
+            "Preco_Medio"
+        ],
+        ascending=[
+            False,
+            True
+        ]
     )
 
     ranking_exibir = ranking.copy()
 
-    if "Preço (R$)" in ranking_exibir.columns:
-        ranking_exibir["Preço (R$)"] = ranking_exibir["Preço (R$)"].apply(moeda_br)
+    ranking_exibir["Preco_Medio"] = (
+        ranking_exibir["Preco_Medio"]
+        .apply(moeda_br)
+    )
+
+    ranking_exibir = ranking_exibir.rename(
+        columns={
+            "Farmácia": "Farmácia",
+            "Quantidade_Pesquisas": "Quantidade de Pesquisas",
+            "Preco_Medio": "Preço Médio"
+        }
+    )
 
     st.dataframe(
-        ranking_exibir,
+        ranking_exibir[
+            [
+                "Farmácia",
+                "Quantidade de Pesquisas",
+                "Preço Médio"
+            ]
+        ],
         width="stretch"
     )
 
@@ -1708,6 +2222,23 @@ if not compra.empty:
     st.subheader(
         "📦 Curva ABC Financeira"
     )
+
+    # Remover Total Geral definitivamente
+    if "Marca" in compra.columns:
+
+        compra = compra[
+            ~compra["Marca"]
+            .astype(str)
+            .str.upper()
+            .str.strip()
+            .isin(
+                [
+                    "TOTAL GERAL",
+                    "TOTAL",
+                    "GRAND TOTAL"
+                ]
+            )
+        ].copy()
 
     # Remove colunas vazias do Excel
     compra = compra.loc[
