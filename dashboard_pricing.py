@@ -737,7 +737,8 @@ with c1:
         .map(acoes)
     )
 
-    st.dataframe(
+    # Quadro interativo de recomendações
+    selecao_recomendacao = st.dataframe(
         acoes_df[
             [
                 "Recomendacao",
@@ -745,8 +746,198 @@ with c1:
                 "Ação Recomendada"
             ]
         ],
-        width="stretch"
+        width="stretch",
+        key="tabela_acoes_recomendadas",
+        on_select="rerun",
+        selection_mode="single-row"
     )
+
+    recomendacao_selecionada = None
+
+    try:
+
+        linhas_selecionadas = (
+            selecao_recomendacao
+            .selection
+            .rows
+        )
+
+        if linhas_selecionadas:
+
+            recomendacao_selecionada = (
+                acoes_df
+                .iloc[linhas_selecionadas[0]]
+                ["Recomendacao"]
+            )
+
+    except Exception:
+
+        recomendacao_selecionada = None
+
+    if recomendacao_selecionada is None:
+
+        recomendacao_selecionada = st.selectbox(
+            "Selecione a recomendação para detalhar",
+            acoes_df["Recomendacao"].tolist(),
+            key="select_recomendacao_detalhe"
+        )
+
+    st.subheader(
+        f"🔎 Produtos da recomendação: {recomendacao_selecionada}"
+    )
+
+    produtos_recomendacao = df_filtrado[
+        df_filtrado["Recomendacao"] == recomendacao_selecionada
+    ].copy()
+
+    if not produtos_recomendacao.empty:
+
+        if "EAN" in produtos_recomendacao.columns:
+
+            produtos_recomendacao["EAN"] = (
+                produtos_recomendacao["EAN"]
+                .astype(str)
+                .str.replace(".0", "", regex=False)
+                .str.strip()
+            )
+
+        # Enriquecer com os dados do simulador, quando disponíveis
+        if (
+            "simulacao_global" in globals()
+            and not simulacao_global.empty
+            and "EAN" in produtos_recomendacao.columns
+        ):
+
+            simulador_cols = [
+                "EAN",
+                "Qtd_Vendida_Mes_Anterior",
+                "Venda_Preco_Antigo",
+                "Preco_Atual",
+                "Preco_Sugerido_Mercado",
+                "Venda_Projetada_Preco_Sugerido",
+                "Ganho_Unitario",
+                "Ganho_Potencial_Simulador"
+            ]
+
+            simulador_cols = [
+                coluna
+                for coluna in simulador_cols
+                if coluna in simulacao_global.columns
+            ]
+
+            produtos_recomendacao = produtos_recomendacao.merge(
+                simulacao_global[simulador_cols],
+                on="EAN",
+                how="left"
+            )
+
+        colunas_base = []
+
+        for coluna in [
+            "EAN",
+            "Descricao_Unica",
+            "Produto",
+            "Laboratório",
+            "Família",
+            "CURVA",
+            "Recomendacao",
+            "Qtd_Vendida_Mes_Anterior",
+            "Venda_Preco_Antigo",
+            "Preco_Atual",
+            "Preco_Sugerido_Mercado",
+            "Venda_Projetada_Preco_Sugerido",
+            "Ganho_Unitario",
+            "Ganho_Potencial_Simulador",
+            "Ganho_Potencial",
+            "Margem_%",
+            "Lucro_Unitario",
+            "Preco_Medio"
+        ]:
+
+            if coluna in produtos_recomendacao.columns:
+                colunas_base.append(coluna)
+
+        produtos_exibir = produtos_recomendacao[colunas_base].copy()
+
+        # Formatar padrão Brasil
+        for coluna in [
+            "Venda_Preco_Antigo",
+            "Preco_Atual",
+            "Preco_Sugerido_Mercado",
+            "Venda_Projetada_Preco_Sugerido",
+            "Ganho_Unitario",
+            "Ganho_Potencial_Simulador",
+            "Ganho_Potencial",
+            "Lucro_Unitario",
+            "Preco_Medio"
+        ]:
+
+            if coluna in produtos_exibir.columns:
+                produtos_exibir[coluna] = produtos_exibir[coluna].apply(moeda_br)
+
+        if "Margem_%" in produtos_exibir.columns:
+            produtos_exibir["Margem_%"] = produtos_exibir["Margem_%"].apply(percentual_br)
+
+        if "Qtd_Vendida_Mes_Anterior" in produtos_exibir.columns:
+            produtos_exibir["Qtd_Vendida_Mes_Anterior"] = (
+                produtos_exibir["Qtd_Vendida_Mes_Anterior"]
+                .apply(numero_br)
+            )
+
+        st.dataframe(
+            produtos_exibir,
+            width="stretch"
+        )
+
+        # Exportação da recomendação selecionada
+        exportar_recomendacao = produtos_recomendacao[colunas_base].copy()
+
+        for coluna in [
+            "Venda_Preco_Antigo",
+            "Preco_Atual",
+            "Preco_Sugerido_Mercado",
+            "Venda_Projetada_Preco_Sugerido",
+            "Ganho_Unitario",
+            "Ganho_Potencial_Simulador",
+            "Ganho_Potencial",
+            "Lucro_Unitario",
+            "Preco_Medio"
+        ]:
+
+            if coluna in exportar_recomendacao.columns:
+                exportar_recomendacao[coluna] = exportar_recomendacao[coluna].apply(moeda_br)
+
+        if "Margem_%" in exportar_recomendacao.columns:
+            exportar_recomendacao["Margem_%"] = exportar_recomendacao["Margem_%"].apply(percentual_br)
+
+        if "Qtd_Vendida_Mes_Anterior" in exportar_recomendacao.columns:
+            exportar_recomendacao["Qtd_Vendida_Mes_Anterior"] = (
+                exportar_recomendacao["Qtd_Vendida_Mes_Anterior"]
+                .apply(numero_br)
+            )
+
+        csv_recomendacao = (
+            exportar_recomendacao
+            .to_csv(
+                index=False,
+                sep=";"
+            )
+            .encode("utf-8-sig")
+        )
+
+        st.download_button(
+            "📥 Exportar produtos da recomendação",
+            csv_recomendacao,
+            f"produtos_{recomendacao_selecionada.lower().replace(' ', '_')}.csv",
+            "text/csv",
+            key="exportar_recomendacao"
+        )
+
+    else:
+
+        st.info(
+            "Não há produtos para a recomendação selecionada."
+        )
 
 with c2:
 
