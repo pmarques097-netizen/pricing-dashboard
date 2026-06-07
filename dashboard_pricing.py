@@ -138,7 +138,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "sem_debug_colunas_definitivo_20260607"
+VERSAO_APP = "leitura_xls_xlsx_corrigida_20260607"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -273,6 +273,86 @@ carregar_estoque,
 identificar_rede,
 curva_abc
 )
+
+
+
+# --------------------------------------------------
+# LEITURA COMPATÍVEL DE EXCEL / CSV
+# --------------------------------------------------
+
+def carregar_pasta_excel_compat(pastas, nome_base="base"):
+
+    bases = []
+
+    for pasta_nome in pastas:
+
+        pasta = Path(pasta_nome)
+
+        if not pasta.exists() or not pasta.is_dir():
+            continue
+
+        arquivos = []
+
+        for ext in [
+            "*.xls",
+            "*.xlsx",
+            "*.xlsm",
+            "*.csv"
+        ]:
+            arquivos.extend(list(pasta.glob(ext)))
+
+        for arquivo in sorted(arquivos):
+
+            try:
+
+                if arquivo.suffix.lower() == ".csv":
+
+                    try:
+                        temp = pd.read_csv(
+                            arquivo,
+                            sep=";",
+                            encoding="utf-8-sig"
+                        )
+                    except Exception:
+                        temp = pd.read_csv(
+                            arquivo,
+                            encoding="utf-8-sig"
+                        )
+
+                else:
+
+                    temp = pd.read_excel(
+                        arquivo
+                    )
+
+                if not temp.empty:
+
+                    temp["Arquivo_Origem"] = arquivo.name
+                    temp["Fonte_Carregamento"] = str(pasta)
+                    bases.append(temp)
+
+            except Exception as erro:
+
+                print(
+                    f"Falha ao ler {nome_base} / {arquivo}: {erro}"
+                )
+
+    if bases:
+
+        base = pd.concat(
+            bases,
+            ignore_index=True
+        )
+
+        base.columns = (
+            base.columns
+            .astype(str)
+            .str.strip()
+        )
+
+        return base
+
+    return pd.DataFrame()
 
 
 # --------------------------------------------------
@@ -1602,6 +1682,32 @@ if estoque.empty:
     estoque = ler_base_pasta_ou_zip(
         ["ESTOQUE_TESTE", "ESTOQUE"],
         ["ESTOQUE_TESTE.zip", "ESTOQUE.zip"]
+    )
+
+# Fallback final compatível com .xls, .xlsx e .xlsm
+# Necessário para Streamlit Cloud quando a pasta contém arquivos .xls.
+if historico.empty:
+    historico = carregar_pasta_excel_compat(
+        ["VENDA_TESTE"],
+        "VENDA_TESTE"
+    )
+
+if compra.empty:
+    compra = carregar_pasta_excel_compat(
+        ["COMPRA_TESTE", "COMPRA", "COMPRAS_TESTE"],
+        "COMPRA_TESTE"
+    )
+
+if venda_rede.empty:
+    venda_rede = carregar_pasta_excel_compat(
+        ["VENDA_FINAL_TESTE", "VENDA_TESTE_FINAL", "VENDA_FINAL", "VENDA_REDE"],
+        "VENDA_FINAL_TESTE"
+    )
+
+if estoque.empty:
+    estoque = carregar_pasta_excel_compat(
+        ["ESTOQUE_TESTE", "ESTOQUE"],
+        "ESTOQUE_TESTE"
     )
 
 # Fallback robusto para Streamlit Cloud / GitHub
