@@ -6479,11 +6479,74 @@ if not simulacao_global.empty:
         width="stretch"
     )
 
+    # --------------------------------------------------
+    # GRÁFICO TOP 20 CORRIGIDO
+    # Barras horizontais evitam que um produto com ganho muito alto
+    # esconda visualmente os demais.
+    # --------------------------------------------------
+
+    top_ganho_grafico = simulacao.copy()
+
+    top_ganho_grafico["Ganho_Potencial_Simulador"] = pd.to_numeric(
+        top_ganho_grafico["Ganho_Potencial_Simulador"],
+        errors="coerce"
+    ).fillna(0)
+
+    eixo_produto_grafico = (
+        "Produto"
+        if "Produto" in top_ganho_grafico.columns
+        else "EAN"
+    )
+
+    top_ganho_grafico = (
+        top_ganho_grafico
+        .sort_values(
+            "Ganho_Potencial_Simulador",
+            ascending=True
+        )
+        .tail(20)
+    )
+
+    top_ganho_grafico["Ganho_Label"] = (
+        top_ganho_grafico["Ganho_Potencial_Simulador"]
+        .apply(moeda_br)
+    )
+
     fig = px.bar(
-        simulacao.head(20),
-        x="Produto" if "Produto" in simulacao.columns else "EAN",
-        y="Ganho_Potencial_Simulador",
-        title="Top 20 Produtos com Maior Ganho Projetado"
+        top_ganho_grafico,
+        x="Ganho_Potencial_Simulador",
+        y=eixo_produto_grafico,
+        orientation="h",
+        text="Ganho_Label",
+        title="Top 20 Produtos com Maior Ganho Projetado",
+        labels={
+            "Ganho_Potencial_Simulador": "Ganho Projetado",
+            eixo_produto_grafico: "Produto"
+        }
+    )
+
+    fig.update_traces(
+        textposition="outside",
+        cliponaxis=False
+    )
+
+    fig.update_layout(
+        height=650,
+        margin=dict(
+            l=20,
+            r=180,
+            t=60,
+            b=40
+        ),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(
+            tickformat=",",
+            showgrid=True
+        ),
+        yaxis=dict(
+            automargin=True
+        )
     )
 
     st.plotly_chart(
