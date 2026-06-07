@@ -1,0 +1,320 @@
+
+/* ==================================================
+   EIROX DARK ENTERPRISE PREMIUM
+   Tema escuro corporativo para Streamlit
+   ================================================== */
+
+:root {
+    --eirox-bg: #07111F;
+    --eirox-panel: #0B1B33;
+    --eirox-panel-2: #0F2747;
+    --eirox-border: rgba(120, 180, 255, 0.18);
+    --eirox-text: #F3F7FF;
+    --eirox-muted: #AFC7E8;
+    --eirox-blue: #2CA0FF;
+    --eirox-blue-2: #0E64C8;
+    --eirox-green: #2ED47A;
+    --eirox-yellow: #FFB946;
+    --eirox-red: #FF5C7A;
+    --eirox-orange: #FF8A3D;
+}
+
+html, body, [data-testid="stAppViewContainer"] {
+    background:
+        radial-gradient(circle at top left, rgba(44,160,255,0.15), transparent 32%),
+        linear-gradient(135deg, #050B14 0%, #07111F 45%, #0A1C34 100%) !important;
+    color: var(--eirox-text) !important;
+}
+
+[data-testid="stHeader"] {
+    background: rgba(5, 11, 20, 0.72) !important;
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(120, 180, 255, 0.10);
+}
+
+.block-container {
+    max-width: 100% !important;
+    padding-top: 1.2rem !important;
+    padding-left: 1.4rem !important;
+    padding-right: 1.4rem !important;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background:
+        radial-gradient(circle at top, rgba(44,160,255,0.28), transparent 30%),
+        linear-gradient(180deg, #0E2A4F 0%, #071A33 58%, #04101F 100%) !important;
+    border-right: 1px solid rgba(120, 180, 255, 0.18);
+    box-shadow: 8px 0 28px rgba(0, 0, 0, 0.26);
+}
+
+section[data-testid="stSidebar"] .block-container {
+    padding-top: 1.2rem !important;
+}
+
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3,
+section[data-testid="stSidebar"] label,
+section[data-testid="stSidebar"] p,
+section[data-testid="stSidebar"] span {
+    color: #FFFFFF !important;
+}
+
+.sidebar-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
+    border: 1px solid rgba(180, 215, 255, 0.18);
+    border-radius: 18px;
+    padding: 16px 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
+    backdrop-filter: blur(10px);
+}
+
+.sidebar-title {
+    font-size: 19px;
+    font-weight: 900;
+    letter-spacing: .02em;
+    color: #FFFFFF;
+    margin-bottom: 4px;
+}
+
+.sidebar-subtitle {
+    font-size: 12px;
+    color: #C8DFFF;
+}
+
+.sidebar-section {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: #9FD0FF !important;
+    margin-top: 18px;
+    margin-bottom: 8px;
+}
+
+.sidebar-pill {
+    display: inline-block;
+    background: linear-gradient(135deg, rgba(44,160,255,.32), rgba(46,212,122,.16));
+    border: 1px solid rgba(44,160,255,.48);
+    color: #E6F4FF;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    margin-top: 6px;
+}
+
+section[data-testid="stSidebar"] div[role="radiogroup"] label {
+    background: rgba(255,255,255,0.065);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 13px;
+    padding: 10px 10px;
+    margin-bottom: 7px;
+    transition: all .18s ease;
+}
+
+section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+    background: rgba(44,160,255,0.18);
+    border-color: rgba(44,160,255,0.42);
+    transform: translateX(3px);
+}
+
+/* Títulos */
+h1, h2, h3 {
+    color: #F6FAFF !important;
+    letter-spacing: -0.02em;
+}
+
+h1 {
+    font-weight: 900 !important;
+}
+
+h4, p, span, label {
+    color: var(--eirox-muted) !important;
+}
+
+/* Cards e containers */
+div[data-testid="stMetric"] {
+    background:
+        linear-gradient(135deg, rgba(15,39,71,.98), rgba(8,20,38,.95));
+    border: 1px solid rgba(120,180,255,.18);
+    border-radius: 18px;
+    padding: 18px 18px;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.26);
+    position: relative;
+    overflow: hidden;
+}
+
+div[data-testid="stMetric"]::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(90deg, #2CA0FF, #2ED47A);
+}
+
+div[data-testid="stMetricLabel"] {
+    color: #AFC7E8 !important;
+    font-weight: 700;
+}
+
+div[data-testid="stMetricValue"] {
+    color: #FFFFFF !important;
+    font-weight: 900;
+    font-size: 28px !important;
+}
+
+/* Alertas Streamlit */
+div[data-testid="stAlert"] {
+    background: linear-gradient(135deg, rgba(14,42,79,.88), rgba(7,26,51,.88)) !important;
+    border: 1px solid rgba(120,180,255,.18) !important;
+    border-radius: 16px !important;
+    color: #EAF4FF !important;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .18);
+}
+
+/* Inputs */
+.stTextInput input,
+.stSelectbox div[data-baseweb="select"] > div,
+.stMultiSelect div[data-baseweb="select"] > div {
+    background: rgba(6, 18, 34, 0.96) !important;
+    color: #F6FAFF !important;
+    border: 1px solid rgba(120,180,255,.22) !important;
+    border-radius: 12px !important;
+}
+
+.stTextInput input:focus {
+    border-color: rgba(44,160,255,.75) !important;
+    box-shadow: 0 0 0 2px rgba(44,160,255,.18) !important;
+}
+
+/* Botões */
+.stButton button,
+.stDownloadButton button,
+button[kind="primary"],
+button[kind="secondary"] {
+    background: linear-gradient(135deg, #0E64C8, #2CA0FF) !important;
+    color: #FFFFFF !important;
+    border: 1px solid rgba(255,255,255,.18) !important;
+    border-radius: 13px !important;
+    font-weight: 800 !important;
+    box-shadow: 0 10px 24px rgba(44,160,255,.25);
+    transition: all .18s ease;
+}
+
+.stButton button:hover,
+.stDownloadButton button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 32px rgba(44,160,255,.34);
+}
+
+/* Dataframes */
+div[data-testid="stDataFrame"] {
+    width: 100% !important;
+    border-radius: 18px !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(120,180,255,.16);
+    box-shadow: 0 16px 38px rgba(0, 0, 0, .24);
+}
+
+div[data-testid="stDataFrame"] > div {
+    width: 100% !important;
+    background: rgba(7, 17, 31, .88) !important;
+}
+
+/* Tabs e radios */
+div[role="radiogroup"] label {
+    color: #EAF4FF !important;
+}
+
+.stRadio label {
+    color: #EAF4FF !important;
+}
+
+/* Plotly */
+.js-plotly-plot,
+.plotly,
+.plot-container {
+    border-radius: 18px !important;
+}
+
+/* Cards customizados opcionais */
+.eirox-card {
+    background: linear-gradient(135deg, rgba(15,39,71,.96), rgba(8,20,38,.94));
+    border: 1px solid rgba(120,180,255,.17);
+    border-radius: 18px;
+    padding: 18px;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, .26);
+    margin-bottom: 16px;
+}
+
+.eirox-section-title {
+    font-size: 13px;
+    color: #9FD0FF;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    font-weight: 900;
+    margin-bottom: 8px;
+}
+
+.eirox-hero {
+    background:
+        radial-gradient(circle at top right, rgba(44,160,255,.22), transparent 28%),
+        linear-gradient(135deg, rgba(15,39,71,.96), rgba(7,17,31,.96));
+    border: 1px solid rgba(120,180,255,.18);
+    border-radius: 22px;
+    padding: 22px 24px;
+    margin-bottom: 18px;
+    box-shadow: 0 18px 45px rgba(0,0,0,.30);
+}
+
+.eirox-hero h1 {
+    margin: 0;
+    font-size: 30px;
+}
+
+.eirox-hero p {
+    margin: 6px 0 0 0;
+    color: #BFD7FF !important;
+}
+
+/* Destaques por prioridade em HTML */
+.tag-critical {
+    background: rgba(255,92,122,.14);
+    color: #FFD6DE;
+    border: 1px solid rgba(255,92,122,.36);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-weight: 800;
+}
+
+.tag-high {
+    background: rgba(255,138,61,.14);
+    color: #FFE3CF;
+    border: 1px solid rgba(255,138,61,.36);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-weight: 800;
+}
+
+.tag-medium {
+    background: rgba(255,185,70,.14);
+    color: #FFF1CF;
+    border: 1px solid rgba(255,185,70,.36);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-weight: 800;
+}
+
+.tag-low {
+    background: rgba(46,212,122,.14);
+    color: #D7FFE8;
+    border: 1px solid rgba(46,212,122,.36);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-weight: 800;
+}
