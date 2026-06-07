@@ -138,7 +138,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "ganho_replicado_com_mapa_20260607"
+VERSAO_APP = "mapa_sem_debug_20260607"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -7373,7 +7373,7 @@ if not simulacao_global.empty:
 
 else:
 
-    st.info("ℹ️ O simulador usa o motor inteligente quando VENDA_FINAL_TESTE contém Cód. Barras/Etiq., Itens e Venda.")
+    
 
     if not venda_rede.empty:
         st.write("Colunas encontradas em VENDA_FINAL_TESTE:")
