@@ -3,6 +3,7 @@ import os
 import zipfile
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import plotly.io as pio
 import hashlib
 from pathlib import Path
@@ -136,7 +137,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "ganho_100pct_analise_pricing_20260607"
+VERSAO_APP = "mapa_geografico_20260607"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -862,6 +863,7 @@ PERMISSOES_TELAS = {
     "Diretoria": [
         "📊 Dashboard Geral",
         "🔎 Rede/Loja vs Concorrentes",
+        "🌎 Mapa Geográfico de Concorrência",
         "🛒 Negociação Compras",
         "🚨 Central de Alertas",
         "🧪 Diagnóstico",
@@ -871,6 +873,7 @@ PERMISSOES_TELAS = {
     "Pricing": [
         "📊 Dashboard Geral",
         "🔎 Rede/Loja vs Concorrentes",
+        "🌎 Mapa Geográfico de Concorrência",
         "🛒 Negociação Compras",
         "🚨 Central de Alertas",
         "🧪 Diagnóstico",
@@ -880,6 +883,7 @@ PERMISSOES_TELAS = {
     "Comercial": [
         "📊 Dashboard Geral",
         "🔎 Rede/Loja vs Concorrentes",
+        "🌎 Mapa Geográfico de Concorrência",
         "🛒 Negociação Compras",
         "🚨 Central de Alertas",
         "🧪 Diagnóstico",
@@ -889,6 +893,7 @@ PERMISSOES_TELAS = {
     "Regional": [
         "📊 Dashboard Geral",
         "🔎 Rede/Loja vs Concorrentes",
+        "🌎 Mapa Geográfico de Concorrência",
         "🛒 Negociação Compras",
         "🚨 Central de Alertas",
         "🧪 Diagnóstico",
@@ -2700,6 +2705,462 @@ if pagina == "🏢 Dashboard Executivo":
         top_exibir,
         use_container_width=True,
         height=520
+    )
+
+    st.stop()
+
+
+
+
+# --------------------------------------------------
+# MAPA GEOGRÁFICO DE CONCORRÊNCIA
+# --------------------------------------------------
+
+if pagina == "🌎 Mapa Geográfico de Concorrência":
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">Geointeligência Comercial</div>
+            <h1>🌎 Mapa Geográfico de Concorrência</h1>
+            <p>Visualização geográfica das farmácias, redes concorrentes, sua rede e concentração de pesquisas de preço.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    if historico.empty:
+
+        st.warning(
+            "Não há dados de pesquisa de preços carregados em VENDA_TESTE para montar o mapa."
+        )
+        st.stop()
+
+    mapa_base = historico.copy()
+    mapa_base.columns = mapa_base.columns.astype(str).str.strip()
+
+    # --------------------------------------------------
+    # IDENTIFICAÇÃO DE COLUNAS
+    # --------------------------------------------------
+
+    col_lat = None
+    col_lon = None
+
+    for c in mapa_base.columns:
+
+        nome = str(c).strip().lower()
+
+        if nome in ["lat", "latitude"]:
+            col_lat = c
+
+        if nome in ["lon", "long", "longitude"]:
+            col_lon = c
+
+    if col_lat is None or col_lon is None:
+
+        st.error(
+            "Não encontrei as colunas de latitude/longitude. A base precisa ter colunas como lat/lon ou latitude/longitude."
+        )
+
+        st.write(
+            "Colunas encontradas:",
+            mapa_base.columns.tolist()
+        )
+
+        st.stop()
+
+    if "Farmácia" not in mapa_base.columns:
+
+        st.error(
+            "Não encontrei a coluna Farmácia na base de pesquisas."
+        )
+        st.stop()
+
+    if "Rede" not in mapa_base.columns:
+
+        mapa_base["Rede"] = (
+            mapa_base["Farmácia"]
+            .apply(identificar_rede)
+        )
+
+    if "Preço (R$)" in mapa_base.columns:
+
+        mapa_base["Preço (R$)"] = pd.to_numeric(
+            mapa_base["Preço (R$)"],
+            errors="coerce"
+        )
+
+    else:
+
+        mapa_base["Preço (R$)"] = None
+
+    mapa_base[col_lat] = pd.to_numeric(
+        mapa_base[col_lat],
+        errors="coerce"
+    )
+
+    mapa_base[col_lon] = pd.to_numeric(
+        mapa_base[col_lon],
+        errors="coerce"
+    )
+
+    mapa_base = mapa_base.dropna(
+        subset=[
+            col_lat,
+            col_lon
+        ]
+    ).copy()
+
+    if mapa_base.empty:
+
+        st.warning(
+            "Não existem registros com latitude e longitude válidos para montar o mapa."
+        )
+        st.stop()
+
+    # --------------------------------------------------
+    # CLASSIFICAÇÃO DA REDE
+    # --------------------------------------------------
+
+    def classificar_rede_mapa(row):
+
+        farmacia = str(row.get("Farmácia", "")).upper()
+        rede = str(row.get("Rede", "")).upper()
+
+        texto = f"{farmacia} {rede}"
+
+        if "ZANOL" in texto or "THOMAZ" in texto:
+            return "ZANOL E THOMAZ LTDA"
+
+        if "TRIANGULO" in texto or "TRIÂNGULO" in texto:
+            return "TRIANGULO DROGARIA LTDA"
+
+        return "CONCORRENTE"
+
+    mapa_base["Tipo_Loja"] = mapa_base.apply(
+        classificar_rede_mapa,
+        axis=1
+    )
+
+    # --------------------------------------------------
+    # FILTROS DA TELA
+    # --------------------------------------------------
+
+    c1, c2, c3 = st.columns(
+        [
+            1.2,
+            1.2,
+            2
+        ]
+    )
+
+    with c1:
+
+        opcoes_tipo = [
+            "Todas",
+            "ZANOL E THOMAZ LTDA",
+            "TRIANGULO DROGARIA LTDA",
+            "CONCORRENTE"
+        ]
+
+        tipo_filtro = st.selectbox(
+            "Tipo de loja",
+            opcoes_tipo,
+            index=0,
+            key="mapa_tipo_loja"
+        )
+
+    with c2:
+
+        redes_mapa = (
+            mapa_base["Rede"]
+            .dropna()
+            .astype(str)
+            .sort_values()
+            .unique()
+            .tolist()
+        )
+
+        rede_filtro = st.multiselect(
+            "Filtrar redes",
+            redes_mapa,
+            key="mapa_redes"
+        )
+
+    with c3:
+
+        busca_mapa = st.text_input(
+            "Buscar farmácia, rede, bairro ou cidade",
+            key="mapa_busca"
+        )
+
+    mapa_filtrado = mapa_base.copy()
+
+    if tipo_filtro != "Todas":
+
+        mapa_filtrado = mapa_filtrado[
+            mapa_filtrado["Tipo_Loja"] == tipo_filtro
+        ]
+
+    if rede_filtro:
+
+        mapa_filtrado = mapa_filtrado[
+            mapa_filtrado["Rede"].astype(str).isin(rede_filtro)
+        ]
+
+    if busca_mapa:
+
+        cols_busca = [
+            c for c in [
+                "Farmácia",
+                "Rede",
+                "Bairro",
+                "Cidade",
+                "Logradouro",
+                "Produto"
+            ]
+            if c in mapa_filtrado.columns
+        ]
+
+        if cols_busca:
+
+            mask = False
+
+            for c in cols_busca:
+
+                mask = mask | mapa_filtrado[c].astype(str).str.contains(
+                    busca_mapa,
+                    case=False,
+                    na=False
+                )
+
+            mapa_filtrado = mapa_filtrado[mask].copy()
+
+    if mapa_filtrado.empty:
+
+        st.warning(
+            "Nenhum ponto encontrado para os filtros selecionados."
+        )
+        st.stop()
+
+    # --------------------------------------------------
+    # AGRUPAR PONTOS POR FARMÁCIA / LOCAL
+    # --------------------------------------------------
+
+    agg_map = {
+        col_lat: "mean",
+        col_lon: "mean",
+        "Qtd_Pesquisas": ("Farmácia", "count")
+    }
+
+    if "Preço (R$)" in mapa_filtrado.columns:
+        pass
+
+    group_cols = [
+        "Farmácia",
+        "Rede",
+        "Tipo_Loja"
+    ]
+
+    for c in [
+        "Cidade",
+        "Bairro",
+        "Logradouro",
+        "Número"
+    ]:
+
+        if c in mapa_filtrado.columns:
+            group_cols.append(c)
+
+    mapa_agrupado = (
+        mapa_filtrado
+        .groupby(group_cols, dropna=False)
+        .agg(
+            Latitude=(col_lat, "mean"),
+            Longitude=(col_lon, "mean"),
+            Qtd_Pesquisas=("Farmácia", "count"),
+            Preco_Medio=("Preço (R$)", "mean")
+        )
+        .reset_index()
+    )
+
+    mapa_agrupado["Preco_Medio"] = pd.to_numeric(
+        mapa_agrupado["Preco_Medio"],
+        errors="coerce"
+    )
+
+    mapa_agrupado["Preco_Medio_Label"] = (
+        mapa_agrupado["Preco_Medio"]
+        .apply(moeda_br)
+    )
+
+    mapa_agrupado["Texto_Mapa"] = (
+        "<b>" + mapa_agrupado["Farmácia"].astype(str) + "</b>"
+        + "<br>Rede: " + mapa_agrupado["Rede"].astype(str)
+        + "<br>Tipo: " + mapa_agrupado["Tipo_Loja"].astype(str)
+        + "<br>Pesquisas: " + mapa_agrupado["Qtd_Pesquisas"].astype(str)
+        + "<br>Preço médio: " + mapa_agrupado["Preco_Medio_Label"].astype(str)
+    )
+
+    if "Cidade" in mapa_agrupado.columns:
+        mapa_agrupado["Texto_Mapa"] += "<br>Cidade: " + mapa_agrupado["Cidade"].astype(str)
+
+    if "Bairro" in mapa_agrupado.columns:
+        mapa_agrupado["Texto_Mapa"] += "<br>Bairro: " + mapa_agrupado["Bairro"].astype(str)
+
+    # --------------------------------------------------
+    # KPIS DO MAPA
+    # --------------------------------------------------
+
+    k1, k2, k3, k4 = st.columns(4)
+
+    k1.metric(
+        "Farmácias no mapa",
+        f"{mapa_agrupado['Farmácia'].nunique():,}".replace(",", ".")
+    )
+
+    k2.metric(
+        "Redes monitoradas",
+        f"{mapa_agrupado['Rede'].nunique():,}".replace(",", ".")
+    )
+
+    k3.metric(
+        "Pesquisas de preço",
+        f"{int(mapa_agrupado['Qtd_Pesquisas'].sum()):,}".replace(",", ".")
+    )
+
+    k4.metric(
+        "Preço médio",
+        moeda_br(mapa_agrupado["Preco_Medio"].mean())
+    )
+
+    # --------------------------------------------------
+    # MAPA INTERATIVO
+    # --------------------------------------------------
+
+    centro_lat = mapa_agrupado["Latitude"].mean()
+    centro_lon = mapa_agrupado["Longitude"].mean()
+
+    mapa_agrupado["Cor"] = mapa_agrupado["Tipo_Loja"].map(
+        {
+            "ZANOL E THOMAZ LTDA": "#FFD500",
+            "TRIANGULO DROGARIA LTDA": "#1E90FF",
+            "CONCORRENTE": "#FF3B30"
+        }
+    ).fillna("#FF3B30")
+
+    mapa_agrupado["Tamanho"] = (
+        mapa_agrupado["Qtd_Pesquisas"]
+        .clip(lower=1)
+        .apply(lambda x: min(10 + x ** 0.5 * 4, 34))
+    )
+
+    fig_mapa = go.Figure()
+
+    for tipo, base_tipo in mapa_agrupado.groupby("Tipo_Loja"):
+
+        fig_mapa.add_trace(
+            go.Scattermapbox(
+                lat=base_tipo["Latitude"],
+                lon=base_tipo["Longitude"],
+                mode="markers",
+                marker=go.scattermapbox.Marker(
+                    size=base_tipo["Tamanho"],
+                    color=base_tipo["Cor"],
+                    opacity=0.88
+                ),
+                text=base_tipo["Texto_Mapa"],
+                hoverinfo="text",
+                name=tipo
+            )
+        )
+
+    fig_mapa.update_layout(
+        mapbox=dict(
+            style="carto-darkmatter",
+            center=dict(
+                lat=centro_lat,
+                lon=centro_lon
+            ),
+            zoom=11
+        ),
+        height=680,
+        margin=dict(
+            l=0,
+            r=0,
+            t=20,
+            b=0
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0
+        ),
+        paper_bgcolor="rgba(0,0,0,0)"
+    )
+
+    st.plotly_chart(
+        fig_mapa,
+        use_container_width=True,
+        key="mapa_geografico_concorrencia"
+    )
+
+    # --------------------------------------------------
+    # RANKING GEOGRÁFICO
+    # --------------------------------------------------
+
+    st.markdown("### 🏆 Ranking de lojas por quantidade de pesquisas")
+
+    ranking_mapa = (
+        mapa_agrupado
+        .sort_values(
+            "Qtd_Pesquisas",
+            ascending=False
+        )
+        .copy()
+    )
+
+    ranking_exibir = ranking_mapa[
+        [
+            c for c in [
+                "Farmácia",
+                "Rede",
+                "Tipo_Loja",
+                "Cidade",
+                "Bairro",
+                "Qtd_Pesquisas",
+                "Preco_Medio_Label"
+            ]
+            if c in ranking_mapa.columns
+        ]
+    ].rename(
+        columns={
+            "Tipo_Loja": "Classificação",
+            "Qtd_Pesquisas": "Qtd Pesquisas",
+            "Preco_Medio_Label": "Preço Médio"
+        }
+    )
+
+    st.dataframe(
+        ranking_exibir,
+        use_container_width=True,
+        height=420
+    )
+
+    csv_mapa = (
+        ranking_exibir
+        .to_csv(index=False, sep=";")
+        .encode("utf-8-sig")
+    )
+
+    st.download_button(
+        "📥 Exportar ranking geográfico",
+        csv_mapa,
+        "ranking_geografico_concorrencia.csv",
+        "text/csv",
+        key="exportar_mapa_geografico"
     )
 
     st.stop()
