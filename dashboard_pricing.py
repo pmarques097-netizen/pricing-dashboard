@@ -136,7 +136,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "corrigido_robusto_20260607"
+VERSAO_APP = "corrigido_ganho_oficial_20260607"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -1197,6 +1197,7 @@ def encontrar_coluna_global(base, opcoes):
 
 
 simulacao_global = pd.DataFrame()
+origem_simulacao_global = "vazia"
 
 if (
     not venda_rede.empty
@@ -1428,6 +1429,8 @@ if (
             how="left"
         )
 
+        origem_simulacao_global = "venda_rede"
+
         if col_produto_venda_global:
 
             desc_global = (
@@ -1490,11 +1493,19 @@ if (
                 )
 
 # Fallback: se a venda final não conseguir montar a simulação,
-# usa o histórico de pesquisa como base para uma simulação operacional.
+# usa o histórico apenas como diagnóstico/consulta operacional.
+# IMPORTANTE: essa simulação NÃO deve substituir o Ganho_Potencial oficial
+# da Analise_Pricing.xlsx, para evitar diferença entre localhost e online.
 if simulacao_global.empty and not historico.empty:
     simulacao_global = criar_simulacao_por_historico(historico)
+    if not simulacao_global.empty:
+        origem_simulacao_global = "historico_pesquisa"
 
-if not simulacao_global.empty and "EAN" in df.columns:
+if (
+    not simulacao_global.empty
+    and "EAN" in df.columns
+    and origem_simulacao_global == "venda_rede"
+):
 
     df["EAN"] = (
         df["EAN"]
@@ -1867,7 +1878,7 @@ if pagina == "🧪 Diagnóstico":
                 "Colunas": len(estoque.columns) if isinstance(estoque, pd.DataFrame) else 0
             },
             {
-                "Base": "simulacao_global",
+                "Base": f"simulacao_global / origem: {origem_simulacao_global if 'origem_simulacao_global' in globals() else 'não definida'}",
                 "Linhas": len(simulacao_global) if "simulacao_global" in globals() and isinstance(simulacao_global, pd.DataFrame) else 0,
                 "Colunas": len(simulacao_global.columns) if "simulacao_global" in globals() and isinstance(simulacao_global, pd.DataFrame) else 0
             }
@@ -4791,6 +4802,14 @@ if pagina == "🚨 Central de Alertas":
 
     st.stop()
 
+
+
+# Aviso técnico quando o simulador estiver usando fallback do histórico
+if origem_simulacao_global == "historico_pesquisa":
+    st.info(
+        "ℹ️ O simulador operacional está usando o histórico de pesquisa como apoio, "
+        "mas o Ganho Potencial exibido no dashboard permanece o valor oficial da Analise_Pricing.xlsx."
+    )
 
 
 # --------------------------------------------------
