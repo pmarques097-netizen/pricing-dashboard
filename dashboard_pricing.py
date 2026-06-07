@@ -185,6 +185,59 @@ def percentual_br(valor):
         return ""
 
 
+def preco_mercado_seguro(serie):
+    """
+    Calcula uma referência de mercado segura para simulação.
+
+    Regras:
+    - remove preços vazios, negativos ou zero;
+    - remove preços absurdos acima de R$ 5.000;
+    - remove outliers pelo método IQR;
+    - usa a mediana dos preços válidos.
+    """
+
+    try:
+
+        s = pd.to_numeric(
+            serie,
+            errors="coerce"
+        ).dropna()
+
+        s = s[
+            (s > 0)
+            & (s <= 5000)
+        ]
+
+        if s.empty:
+            return None
+
+        if len(s) >= 4:
+
+            q1 = s.quantile(0.25)
+            q3 = s.quantile(0.75)
+            iqr = q3 - q1
+
+            limite_superior = q3 + (1.5 * iqr)
+            limite_inferior = max(q1 - (1.5 * iqr), 0)
+
+            s_filtrada = s[
+                (s >= limite_inferior)
+                & (s <= limite_superior)
+            ]
+
+            if not s_filtrada.empty:
+                s = s_filtrada
+
+        return float(
+            s.median()
+        )
+
+    except Exception:
+
+        return None
+
+
+
 from pricing_utils import (
 carregar_historico,
 carregar_compra,
@@ -1190,6 +1243,42 @@ if (
                 on="EAN",
                 how="left"
             )
+
+
+        # Proteção contra preços fora da curva que distorcem o ganho
+        if (
+            "Preco_Atual" in simulacao_global.columns
+            and "Preco_Sugerido_Mercado" in simulacao_global.columns
+        ):
+
+            simulacao_global["Preco_Sugerido_Mercado"] = pd.to_numeric(
+                simulacao_global["Preco_Sugerido_Mercado"],
+                errors="coerce"
+            )
+
+            simulacao_global["Preco_Atual"] = pd.to_numeric(
+                simulacao_global["Preco_Atual"],
+                errors="coerce"
+            )
+
+            simulacao_global = simulacao_global[
+                (
+                    simulacao_global["Preco_Sugerido_Mercado"].notna()
+                )
+                & (
+                    simulacao_global["Preco_Atual"].notna()
+                )
+                & (
+                    simulacao_global["Preco_Sugerido_Mercado"] > 0
+                )
+                & (
+                    simulacao_global["Preco_Atual"] > 0
+                )
+                & (
+                    simulacao_global["Preco_Sugerido_Mercado"]
+                    <= simulacao_global["Preco_Atual"] * 3
+                )
+            ].copy()
 
         simulacao_global["Venda_Projetada_Preco_Sugerido"] = (
             simulacao_global["Qtd_Vendida_Mes_Anterior"]
