@@ -1,7 +1,10 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.io as pio
 import hashlib
+
+pio.templates.default = "plotly_dark"
 
 
 st.markdown(
@@ -25,6 +28,104 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+
+
+st.markdown(
+    """
+    <style>
+        section[data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #0E2A4F 0%, #071A33 100%);
+        }
+
+        section[data-testid="stSidebar"] .block-container {
+            padding-top: 1.5rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+
+        section[data-testid="stSidebar"] h1,
+        section[data-testid="stSidebar"] h2,
+        section[data-testid="stSidebar"] h3,
+        section[data-testid="stSidebar"] label,
+        section[data-testid="stSidebar"] p,
+        section[data-testid="stSidebar"] span {
+            color: #FFFFFF !important;
+        }
+
+        .sidebar-card {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.14);
+            border-radius: 14px;
+            padding: 14px 14px;
+            margin-bottom: 14px;
+        }
+
+        .sidebar-title {
+            font-size: 18px;
+            font-weight: 800;
+            color: #FFFFFF;
+            margin-bottom: 4px;
+        }
+
+        .sidebar-subtitle {
+            font-size: 12px;
+            color: #BFD7FF;
+            margin-bottom: 0px;
+        }
+
+        .sidebar-user {
+            font-size: 13px;
+            color: #FFFFFF;
+            margin: 2px 0px;
+        }
+
+        .sidebar-pill {
+            display: inline-block;
+            background: rgba(44, 160, 255, 0.22);
+            border: 1px solid rgba(44, 160, 255, 0.45);
+            color: #D8ECFF;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-top: 6px;
+        }
+
+        .sidebar-section {
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: #9FC7FF;
+            margin-top: 18px;
+            margin-bottom: 8px;
+        }
+
+        div[data-testid="stSidebarUserContent"] hr {
+            border-color: rgba(255,255,255,0.18);
+        }
+
+        section[data-testid="stSidebar"] div[role="radiogroup"] label {
+            background: rgba(255,255,255,0.06);
+            border-radius: 10px;
+            padding: 7px 9px;
+            margin-bottom: 5px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+            background: rgba(255,255,255,0.12);
+            border-color: rgba(255,255,255,0.20);
+        }
+
+        section[data-testid="stSidebar"] button {
+            border-radius: 10px !important;
+            border: 1px solid rgba(255,255,255,0.20) !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -102,6 +203,337 @@ st.set_page_config(
     layout="wide"
 )
 
+
+
+st.markdown(
+    """
+    <style>
+
+/* ==================================================
+   EIROX DARK ENTERPRISE PREMIUM
+   Tema escuro corporativo para Streamlit
+   ================================================== */
+
+:root {
+    --eirox-bg: #07111F;
+    --eirox-panel: #0B1B33;
+    --eirox-panel-2: #0F2747;
+    --eirox-border: rgba(120, 180, 255, 0.18);
+    --eirox-text: #F3F7FF;
+    --eirox-muted: #AFC7E8;
+    --eirox-blue: #2CA0FF;
+    --eirox-blue-2: #0E64C8;
+    --eirox-green: #2ED47A;
+    --eirox-yellow: #FFB946;
+    --eirox-red: #FF5C7A;
+    --eirox-orange: #FF8A3D;
+}
+
+html, body, [data-testid="stAppViewContainer"] {
+    background:
+        radial-gradient(circle at top left, rgba(44,160,255,0.15), transparent 32%),
+        linear-gradient(135deg, #050B14 0%, #07111F 45%, #0A1C34 100%) !important;
+    color: var(--eirox-text) !important;
+}
+
+[data-testid="stHeader"] {
+    background: rgba(5, 11, 20, 0.72) !important;
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(120, 180, 255, 0.10);
+}
+
+.block-container {
+    max-width: 100% !important;
+    padding-top: 1.2rem !important;
+    padding-left: 1.4rem !important;
+    padding-right: 1.4rem !important;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background:
+        radial-gradient(circle at top, rgba(44,160,255,0.28), transparent 30%),
+        linear-gradient(180deg, #0E2A4F 0%, #071A33 58%, #04101F 100%) !important;
+    border-right: 1px solid rgba(120, 180, 255, 0.18);
+    box-shadow: 8px 0 28px rgba(0, 0, 0, 0.26);
+}
+
+section[data-testid="stSidebar"] .block-container {
+    padding-top: 1.2rem !important;
+}
+
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3,
+section[data-testid="stSidebar"] label,
+section[data-testid="stSidebar"] p,
+section[data-testid="stSidebar"] span {
+    color: #FFFFFF !important;
+}
+
+.sidebar-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
+    border: 1px solid rgba(180, 215, 255, 0.18);
+    border-radius: 18px;
+    padding: 16px 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
+    backdrop-filter: blur(10px);
+}
+
+.sidebar-title {
+    font-size: 19px;
+    font-weight: 900;
+    letter-spacing: .02em;
+    color: #FFFFFF;
+    margin-bottom: 4px;
+}
+
+.sidebar-subtitle {
+    font-size: 12px;
+    color: #C8DFFF;
+}
+
+.sidebar-section {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: #9FD0FF !important;
+    margin-top: 18px;
+    margin-bottom: 8px;
+}
+
+.sidebar-pill {
+    display: inline-block;
+    background: linear-gradient(135deg, rgba(44,160,255,.32), rgba(46,212,122,.16));
+    border: 1px solid rgba(44,160,255,.48);
+    color: #E6F4FF;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    margin-top: 6px;
+}
+
+section[data-testid="stSidebar"] div[role="radiogroup"] label {
+    background: rgba(255,255,255,0.065);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 13px;
+    padding: 10px 10px;
+    margin-bottom: 7px;
+    transition: all .18s ease;
+}
+
+section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+    background: rgba(44,160,255,0.18);
+    border-color: rgba(44,160,255,0.42);
+    transform: translateX(3px);
+}
+
+/* Títulos */
+h1, h2, h3 {
+    color: #F6FAFF !important;
+    letter-spacing: -0.02em;
+}
+
+h1 {
+    font-weight: 900 !important;
+}
+
+h4, p, span, label {
+    color: var(--eirox-muted) !important;
+}
+
+/* Cards e containers */
+div[data-testid="stMetric"] {
+    background:
+        linear-gradient(135deg, rgba(15,39,71,.98), rgba(8,20,38,.95));
+    border: 1px solid rgba(120,180,255,.18);
+    border-radius: 18px;
+    padding: 18px 18px;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.26);
+    position: relative;
+    overflow: hidden;
+}
+
+div[data-testid="stMetric"]::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(90deg, #2CA0FF, #2ED47A);
+}
+
+div[data-testid="stMetricLabel"] {
+    color: #AFC7E8 !important;
+    font-weight: 700;
+}
+
+div[data-testid="stMetricValue"] {
+    color: #FFFFFF !important;
+    font-weight: 900;
+    font-size: 28px !important;
+}
+
+/* Alertas Streamlit */
+div[data-testid="stAlert"] {
+    background: linear-gradient(135deg, rgba(14,42,79,.88), rgba(7,26,51,.88)) !important;
+    border: 1px solid rgba(120,180,255,.18) !important;
+    border-radius: 16px !important;
+    color: #EAF4FF !important;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .18);
+}
+
+/* Inputs */
+.stTextInput input,
+.stSelectbox div[data-baseweb="select"] > div,
+.stMultiSelect div[data-baseweb="select"] > div {
+    background: rgba(6, 18, 34, 0.96) !important;
+    color: #F6FAFF !important;
+    border: 1px solid rgba(120,180,255,.22) !important;
+    border-radius: 12px !important;
+}
+
+.stTextInput input:focus {
+    border-color: rgba(44,160,255,.75) !important;
+    box-shadow: 0 0 0 2px rgba(44,160,255,.18) !important;
+}
+
+/* Botões */
+.stButton button,
+.stDownloadButton button,
+button[kind="primary"],
+button[kind="secondary"] {
+    background: linear-gradient(135deg, #0E64C8, #2CA0FF) !important;
+    color: #FFFFFF !important;
+    border: 1px solid rgba(255,255,255,.18) !important;
+    border-radius: 13px !important;
+    font-weight: 800 !important;
+    box-shadow: 0 10px 24px rgba(44,160,255,.25);
+    transition: all .18s ease;
+}
+
+.stButton button:hover,
+.stDownloadButton button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 32px rgba(44,160,255,.34);
+}
+
+/* Dataframes */
+div[data-testid="stDataFrame"] {
+    width: 100% !important;
+    border-radius: 18px !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(120,180,255,.16);
+    box-shadow: 0 16px 38px rgba(0, 0, 0, .24);
+}
+
+div[data-testid="stDataFrame"] > div {
+    width: 100% !important;
+    background: rgba(7, 17, 31, .88) !important;
+}
+
+/* Tabs e radios */
+div[role="radiogroup"] label {
+    color: #EAF4FF !important;
+}
+
+.stRadio label {
+    color: #EAF4FF !important;
+}
+
+/* Plotly */
+.js-plotly-plot,
+.plotly,
+.plot-container {
+    border-radius: 18px !important;
+}
+
+/* Cards customizados opcionais */
+.eirox-card {
+    background: linear-gradient(135deg, rgba(15,39,71,.96), rgba(8,20,38,.94));
+    border: 1px solid rgba(120,180,255,.17);
+    border-radius: 18px;
+    padding: 18px;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, .26);
+    margin-bottom: 16px;
+}
+
+.eirox-section-title {
+    font-size: 13px;
+    color: #9FD0FF;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    font-weight: 900;
+    margin-bottom: 8px;
+}
+
+.eirox-hero {
+    background:
+        radial-gradient(circle at top right, rgba(44,160,255,.22), transparent 28%),
+        linear-gradient(135deg, rgba(15,39,71,.96), rgba(7,17,31,.96));
+    border: 1px solid rgba(120,180,255,.18);
+    border-radius: 22px;
+    padding: 22px 24px;
+    margin-bottom: 18px;
+    box-shadow: 0 18px 45px rgba(0,0,0,.30);
+}
+
+.eirox-hero h1 {
+    margin: 0;
+    font-size: 30px;
+}
+
+.eirox-hero p {
+    margin: 6px 0 0 0;
+    color: #BFD7FF !important;
+}
+
+/* Destaques por prioridade em HTML */
+.tag-critical {
+    background: rgba(255,92,122,.14);
+    color: #FFD6DE;
+    border: 1px solid rgba(255,92,122,.36);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-weight: 800;
+}
+
+.tag-high {
+    background: rgba(255,138,61,.14);
+    color: #FFE3CF;
+    border: 1px solid rgba(255,138,61,.36);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-weight: 800;
+}
+
+.tag-medium {
+    background: rgba(255,185,70,.14);
+    color: #FFF1CF;
+    border: 1px solid rgba(255,185,70,.36);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-weight: 800;
+}
+
+.tag-low {
+    background: rgba(46,212,122,.14);
+    color: #D7FFE8;
+    border: 1px solid rgba(46,212,122,.36);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-weight: 800;
+}
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # --------------------------------------------------
 # LOGIN E CONTROLE DE ACESSO
 # --------------------------------------------------
@@ -159,21 +591,27 @@ USUARIOS = {
 PERMISSOES_TELAS = {
     "Diretoria": [
         "📊 Dashboard Geral",
-        "🔎 Análise por Rede/Loja"
+        "🔎 Análise por Rede/Loja",
+        "🛒 Negociação Compras",
+        "🚨 Central de Alertas"
     ],
     "Pricing": [
         "📊 Dashboard Geral",
         "🔎 Análise por Rede/Loja",
-        "💵 Simulador",
-        "📈 Curva ABC"
+        "🛒 Negociação Compras",
+        "🚨 Central de Alertas"
     ],
     "Comercial": [
         "📊 Dashboard Geral",
-        "🔎 Análise por Rede/Loja"
+        "🔎 Análise por Rede/Loja",
+        "🛒 Negociação Compras",
+        "🚨 Central de Alertas"
     ],
     "Regional": [
         "📊 Dashboard Geral",
-        "🔎 Análise por Rede/Loja"
+        "🔎 Análise por Rede/Loja",
+        "🛒 Negociação Compras",
+        "🚨 Central de Alertas"
     ],
     "Consulta": [
         "📊 Dashboard Geral"
@@ -358,7 +796,7 @@ try:
 
     st.image(
         "logo eirox.png",
-        width=350
+        width=460
     )
 
 except:
@@ -366,17 +804,11 @@ except:
 
 st.markdown(
     """
-    <h1 style='margin-bottom:0px;'>
-        📊 Eirox - Ferramenta de Inteligência de Pricing
-    </h1>
-
-    <h4 style='
-        margin-top:0px;
-        color:#B0B0B0;
-        font-weight:400;
-    '>
-        Consulta e comparação de preços concorrência
-    </h4>
+    <div class="eirox-hero">
+        <div class="eirox-section-title">Eirox Pricing Enterprise</div>
+        <h1>📊 Inteligência de Pricing & Competitividade</h1>
+        <p>Monitoramento executivo de preços, concorrência, margem, alertas e oportunidades comerciais.</p>
+    </div>
     """,
     unsafe_allow_html=True
 )
@@ -828,38 +1260,45 @@ if not simulacao_global.empty and "EAN" in df.columns:
     )
 
 # --------------------------------------------------
-# FILTROS
+# MENU LATERAL / FILTROS
 # --------------------------------------------------
 
 try:
 
     st.sidebar.image(
         "logo eirox.png",
-        width=220
+        width=280
     )
 
 except Exception:
 
     pass
 
-st.sidebar.header("Menu")
-
 st.sidebar.markdown(
-    f"**Usuário:** {nome_usuario}"
+    """
+    <div class="sidebar-card">
+        <div class="sidebar-title">Eirox Pricing</div>
+        <div class="sidebar-subtitle">Inteligência de preços e competitividade</div>
+    </div>
+    """,
+    unsafe_allow_html=True
 )
 
 st.sidebar.markdown(
-    f"**Perfil:** {perfil_usuario}"
+    f"""
+    <div class="sidebar-card">
+        <div class="sidebar-section" style="margin-top:0;">Usuário</div>
+        <div class="sidebar-user"><b>{nome_usuario}</b></div>
+        <div class="sidebar-pill">{perfil_usuario}</div>
+    </div>
+    """,
+    unsafe_allow_html=True
 )
 
-if st.sidebar.button(
-    "Sair",
-    use_container_width=True
-):
-
-    logout()
-
-st.sidebar.markdown("---")
+st.sidebar.markdown(
+    '<div class="sidebar-section">Navegação</div>',
+    unsafe_allow_html=True
+)
 
 paginas_liberadas = PERMISSOES_TELAS.get(
     perfil_usuario,
@@ -869,25 +1308,35 @@ paginas_liberadas = PERMISSOES_TELAS.get(
 )
 
 pagina = st.sidebar.radio(
-    "Navegação",
+    "Escolha a visão",
     paginas_liberadas,
-    key="menu_principal"
+    key="menu_principal",
+    label_visibility="collapsed"
 )
 
 st.sidebar.markdown("---")
 
+if st.sidebar.button(
+    "🚪 Sair do sistema",
+    use_container_width=True
+):
+
+    logout()
+
 if not pode_exportar:
     st.sidebar.info(
-        "Seu perfil possui exportação bloqueada."
+        "🔒 Exportação bloqueada para este perfil."
     )
 
 if not pode_ver_margem:
     st.sidebar.info(
-        "Seu perfil possui visão de margem/custo restrita."
+        "🔒 Margem e custo restritos para este perfil."
     )
 
-st.sidebar.header("Filtros")
-
+st.sidebar.markdown(
+    '<div class="sidebar-section">Filtros Globais</div>',
+    unsafe_allow_html=True
+)
 
 laboratorio = st.sidebar.multiselect(
     "Laboratório",
@@ -1481,6 +1930,1620 @@ if pagina == "🔎 Análise por Rede/Loja":
 
 
 # --------------------------------------------------
+# NEGOCIAÇÃO COMERCIAL / COMPRAS
+# --------------------------------------------------
+
+if pagina == "🛒 Negociação Compras":
+
+    st.subheader(
+        "🛒 Negociação Compras"
+    )
+
+    st.info(
+        "A rede ou farmácia selecionada será tratada como principal. "
+        "Todos os demais registros serão considerados concorrentes. "
+        "Esta visão mostra apenas os produtos em que o preço principal está acima do menor preço concorrente "
+        "e não conseguimos acompanhar a concorrência por falta de custo, margem ou lucro suficiente. "
+        "O objetivo é gerar uma lista para o comercial de compras negociar melhor condição."
+    )
+
+    if (
+        not historico.empty
+        and "Farmácia" in historico.columns
+        and "Preço (R$)" in historico.columns
+    ):
+
+        analise_hist = historico.copy()
+
+        if "Rede" not in analise_hist.columns:
+
+            analise_hist["Rede"] = (
+                analise_hist["Farmácia"]
+                .apply(identificar_rede)
+            )
+
+        if "EAN" not in analise_hist.columns and "EAN (GTIN)" in analise_hist.columns:
+
+            analise_hist["EAN"] = analise_hist["EAN (GTIN)"]
+
+        if "EAN" in analise_hist.columns:
+
+            analise_hist["EAN"] = (
+                analise_hist["EAN"]
+                .astype(str)
+                .str.replace(".0", "", regex=False)
+                .str.strip()
+            )
+
+        analise_hist["Preço (R$)"] = pd.to_numeric(
+            analise_hist["Preço (R$)"],
+            errors="coerce"
+        )
+
+        tipo_compra = st.radio(
+            "Analisar por",
+            [
+                "Rede",
+                "Farmácia"
+            ],
+            horizontal=True,
+            key="tipo_negociacao_compras"
+        )
+
+        if tipo_compra == "Rede":
+
+            opcoes_compra = (
+                analise_hist["Rede"]
+                .dropna()
+                .astype(str)
+                .sort_values()
+                .unique()
+                .tolist()
+            )
+
+        else:
+
+            opcoes_compra = (
+                analise_hist["Farmácia"]
+                .dropna()
+                .astype(str)
+                .sort_values()
+                .unique()
+                .tolist()
+            )
+
+        indice_padrao_compra = 0
+
+        for i, opcao in enumerate(opcoes_compra):
+
+            if "ZANOL" in str(opcao).upper():
+                indice_padrao_compra = i
+                break
+
+        selecionado_compra = st.selectbox(
+            f"Selecione a {tipo_compra.lower()} principal",
+            opcoes_compra,
+            index=indice_padrao_compra,
+            key="select_negociacao_compras"
+        )
+
+        if tipo_compra == "Rede":
+
+            base_principal = analise_hist[
+                analise_hist["Rede"] == selecionado_compra
+            ].copy()
+
+            base_concorrentes = analise_hist[
+                analise_hist["Rede"] != selecionado_compra
+            ].copy()
+
+        else:
+
+            base_principal = analise_hist[
+                analise_hist["Farmácia"] == selecionado_compra
+            ].copy()
+
+            base_concorrentes = analise_hist[
+                analise_hist["Farmácia"] != selecionado_compra
+            ].copy()
+
+        if (
+            not base_principal.empty
+            and not base_concorrentes.empty
+            and "EAN" in base_principal.columns
+            and "EAN" in base_concorrentes.columns
+        ):
+
+            # --------------------------------------------------
+            # PREÇO PRINCIPAL
+            # --------------------------------------------------
+
+            preco_principal = (
+                base_principal
+                .dropna(
+                    subset=[
+                        "EAN",
+                        "Preço (R$)"
+                    ]
+                )
+                .groupby("EAN")
+                .agg(
+                    Produto_Pesquisa=("Produto", "first"),
+                    Preco_Principal=("Preço (R$)", "mean"),
+                    Qtd_Pesquisas_Principal=("Preço (R$)", "count"),
+                    Farmacia_Principal=("Farmácia", "first"),
+                    Rede_Principal=("Rede", "first")
+                )
+                .reset_index()
+            )
+
+            # --------------------------------------------------
+            # MENOR PREÇO CONCORRENTE
+            # --------------------------------------------------
+
+            concorrentes_validos = (
+                base_concorrentes
+                .dropna(
+                    subset=[
+                        "EAN",
+                        "Preço (R$)"
+                    ]
+                )
+                .copy()
+            )
+
+            idx_menor_concorrente = (
+                concorrentes_validos
+                .groupby("EAN")
+                ["Preço (R$)"]
+                .idxmin()
+            )
+
+            menor_concorrente = (
+                concorrentes_validos
+                .loc[
+                    idx_menor_concorrente,
+                    [
+                        "EAN",
+                        "Preço (R$)",
+                        "Farmácia",
+                        "Rede"
+                    ]
+                ]
+                .rename(
+                    columns={
+                        "Preço (R$)": "Menor_Preco_Concorrente",
+                        "Farmácia": "Loja_Menor_Preco_Concorrente",
+                        "Rede": "Rede_Menor_Preco_Concorrente"
+                    }
+                )
+            )
+
+            qtd_concorrentes = (
+                concorrentes_validos
+                .groupby("EAN")
+                ["Preço (R$)"]
+                .count()
+                .reset_index()
+                .rename(
+                    columns={
+                        "Preço (R$)": "Qtd_Pesquisas_Concorrentes"
+                    }
+                )
+            )
+
+            compras = (
+                preco_principal
+                .merge(
+                    menor_concorrente,
+                    on="EAN",
+                    how="inner"
+                )
+                .merge(
+                    qtd_concorrentes,
+                    on="EAN",
+                    how="left"
+                )
+            )
+
+            # --------------------------------------------------
+            # CADASTRO / RECOMENDAÇÃO
+            # --------------------------------------------------
+
+            if "EAN" in df_filtrado.columns:
+
+                cadastro = df_filtrado.copy()
+
+                cadastro["EAN"] = (
+                    cadastro["EAN"]
+                    .astype(str)
+                    .str.replace(".0", "", regex=False)
+                    .str.strip()
+                )
+
+                cadastro_cols = []
+
+                for coluna in [
+                    "EAN",
+                    "Produto",
+                    "Laboratório",
+                    "Família",
+                    "CURVA",
+                    "Recomendacao",
+                    "Ganho_Potencial",
+                    "Margem_%",
+                    "Lucro_Unitario",
+                    "Preco_Medio"
+                ]:
+
+                    if coluna in cadastro.columns:
+                        cadastro_cols.append(coluna)
+
+                cadastro = (
+                    cadastro[cadastro_cols]
+                    .drop_duplicates(
+                        subset=[
+                            "EAN"
+                        ]
+                    )
+                )
+
+                compras = compras.merge(
+                    cadastro,
+                    on="EAN",
+                    how="left"
+                )
+
+            # --------------------------------------------------
+            # SIMULADOR
+            # --------------------------------------------------
+
+            if (
+                "simulacao_global" in globals()
+                and not simulacao_global.empty
+            ):
+
+                sim = simulacao_global.copy()
+
+                sim["EAN"] = (
+                    sim["EAN"]
+                    .astype(str)
+                    .str.replace(".0", "", regex=False)
+                    .str.strip()
+                )
+
+                sim_cols = []
+
+                for coluna in [
+                    "EAN",
+                    "Qtd_Vendida_Mes_Anterior",
+                    "Venda_Preco_Antigo",
+                    "Preco_Atual",
+                    "Preco_Sugerido_Mercado",
+                    "Venda_Projetada_Preco_Sugerido",
+                    "Ganho_Unitario",
+                    "Ganho_Potencial_Simulador"
+                ]:
+
+                    if coluna in sim.columns:
+                        sim_cols.append(coluna)
+
+                compras = compras.merge(
+                    sim[sim_cols],
+                    on="EAN",
+                    how="left"
+                )
+
+            # --------------------------------------------------
+            # REGRA DE NEGOCIAÇÃO
+            # --------------------------------------------------
+
+            for coluna in [
+                "Preco_Principal",
+                "Menor_Preco_Concorrente",
+                "Preco_Atual",
+                "Preco_Medio",
+                "Lucro_Unitario",
+                "Margem_%",
+                "Ganho_Potencial",
+                "Ganho_Potencial_Simulador"
+            ]:
+
+                if coluna in compras.columns:
+                    compras[coluna] = pd.to_numeric(
+                        compras[coluna],
+                        errors="coerce"
+                    )
+
+            compras["Reducao_Necessaria_R$"] = (
+                compras["Preco_Principal"]
+                - compras["Menor_Preco_Concorrente"]
+            )
+
+            compras["Reducao_Necessaria_%"] = (
+                compras["Reducao_Necessaria_R$"]
+                / compras["Preco_Principal"]
+                * 100
+            )
+
+            # Custo estimado: preço atual/principal menos lucro unitário.
+            # Quando não houver lucro, considera sem condição de compra.
+            compras["Custo_Estimado"] = None
+
+            if "Lucro_Unitario" in compras.columns:
+
+                compras["Custo_Estimado"] = (
+                    compras["Preco_Principal"]
+                    - compras["Lucro_Unitario"]
+                )
+
+            compras["Lucro_Apos_Acompanhar"] = (
+                compras["Menor_Preco_Concorrente"]
+                - compras["Custo_Estimado"]
+            )
+
+            compras["Margem_Apos_Acompanhar_%"] = (
+                compras["Lucro_Apos_Acompanhar"]
+                / compras["Menor_Preco_Concorrente"]
+                * 100
+            )
+
+            precisa_baixar = (
+                compras["Reducao_Necessaria_R$"]
+                .fillna(0)
+                > 0
+            )
+
+            sem_condicao_custo = pd.Series(
+                False,
+                index=compras.index
+            )
+
+            if "Recomendacao" in compras.columns:
+
+                sem_condicao_custo = (
+                    sem_condicao_custo
+                    | compras["Recomendacao"]
+                        .astype(str)
+                        .str.upper()
+                        .str.contains(
+                            "SEM CUSTO",
+                            na=False
+                        )
+                )
+
+            sem_condicao_custo = (
+                sem_condicao_custo
+                | compras["Custo_Estimado"].isna()
+                | compras["Lucro_Unitario"].isna()
+                | (compras["Lucro_Apos_Acompanhar"] <= 0)
+                | (compras["Margem_Apos_Acompanhar_%"] <= 0)
+            )
+
+            compras_negociar = compras[
+                precisa_baixar
+                & sem_condicao_custo
+            ].copy()
+
+            # --------------------------------------------------
+            # MOTIVO / AÇÃO
+            # --------------------------------------------------
+
+            def definir_motivo(row):
+
+                motivos = []
+
+                if row.get("Reducao_Necessaria_R$", 0) > 0:
+                    motivos.append("Precisa baixar para acompanhar o menor concorrente")
+
+                if "SEM CUSTO" in str(row.get("Recomendacao", "")).upper():
+                    motivos.append("Sem custo cadastrado")
+
+                if pd.isna(row.get("Custo_Estimado", None)):
+                    motivos.append("Custo não identificado")
+
+                if pd.isna(row.get("Lucro_Unitario", None)):
+                    motivos.append("Lucro unitário não identificado")
+
+                if pd.notna(row.get("Lucro_Apos_Acompanhar", None)) and row.get("Lucro_Apos_Acompanhar", 0) <= 0:
+                    motivos.append("Acompanhando concorrente ficaria sem lucro")
+
+                if pd.notna(row.get("Margem_Apos_Acompanhar_%", None)) and row.get("Margem_Apos_Acompanhar_%", 0) <= 0:
+                    motivos.append("Acompanhando concorrente ficaria sem margem")
+
+                return " | ".join(motivos)
+
+            compras_negociar["Motivo_Compras"] = compras_negociar.apply(
+                definir_motivo,
+                axis=1
+            )
+
+            compras_negociar["Acao_Compras"] = (
+                "Negociar custo/condição comercial antes de acompanhar o menor preço concorrente."
+            )
+
+            # --------------------------------------------------
+            # KPIS
+            # --------------------------------------------------
+
+            k1, k2, k3, k4 = st.columns(4)
+
+            k1.metric(
+                "Produtos para negociar",
+                len(compras_negociar)
+            )
+
+            k2.metric(
+                "Pesquisas principal",
+                int(
+                    compras_negociar[
+                        "Qtd_Pesquisas_Principal"
+                    ].sum()
+                )
+                if "Qtd_Pesquisas_Principal" in compras_negociar.columns
+                else 0
+            )
+
+            k3.metric(
+                "Redução média necessária",
+                moeda_br(
+                    compras_negociar[
+                        "Reducao_Necessaria_R$"
+                    ].mean()
+                )
+            )
+
+            if "Qtd_Vendida_Mes_Anterior" in compras_negociar.columns:
+
+                k4.metric(
+                    "Qtd vendida envolvida",
+                    numero_br(
+                        compras_negociar[
+                            "Qtd_Vendida_Mes_Anterior"
+                        ].sum()
+                    )
+                )
+
+            # --------------------------------------------------
+            # FILTROS DA VISÃO
+            # --------------------------------------------------
+
+            f1, f2, f3 = st.columns(3)
+
+            with f1:
+
+                filtro_rec = st.multiselect(
+                    "Recomendação",
+                    sorted(
+                        compras_negociar["Recomendacao"]
+                        .dropna()
+                        .astype(str)
+                        .unique()
+                    )
+                    if "Recomendacao" in compras_negociar.columns
+                    else [],
+                    key="filtro_rec_compras_principal"
+                )
+
+            with f2:
+
+                filtro_lab = st.multiselect(
+                    "Laboratório",
+                    sorted(
+                        compras_negociar["Laboratório"]
+                        .dropna()
+                        .astype(str)
+                        .unique()
+                    )
+                    if "Laboratório" in compras_negociar.columns
+                    else [],
+                    key="filtro_lab_compras_principal"
+                )
+
+            with f3:
+
+                busca_compra = st.text_input(
+                    "Buscar produto ou EAN",
+                    key="busca_compras_principal"
+                )
+
+            if filtro_rec and "Recomendacao" in compras_negociar.columns:
+
+                compras_negociar = compras_negociar[
+                    compras_negociar["Recomendacao"]
+                    .astype(str)
+                    .isin(filtro_rec)
+                ]
+
+            if filtro_lab and "Laboratório" in compras_negociar.columns:
+
+                compras_negociar = compras_negociar[
+                    compras_negociar["Laboratório"]
+                    .astype(str)
+                    .isin(filtro_lab)
+                ]
+
+            if busca_compra:
+
+                cond_busca = pd.Series(
+                    False,
+                    index=compras_negociar.index
+                )
+
+                for coluna in [
+                    "EAN",
+                    "Produto",
+                    "Produto_Pesquisa"
+                ]:
+
+                    if coluna in compras_negociar.columns:
+
+                        cond_busca = (
+                            cond_busca
+                            | compras_negociar[coluna]
+                                .astype(str)
+                                .str.contains(
+                                    busca_compra,
+                                    case=False,
+                                    na=False
+                                )
+                        )
+
+                compras_negociar = compras_negociar[
+                    cond_busca
+                ]
+
+            # --------------------------------------------------
+            # TABELA
+            # --------------------------------------------------
+
+            compras_negociar = compras_negociar.sort_values(
+                [
+                    "Reducao_Necessaria_R$",
+                    "Qtd_Pesquisas_Principal"
+                ],
+                ascending=[
+                    False,
+                    False
+                ]
+            )
+
+            colunas_exibir = []
+
+            for coluna in [
+                "EAN",
+                "Produto",
+                "Produto_Pesquisa",
+                "Laboratório",
+                "Família",
+                "CURVA",
+                "Recomendacao",
+                "Rede_Principal",
+                "Farmacia_Principal",
+                "Qtd_Pesquisas_Principal",
+                "Qtd_Pesquisas_Concorrentes",
+                "Preco_Principal",
+                "Menor_Preco_Concorrente",
+                "Loja_Menor_Preco_Concorrente",
+                "Rede_Menor_Preco_Concorrente",
+                "Reducao_Necessaria_R$",
+                "Reducao_Necessaria_%",
+                "Custo_Estimado",
+                "Lucro_Unitario",
+                "Margem_%",
+                "Lucro_Apos_Acompanhar",
+                "Margem_Apos_Acompanhar_%",
+                "Qtd_Vendida_Mes_Anterior",
+                "Motivo_Compras",
+                "Acao_Compras"
+            ]:
+
+                if coluna in compras_negociar.columns:
+                    colunas_exibir.append(coluna)
+
+            compras_exibir = compras_negociar[colunas_exibir].copy()
+
+            for coluna in [
+                "Preco_Principal",
+                "Menor_Preco_Concorrente",
+                "Reducao_Necessaria_R$",
+                "Custo_Estimado",
+                "Lucro_Unitario",
+                "Lucro_Apos_Acompanhar"
+            ]:
+
+                if coluna in compras_exibir.columns:
+                    compras_exibir[coluna] = compras_exibir[coluna].apply(moeda_br)
+
+            for coluna in [
+                "Reducao_Necessaria_%",
+                "Margem_%",
+                "Margem_Apos_Acompanhar_%"
+            ]:
+
+                if coluna in compras_exibir.columns:
+                    compras_exibir[coluna] = compras_exibir[coluna].apply(percentual_br)
+
+            if "Qtd_Vendida_Mes_Anterior" in compras_exibir.columns:
+
+                compras_exibir["Qtd_Vendida_Mes_Anterior"] = (
+                    compras_exibir["Qtd_Vendida_Mes_Anterior"]
+                    .apply(numero_br)
+                )
+
+            compras_exibir = compras_exibir.rename(
+                columns={
+                    "Produto_Pesquisa": "Produto na Pesquisa",
+                    "Recomendacao": "Recomendação",
+                    "Rede_Principal": "Rede Principal",
+                    "Farmacia_Principal": "Farmácia Principal",
+                    "Qtd_Pesquisas_Principal": "Qtd Pesquisas Principal",
+                    "Qtd_Pesquisas_Concorrentes": "Qtd Pesquisas Concorrentes",
+                    "Preco_Principal": "Preço Principal",
+                    "Menor_Preco_Concorrente": "Menor Preço Concorrente",
+                    "Loja_Menor_Preco_Concorrente": "Loja Menor Preço Concorrente",
+                    "Rede_Menor_Preco_Concorrente": "Rede Menor Preço Concorrente",
+                    "Reducao_Necessaria_R$": "Redução Necessária R$",
+                    "Reducao_Necessaria_%": "Redução Necessária %",
+                    "Custo_Estimado": "Custo Estimado",
+                    "Lucro_Unitario": "Lucro Atual",
+                    "Margem_%": "Margem Atual %",
+                    "Lucro_Apos_Acompanhar": "Lucro Após Acompanhar",
+                    "Margem_Apos_Acompanhar_%": "Margem Após Acompanhar %",
+                    "Qtd_Vendida_Mes_Anterior": "Qtd Vendida Mês Anterior",
+                    "Motivo_Compras": "Motivo para Compras",
+                    "Acao_Compras": "Ação Compras"
+                }
+            )
+
+            compras_exibir = (
+                compras_exibir
+                .replace(
+                    {
+                        "None": "",
+                        "nan": "",
+                        "NaN": "",
+                        "R$ nan": "",
+                        "nan%": ""
+                    }
+                )
+                .fillna("")
+            )
+
+            st.dataframe(
+                compras_exibir,
+                use_container_width=True,
+                height=560
+            )
+
+            csv_compras = (
+                compras_exibir
+                .to_csv(
+                    index=False,
+                    sep=";"
+                )
+                .encode("utf-8-sig")
+            )
+
+            st.download_button(
+                "📥 Exportar lista para Comercial de Compras",
+                csv_compras,
+                "produtos_para_negociacao_compras.csv",
+                "text/csv",
+                key="exportar_lista_compras_principal"
+            )
+
+        else:
+
+            st.warning(
+                "Não há dados suficientes para comparar a rede/farmácia principal contra concorrentes."
+            )
+
+    else:
+
+        st.warning(
+            "A base VENDA_TESTE não possui dados suficientes para montar esta visão."
+        )
+
+    st.stop()
+
+
+
+# --------------------------------------------------
+# CENTRAL DE ALERTAS INTELIGENTES
+# --------------------------------------------------
+
+if pagina == "🚨 Central de Alertas":
+
+    st.subheader(
+        "🚨 Central de Alertas Inteligentes"
+    )
+
+    st.info(
+        "Esta central prioriza produtos que exigem ação do time de pricing, comercial ou compras. "
+        "Os alertas são calculados com base em preço principal, menor concorrente, recomendação, custo/margem e potencial financeiro."
+    )
+
+    if (
+        not historico.empty
+        and "Farmácia" in historico.columns
+        and "Preço (R$)" in historico.columns
+    ):
+
+        alertas_hist = historico.copy()
+
+        if "Rede" not in alertas_hist.columns:
+
+            alertas_hist["Rede"] = (
+                alertas_hist["Farmácia"]
+                .apply(identificar_rede)
+            )
+
+        if "EAN" not in alertas_hist.columns and "EAN (GTIN)" in alertas_hist.columns:
+
+            alertas_hist["EAN"] = alertas_hist["EAN (GTIN)"]
+
+        if "EAN" in alertas_hist.columns:
+
+            alertas_hist["EAN"] = (
+                alertas_hist["EAN"]
+                .astype(str)
+                .str.replace(".0", "", regex=False)
+                .str.strip()
+            )
+
+        alertas_hist["Preço (R$)"] = pd.to_numeric(
+            alertas_hist["Preço (R$)"],
+            errors="coerce"
+        )
+
+        tipo_alerta_base = st.radio(
+            "Analisar alertas por",
+            [
+                "Rede",
+                "Farmácia"
+            ],
+            horizontal=True,
+            key="tipo_central_alertas"
+        )
+
+        if tipo_alerta_base == "Rede":
+
+            opcoes_alerta = (
+                alertas_hist["Rede"]
+                .dropna()
+                .astype(str)
+                .sort_values()
+                .unique()
+                .tolist()
+            )
+
+        else:
+
+            opcoes_alerta = (
+                alertas_hist["Farmácia"]
+                .dropna()
+                .astype(str)
+                .sort_values()
+                .unique()
+                .tolist()
+            )
+
+        indice_padrao_alerta = 0
+
+        for i, opcao in enumerate(opcoes_alerta):
+
+            if "ZANOL" in str(opcao).upper():
+                indice_padrao_alerta = i
+                break
+
+        selecionado_alerta = st.selectbox(
+            f"Selecione a {tipo_alerta_base.lower()} principal",
+            opcoes_alerta,
+            index=indice_padrao_alerta,
+            key="select_central_alertas"
+        )
+
+        if tipo_alerta_base == "Rede":
+
+            base_principal_alerta = alertas_hist[
+                alertas_hist["Rede"] == selecionado_alerta
+            ].copy()
+
+            base_concorrente_alerta = alertas_hist[
+                alertas_hist["Rede"] != selecionado_alerta
+            ].copy()
+
+        else:
+
+            base_principal_alerta = alertas_hist[
+                alertas_hist["Farmácia"] == selecionado_alerta
+            ].copy()
+
+            base_concorrente_alerta = alertas_hist[
+                alertas_hist["Farmácia"] != selecionado_alerta
+            ].copy()
+
+        if (
+            not base_principal_alerta.empty
+            and not base_concorrente_alerta.empty
+            and "EAN" in base_principal_alerta.columns
+            and "EAN" in base_concorrente_alerta.columns
+        ):
+
+            principal = (
+                base_principal_alerta
+                .dropna(
+                    subset=[
+                        "EAN",
+                        "Preço (R$)"
+                    ]
+                )
+                .groupby("EAN")
+                .agg(
+                    Produto_Pesquisa=("Produto", "first"),
+                    Preco_Principal=("Preço (R$)", "mean"),
+                    Qtd_Pesquisas_Principal=("Preço (R$)", "count"),
+                    Farmacia_Principal=("Farmácia", "first"),
+                    Rede_Principal=("Rede", "first")
+                )
+                .reset_index()
+            )
+
+            concorrentes_validos = (
+                base_concorrente_alerta
+                .dropna(
+                    subset=[
+                        "EAN",
+                        "Preço (R$)"
+                    ]
+                )
+                .copy()
+            )
+
+            idx_menor = (
+                concorrentes_validos
+                .groupby("EAN")
+                ["Preço (R$)"]
+                .idxmin()
+            )
+
+            menor_concorrente = (
+                concorrentes_validos
+                .loc[
+                    idx_menor,
+                    [
+                        "EAN",
+                        "Preço (R$)",
+                        "Farmácia",
+                        "Rede"
+                    ]
+                ]
+                .rename(
+                    columns={
+                        "Preço (R$)": "Menor_Preco_Concorrente",
+                        "Farmácia": "Loja_Menor_Preco_Concorrente",
+                        "Rede": "Rede_Menor_Preco_Concorrente"
+                    }
+                )
+            )
+
+            qtd_concorrentes = (
+                concorrentes_validos
+                .groupby("EAN")
+                ["Preço (R$)"]
+                .count()
+                .reset_index()
+                .rename(
+                    columns={
+                        "Preço (R$)": "Qtd_Pesquisas_Concorrentes"
+                    }
+                )
+            )
+
+            alertas_base = (
+                principal
+                .merge(
+                    menor_concorrente,
+                    on="EAN",
+                    how="left"
+                )
+                .merge(
+                    qtd_concorrentes,
+                    on="EAN",
+                    how="left"
+                )
+            )
+
+            if "EAN" in df_filtrado.columns:
+
+                cadastro_alerta = df_filtrado.copy()
+
+                cadastro_alerta["EAN"] = (
+                    cadastro_alerta["EAN"]
+                    .astype(str)
+                    .str.replace(".0", "", regex=False)
+                    .str.strip()
+                )
+
+                cadastro_cols = []
+
+                for coluna in [
+                    "EAN",
+                    "Produto",
+                    "Laboratório",
+                    "Família",
+                    "CURVA",
+                    "Recomendacao",
+                    "Ganho_Potencial",
+                    "Margem_%",
+                    "Lucro_Unitario",
+                    "Preco_Medio"
+                ]:
+
+                    if coluna in cadastro_alerta.columns:
+                        cadastro_cols.append(coluna)
+
+                cadastro_alerta = (
+                    cadastro_alerta[cadastro_cols]
+                    .drop_duplicates(
+                        subset=[
+                            "EAN"
+                        ]
+                    )
+                )
+
+                alertas_base = alertas_base.merge(
+                    cadastro_alerta,
+                    on="EAN",
+                    how="left"
+                )
+
+            if (
+                "simulacao_global" in globals()
+                and not simulacao_global.empty
+            ):
+
+                sim_alerta = simulacao_global.copy()
+
+                sim_alerta["EAN"] = (
+                    sim_alerta["EAN"]
+                    .astype(str)
+                    .str.replace(".0", "", regex=False)
+                    .str.strip()
+                )
+
+                sim_cols = []
+
+                for coluna in [
+                    "EAN",
+                    "Qtd_Vendida_Mes_Anterior",
+                    "Venda_Preco_Antigo",
+                    "Preco_Atual",
+                    "Preco_Sugerido_Mercado",
+                    "Venda_Projetada_Preco_Sugerido",
+                    "Ganho_Unitario",
+                    "Ganho_Potencial_Simulador"
+                ]:
+
+                    if coluna in sim_alerta.columns:
+                        sim_cols.append(coluna)
+
+                alertas_base = alertas_base.merge(
+                    sim_alerta[sim_cols],
+                    on="EAN",
+                    how="left"
+                )
+
+            for coluna in [
+                "Preco_Principal",
+                "Menor_Preco_Concorrente",
+                "Ganho_Potencial",
+                "Ganho_Potencial_Simulador",
+                "Margem_%",
+                "Lucro_Unitario",
+                "Preco_Atual"
+            ]:
+
+                if coluna in alertas_base.columns:
+
+                    alertas_base[coluna] = pd.to_numeric(
+                        alertas_base[coluna],
+                        errors="coerce"
+                    )
+
+            alertas_base["Dif_vs_Concorrente_R$"] = (
+                alertas_base["Preco_Principal"]
+                - alertas_base["Menor_Preco_Concorrente"]
+            )
+
+            alertas_base["Dif_vs_Concorrente_%"] = (
+                alertas_base["Dif_vs_Concorrente_R$"]
+                / alertas_base["Menor_Preco_Concorrente"]
+                * 100
+            )
+
+            alertas_base["Custo_Estimado"] = None
+
+            if "Lucro_Unitario" in alertas_base.columns:
+
+                alertas_base["Custo_Estimado"] = (
+                    alertas_base["Preco_Principal"]
+                    - alertas_base["Lucro_Unitario"]
+                )
+
+            alertas_base["Lucro_Apos_Acompanhar"] = (
+                alertas_base["Menor_Preco_Concorrente"]
+                - alertas_base["Custo_Estimado"]
+            )
+
+            alertas_base["Margem_Apos_Acompanhar_%"] = (
+                alertas_base["Lucro_Apos_Acompanhar"]
+                / alertas_base["Menor_Preco_Concorrente"]
+                * 100
+            )
+
+            def classificar_alerta(row):
+
+                dif_perc = row.get(
+                    "Dif_vs_Concorrente_%",
+                    0
+                )
+
+                ganho = row.get(
+                    "Ganho_Potencial_Simulador",
+                    row.get(
+                        "Ganho_Potencial",
+                        0
+                    )
+                )
+
+                recomendacao = str(
+                    row.get(
+                        "Recomendacao",
+                        ""
+                    )
+                ).upper()
+
+                lucro_apos = row.get(
+                    "Lucro_Apos_Acompanhar",
+                    None
+                )
+
+                margem_apos = row.get(
+                    "Margem_Apos_Acompanhar_%",
+                    None
+                )
+
+                if (
+                    pd.notna(dif_perc)
+                    and dif_perc >= 15
+                    and (
+                        pd.isna(lucro_apos)
+                        or lucro_apos <= 0
+                        or pd.isna(margem_apos)
+                        or margem_apos <= 0
+                    )
+                ):
+
+                    return "🔴 Negociar Compras"
+
+                if (
+                    pd.notna(dif_perc)
+                    and dif_perc >= 15
+                ):
+
+                    return "🔴 Perda Competitiva"
+
+                if "SEM CUSTO" in recomendacao:
+
+                    return "🟠 Produto Sem Custo"
+
+                if (
+                    pd.notna(ganho)
+                    and ganho > 0
+                    and "SUBIR PREÇO" in recomendacao
+                ):
+
+                    return "🟢 Ganho Rápido"
+
+                if (
+                    pd.notna(dif_perc)
+                    and dif_perc >= 5
+                ):
+
+                    return "🟡 Atenção Competitiva"
+
+                return "⚪ Monitorar"
+
+            alertas_base["Tipo_Alerta"] = alertas_base.apply(
+                classificar_alerta,
+                axis=1
+            )
+
+            def definir_prioridade(row):
+
+                tipo = str(
+                    row.get(
+                        "Tipo_Alerta",
+                        ""
+                    )
+                )
+
+                dif = row.get(
+                    "Dif_vs_Concorrente_%",
+                    0
+                )
+
+                qtd = row.get(
+                    "Qtd_Pesquisas_Principal",
+                    0
+                )
+
+                curva = str(
+                    row.get(
+                        "CURVA",
+                        ""
+                    )
+                ).upper()
+
+                score = 0
+
+                if "🔴" in tipo:
+                    score += 60
+
+                elif "🟠" in tipo:
+                    score += 45
+
+                elif "🟡" in tipo:
+                    score += 30
+
+                elif "🟢" in tipo:
+                    score += 25
+
+                if pd.notna(dif):
+                    score += min(
+                        abs(float(dif)),
+                        30
+                    )
+
+                if pd.notna(qtd):
+                    score += min(
+                        float(qtd),
+                        20
+                    )
+
+                if curva == "A":
+                    score += 15
+
+                if score >= 85:
+                    return "🔴 Crítica"
+
+                if score >= 60:
+                    return "🟠 Alta"
+
+                if score >= 35:
+                    return "🟡 Média"
+
+                return "🟢 Baixa"
+
+            alertas_base["Prioridade"] = alertas_base.apply(
+                definir_prioridade,
+                axis=1
+            )
+
+            def acao_alerta(row):
+
+                tipo = str(
+                    row.get(
+                        "Tipo_Alerta",
+                        ""
+                    )
+                )
+
+                if "Negociar Compras" in tipo:
+                    return "Enviar para compras negociar custo/condição antes de reduzir."
+
+                if "Perda Competitiva" in tipo:
+                    return "Avaliar redução de preço ou ação promocional."
+
+                if "Produto Sem Custo" in tipo:
+                    return "Regularizar custo/cadastro antes de decisão comercial."
+
+                if "Ganho Rápido" in tipo:
+                    return "Avaliar aumento de preço com baixo risco competitivo."
+
+                if "Atenção Competitiva" in tipo:
+                    return "Monitorar e comparar histórico antes de ajustar."
+
+                return "Manter em monitoramento."
+
+            alertas_base["Ação Recomendada"] = alertas_base.apply(
+                acao_alerta,
+                axis=1
+            )
+
+            f1, f2, f3, f4 = st.columns(4)
+
+            with f1:
+
+                filtro_tipo_alerta = st.multiselect(
+                    "Tipo de alerta",
+                    sorted(
+                        alertas_base["Tipo_Alerta"]
+                        .dropna()
+                        .unique()
+                    ),
+                    key="filtro_tipo_alerta"
+                )
+
+            with f2:
+
+                filtro_prioridade = st.multiselect(
+                    "Prioridade",
+                    sorted(
+                        alertas_base["Prioridade"]
+                        .dropna()
+                        .unique()
+                    ),
+                    key="filtro_prioridade_alerta"
+                )
+
+            with f3:
+
+                filtro_lab_alerta = st.multiselect(
+                    "Laboratório",
+                    sorted(
+                        alertas_base["Laboratório"]
+                        .dropna()
+                        .astype(str)
+                        .unique()
+                    )
+                    if "Laboratório" in alertas_base.columns
+                    else [],
+                    key="filtro_lab_alerta"
+                )
+
+            with f4:
+
+                busca_alerta = st.text_input(
+                    "Buscar produto ou EAN",
+                    key="busca_alerta"
+                )
+
+            alertas_filtrados = alertas_base.copy()
+
+            if filtro_tipo_alerta:
+
+                alertas_filtrados = alertas_filtrados[
+                    alertas_filtrados["Tipo_Alerta"]
+                    .isin(filtro_tipo_alerta)
+                ]
+
+            if filtro_prioridade:
+
+                alertas_filtrados = alertas_filtrados[
+                    alertas_filtrados["Prioridade"]
+                    .isin(filtro_prioridade)
+                ]
+
+            if filtro_lab_alerta and "Laboratório" in alertas_filtrados.columns:
+
+                alertas_filtrados = alertas_filtrados[
+                    alertas_filtrados["Laboratório"]
+                    .astype(str)
+                    .isin(filtro_lab_alerta)
+                ]
+
+            if busca_alerta:
+
+                cond_busca_alerta = pd.Series(
+                    False,
+                    index=alertas_filtrados.index
+                )
+
+                for coluna in [
+                    "EAN",
+                    "Produto",
+                    "Produto_Pesquisa"
+                ]:
+
+                    if coluna in alertas_filtrados.columns:
+
+                        cond_busca_alerta = (
+                            cond_busca_alerta
+                            | alertas_filtrados[coluna]
+                                .astype(str)
+                                .str.contains(
+                                    busca_alerta,
+                                    case=False,
+                                    na=False
+                                )
+                        )
+
+                alertas_filtrados = alertas_filtrados[
+                    cond_busca_alerta
+                ]
+
+            k1, k2, k3, k4 = st.columns(4)
+
+            k1.metric(
+                "Alertas",
+                len(alertas_filtrados)
+            )
+
+            k2.metric(
+                "Críticos",
+                int(
+                    alertas_filtrados[
+                        alertas_filtrados["Prioridade"]
+                        .astype(str)
+                        .str.contains(
+                            "Crítica",
+                            na=False
+                        )
+                    ].shape[0]
+                )
+            )
+
+            k3.metric(
+                "Negociar Compras",
+                int(
+                    alertas_filtrados[
+                        alertas_filtrados["Tipo_Alerta"]
+                        .astype(str)
+                        .str.contains(
+                            "Negociar Compras",
+                            na=False
+                        )
+                    ].shape[0]
+                )
+            )
+
+            ganho_total_alerta = 0
+
+            if "Ganho_Potencial_Simulador" in alertas_filtrados.columns:
+
+                ganho_total_alerta = (
+                    alertas_filtrados[
+                        "Ganho_Potencial_Simulador"
+                    ]
+                    .fillna(0)
+                    .sum()
+                )
+
+            elif "Ganho_Potencial" in alertas_filtrados.columns:
+
+                ganho_total_alerta = (
+                    alertas_filtrados[
+                        "Ganho_Potencial"
+                    ]
+                    .fillna(0)
+                    .sum()
+                )
+
+            k4.metric(
+                "Potencial envolvido",
+                moeda_br(
+                    ganho_total_alerta
+                )
+            )
+
+            g1, g2 = st.columns(2)
+
+            with g1:
+
+                resumo_alertas = (
+                    alertas_filtrados["Tipo_Alerta"]
+                    .value_counts()
+                    .reset_index()
+                )
+
+                resumo_alertas.columns = [
+                    "Tipo de Alerta",
+                    "Quantidade"
+                ]
+
+                fig_alertas = px.bar(
+                    resumo_alertas,
+                    x="Tipo de Alerta",
+                    y="Quantidade",
+                    text="Quantidade",
+                    title="Alertas por Tipo"
+                )
+
+                fig_alertas.update_traces(
+                    textposition="outside"
+                )
+
+                st.plotly_chart(
+                    fig_alertas,
+                    width="stretch",
+                    key="grafico_alertas_tipo"
+                )
+
+            with g2:
+
+                resumo_prioridade = (
+                    alertas_filtrados["Prioridade"]
+                    .value_counts()
+                    .reset_index()
+                )
+
+                resumo_prioridade.columns = [
+                    "Prioridade",
+                    "Quantidade"
+                ]
+
+                fig_prioridade = px.bar(
+                    resumo_prioridade,
+                    x="Prioridade",
+                    y="Quantidade",
+                    text="Quantidade",
+                    title="Alertas por Prioridade"
+                )
+
+                fig_prioridade.update_traces(
+                    textposition="outside"
+                )
+
+                st.plotly_chart(
+                    fig_prioridade,
+                    width="stretch",
+                    key="grafico_alertas_prioridade"
+                )
+
+            ordem_prioridade = {
+                "🔴 Crítica": 1,
+                "🟠 Alta": 2,
+                "🟡 Média": 3,
+                "🟢 Baixa": 4
+            }
+
+            alertas_filtrados["Ordem_Prioridade"] = (
+                alertas_filtrados["Prioridade"]
+                .map(ordem_prioridade)
+                .fillna(9)
+            )
+
+            alertas_filtrados = alertas_filtrados.sort_values(
+                [
+                    "Ordem_Prioridade",
+                    "Dif_vs_Concorrente_%"
+                ],
+                ascending=[
+                    True,
+                    False
+                ]
+            )
+
+            colunas_alerta = []
+
+            for coluna in [
+                "Prioridade",
+                "Tipo_Alerta",
+                "EAN",
+                "Produto",
+                "Produto_Pesquisa",
+                "Laboratório",
+                "Família",
+                "CURVA",
+                "Recomendacao",
+                "Rede_Principal",
+                "Farmacia_Principal",
+                "Qtd_Pesquisas_Principal",
+                "Qtd_Pesquisas_Concorrentes",
+                "Preco_Principal",
+                "Menor_Preco_Concorrente",
+                "Loja_Menor_Preco_Concorrente",
+                "Rede_Menor_Preco_Concorrente",
+                "Dif_vs_Concorrente_R$",
+                "Dif_vs_Concorrente_%",
+                "Lucro_Apos_Acompanhar",
+                "Margem_Apos_Acompanhar_%",
+                "Ganho_Potencial_Simulador",
+                "Ação Recomendada"
+            ]:
+
+                if coluna in alertas_filtrados.columns:
+                    colunas_alerta.append(coluna)
+
+            alertas_exibir = alertas_filtrados[colunas_alerta].copy()
+
+            for coluna in [
+                "Preco_Principal",
+                "Menor_Preco_Concorrente",
+                "Dif_vs_Concorrente_R$",
+                "Lucro_Apos_Acompanhar",
+                "Ganho_Potencial_Simulador"
+            ]:
+
+                if coluna in alertas_exibir.columns:
+                    alertas_exibir[coluna] = alertas_exibir[coluna].apply(moeda_br)
+
+            for coluna in [
+                "Dif_vs_Concorrente_%",
+                "Margem_Apos_Acompanhar_%"
+            ]:
+
+                if coluna in alertas_exibir.columns:
+                    alertas_exibir[coluna] = alertas_exibir[coluna].apply(percentual_br)
+
+            alertas_exibir = alertas_exibir.rename(
+                columns={
+                    "Tipo_Alerta": "Tipo de Alerta",
+                    "Produto_Pesquisa": "Produto na Pesquisa",
+                    "Recomendacao": "Recomendação",
+                    "Rede_Principal": "Rede Principal",
+                    "Farmacia_Principal": "Farmácia Principal",
+                    "Qtd_Pesquisas_Principal": "Qtd Pesquisas Principal",
+                    "Qtd_Pesquisas_Concorrentes": "Qtd Pesquisas Concorrentes",
+                    "Preco_Principal": "Preço Principal",
+                    "Menor_Preco_Concorrente": "Menor Preço Concorrente",
+                    "Loja_Menor_Preco_Concorrente": "Loja Menor Preço Concorrente",
+                    "Rede_Menor_Preco_Concorrente": "Rede Menor Preço Concorrente",
+                    "Dif_vs_Concorrente_R$": "Dif. vs Concorrente R$",
+                    "Dif_vs_Concorrente_%": "Dif. vs Concorrente %",
+                    "Lucro_Apos_Acompanhar": "Lucro Após Acompanhar",
+                    "Margem_Apos_Acompanhar_%": "Margem Após Acompanhar %",
+                    "Ganho_Potencial_Simulador": "Potencial"
+                }
+            )
+
+            alertas_exibir = (
+                alertas_exibir
+                .replace(
+                    {
+                        "None": "",
+                        "nan": "",
+                        "NaN": "",
+                        "R$ nan": "",
+                        "nan%": ""
+                    }
+                )
+                .fillna("")
+            )
+
+            st.dataframe(
+                alertas_exibir,
+                use_container_width=True,
+                height=560
+            )
+
+            csv_alertas = (
+                alertas_exibir
+                .to_csv(
+                    index=False,
+                    sep=";"
+                )
+                .encode("utf-8-sig")
+            )
+
+            st.download_button(
+                "📥 Exportar Central de Alertas",
+                csv_alertas,
+                "central_alertas_eirox.csv",
+                "text/csv",
+                key="exportar_central_alertas"
+            )
+
+        else:
+
+            st.warning(
+                "Não há dados suficientes para comparar principal contra concorrentes."
+            )
+
+    else:
+
+        st.warning(
+            "A base de pesquisa de preços não possui dados suficientes para montar os alertas."
+        )
+
+    st.stop()
+
+
+
+# --------------------------------------------------
 # KPIS
 # --------------------------------------------------
 
@@ -2067,6 +4130,7 @@ else:
         "Não há produtos dessa recomendação com dados completos no Simulador. "
         "Isso ocorre quando o EAN não existe na venda da rede ou não teve venda no período."
     )
+
 
 
 # CURVA ABC
