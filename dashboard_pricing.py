@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import zipfile
 import pandas as pd
 import plotly.express as px
 import plotly.io as pio
@@ -135,7 +136,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "debug_estavel_20260607_141644"
+VERSAO_APP = "corrigido_robusto_20260607"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -203,6 +204,224 @@ carregar_estoque,
 identificar_rede,
 curva_abc
 )
+
+
+# --------------------------------------------------
+# LEITURA ROBUSTA DE BASES PARA ONLINE / LOCALHOST
+# --------------------------------------------------
+
+def _ler_excel_csv_pasta(pasta):
+    pasta = Path(pasta)
+    if not pasta.exists() or not pasta.is_dir():
+        return pd.DataFrame()
+
+    arquivos = []
+    for ext in ["*.xlsx", "*.xls", "*.csv"]:
+        arquivos.extend(list(pasta.glob(ext)))
+
+    bases = []
+    for arq in arquivos:
+        try:
+            if arq.suffix.lower() == ".csv":
+                try:
+                    temp = pd.read_csv(arq, sep=";", encoding="utf-8-sig")
+                except Exception:
+                    temp = pd.read_csv(arq, encoding="utf-8-sig")
+            else:
+                temp = pd.read_excel(arq)
+
+            if not temp.empty:
+                temp["Arquivo_Origem"] = arq.name
+                bases.append(temp)
+        except Exception as erro:
+            print(f"Falha ao ler {arq}: {erro}")
+
+    if bases:
+        base = pd.concat(bases, ignore_index=True)
+        base.columns = base.columns.astype(str).str.strip()
+        return base
+
+    return pd.DataFrame()
+
+
+def _ler_excel_csv_zip(zip_nome):
+    zip_path = Path(zip_nome)
+    if not zip_path.exists():
+        return pd.DataFrame()
+
+    bases = []
+    try:
+        with zipfile.ZipFile(zip_path, "r") as z:
+            for nome in z.namelist():
+                if not nome.lower().endswith((".xlsx", ".xls", ".csv")):
+                    continue
+
+                try:
+                    with z.open(nome) as f:
+                        if nome.lower().endswith(".csv"):
+                            try:
+                                temp = pd.read_csv(f, sep=";", encoding="utf-8-sig")
+                            except Exception:
+                                f.seek(0)
+                                temp = pd.read_csv(f, encoding="utf-8-sig")
+                        else:
+                            temp = pd.read_excel(f)
+
+                    if not temp.empty:
+                        temp["Arquivo_Origem"] = nome
+                        bases.append(temp)
+                except Exception as erro:
+                    print(f"Falha ao ler {nome} em {zip_nome}: {erro}")
+    except Exception as erro:
+        print(f"Falha ao abrir zip {zip_nome}: {erro}")
+
+    if bases:
+        base = pd.concat(bases, ignore_index=True)
+        base.columns = base.columns.astype(str).str.strip()
+        return base
+
+    return pd.DataFrame()
+
+
+def carregar_base_robusta(nome_base, pastas, zips):
+    for pasta in pastas:
+        base = _ler_excel_csv_pasta(pasta)
+        if not base.empty:
+            base["Fonte_Carregamento"] = pasta
+            return base
+
+    for zip_nome in zips:
+        base = _ler_excel_csv_zip(zip_nome)
+        if not base.empty:
+            base["Fonte_Carregamento"] = zip_nome
+            return base
+
+    print(f"{nome_base} não encontrada.")
+    return pd.DataFrame()
+
+
+def encontrar_coluna_flexivel(base, opcoes, contem=None):
+    if not isinstance(base, pd.DataFrame) or base.empty:
+        return None
+
+    colunas = base.columns.astype(str).tolist()
+
+    for opcao in opcoes:
+        for coluna in colunas:
+            if coluna.strip().lower() == str(opcao).strip().lower():
+                return coluna
+
+    if contem:
+        for coluna in colunas:
+            nome = str(coluna).lower()
+            if any(str(t).lower() in nome for t in contem):
+                return coluna
+
+    return None
+
+
+def _preco_ref_seguro(s):
+    s = pd.to_numeric(s, errors="coerce").dropna()
+    s = s[(s > 0) & (s <= 5000)]
+
+    if s.empty:
+        return None
+
+    if len(s) >= 4:
+        q1 = s.quantile(0.25)
+        q3 = s.quantile(0.75)
+        iqr = q3 - q1
+        lim_inf = max(q1 - 1.5 * iqr, 0)
+        lim_sup = q3 + 1.5 * iqr
+        s2 = s[(s >= lim_inf) & (s <= lim_sup)]
+        if not s2.empty:
+            s = s2
+
+    return float(s.median())
+
+
+def criar_simulacao_por_historico(historico_base):
+    if not isinstance(historico_base, pd.DataFrame) or historico_base.empty:
+        return pd.DataFrame()
+
+    base = historico_base.copy()
+    base.columns = base.columns.astype(str).str.strip()
+
+    col_ean = encontrar_coluna_flexivel(
+        base,
+        ["EAN", "EAN (GTIN)", "GTIN", "Código de Barras", "Codigo de Barras"],
+        ["ean", "gtin", "barras"]
+    )
+
+    col_produto = encontrar_coluna_flexivel(
+        base,
+        ["Produto", "Descrição", "Descricao", "Termo Pesquisado"],
+        ["produto", "descr", "termo"]
+    )
+
+    col_preco = encontrar_coluna_flexivel(
+        base,
+        ["Preço (R$)", "Preco (R$)", "Preço", "Preco", "Valor"],
+        ["preço", "preco", "valor"]
+    )
+
+    if not col_ean or not col_preco:
+        return pd.DataFrame()
+
+    base["EAN"] = base[col_ean].astype(str).str.replace(".0", "", regex=False).str.strip()
+    base["Preco_Base"] = pd.to_numeric(base[col_preco], errors="coerce")
+    base = base.dropna(subset=["EAN", "Preco_Base"])
+    base = base[(base["Preco_Base"] > 0) & (base["Preco_Base"] <= 5000)].copy()
+
+    if base.empty:
+        return pd.DataFrame()
+
+    simulacao = (
+        base
+        .groupby("EAN")
+        .agg(
+            Qtd_Vendida_Mes_Anterior=("Preco_Base", "count"),
+            Preco_Atual=("Preco_Base", "mean"),
+            Preco_Sugerido_Mercado=("Preco_Base", _preco_ref_seguro)
+        )
+        .reset_index()
+    )
+
+    if col_produto:
+        produto_ref = (
+            base.groupby("EAN")[col_produto]
+            .agg(lambda x: x.mode().iloc[0] if not x.mode().empty else x.iloc[0])
+            .reset_index()
+            .rename(columns={col_produto: "Produto_Simulador"})
+        )
+        simulacao = simulacao.merge(produto_ref, on="EAN", how="left")
+
+    simulacao["Preco_Atual"] = pd.to_numeric(simulacao["Preco_Atual"], errors="coerce")
+    simulacao["Preco_Sugerido_Mercado"] = pd.to_numeric(simulacao["Preco_Sugerido_Mercado"], errors="coerce")
+
+    simulacao = simulacao[
+        (simulacao["Preco_Atual"] > 0)
+        & (simulacao["Preco_Sugerido_Mercado"] > 0)
+        & (simulacao["Preco_Sugerido_Mercado"] <= simulacao["Preco_Atual"] * 3)
+    ].copy()
+
+    simulacao["Venda_Preco_Antigo"] = simulacao["Qtd_Vendida_Mes_Anterior"] * simulacao["Preco_Atual"]
+    simulacao["Venda_Projetada_Preco_Sugerido"] = simulacao["Qtd_Vendida_Mes_Anterior"] * simulacao["Preco_Sugerido_Mercado"]
+    simulacao["Ganho_Unitario"] = simulacao["Preco_Sugerido_Mercado"] - simulacao["Preco_Atual"]
+    simulacao["Ganho_Potencial_Simulador"] = simulacao["Venda_Projetada_Preco_Sugerido"] - simulacao["Venda_Preco_Antigo"]
+
+    simulacao = simulacao[simulacao["Ganho_Potencial_Simulador"] > 0].copy()
+
+    for c in [
+        "Preco_Atual", "Preco_Sugerido_Mercado", "Ganho_Unitario",
+        "Venda_Preco_Antigo", "Venda_Projetada_Preco_Sugerido",
+        "Ganho_Potencial_Simulador", "Qtd_Vendida_Mes_Anterior"
+    ]:
+        if c in simulacao.columns:
+            simulacao[c] = simulacao[c].round(2)
+
+    return simulacao
+
 
 # --------------------------------------------------
 # CONFIG
@@ -855,6 +1074,35 @@ compra = carregar_compra()
 venda_rede = carregar_venda_rede()
 estoque = carregar_estoque()
 
+# Fallback robusto para Streamlit Cloud / GitHub
+if historico.empty:
+    historico = carregar_base_robusta(
+        "VENDA_TESTE",
+        ["VENDA_TESTE"],
+        ["VENDA_TESTE.zip"]
+    )
+
+if compra.empty:
+    compra = carregar_base_robusta(
+        "COMPRA_TESTE",
+        ["COMPRA_TESTE", "COMPRA", "COMPRAS_TESTE"],
+        ["COMPRA_TESTE.zip", "COMPRA.zip"]
+    )
+
+if venda_rede.empty:
+    venda_rede = carregar_base_robusta(
+        "VENDA_FINAL_TESTE",
+        ["VENDA_FINAL_TESTE", "VENDA_TESTE_FINAL", "VENDA_FINAL", "VENDA_REDE"],
+        ["VENDA_FINAL_TESTE.zip", "VENDA_TESTE_FINAL.zip", "VENDA_FINAL.zip"]
+    )
+
+if estoque.empty:
+    estoque = carregar_base_robusta(
+        "ESTOQUE_TESTE",
+        ["ESTOQUE_TESTE", "ESTOQUE"],
+        ["ESTOQUE_TESTE.zip", "ESTOQUE.zip"]
+    )
+
 # --------------------------------------------------
 # PADRONIZAR COLUNAS
 # --------------------------------------------------
@@ -1241,6 +1489,11 @@ if (
                     .round(2)
                 )
 
+# Fallback: se a venda final não conseguir montar a simulação,
+# usa o histórico de pesquisa como base para uma simulação operacional.
+if simulacao_global.empty and not historico.empty:
+    simulacao_global = criar_simulacao_por_historico(historico)
+
 if not simulacao_global.empty and "EAN" in df.columns:
 
     df["EAN"] = (
@@ -1520,8 +1773,9 @@ if pagina == "🧪 Diagnóstico":
         pastas = [
             "VENDA_TESTE",
             "VENDA_FINAL_TESTE",
-            "ESTOQUE_TESTE",
-            "VENDA_TESTE_FINAL"
+            "VENDA_TESTE_FINAL",
+            "COMPRA_TESTE",
+            "ESTOQUE_TESTE"
         ]
 
         registros = []
@@ -6528,11 +6782,50 @@ if not simulacao_global.empty:
         width="stretch"
     )
 
+    top_ganho_grafico = simulacao.copy()
+    top_ganho_grafico["Ganho_Potencial_Simulador"] = pd.to_numeric(
+        top_ganho_grafico["Ganho_Potencial_Simulador"],
+        errors="coerce"
+    ).fillna(0)
+
+    eixo_produto_grafico = "Produto" if "Produto" in top_ganho_grafico.columns else "EAN"
+
+    top_ganho_grafico = (
+        top_ganho_grafico
+        .sort_values("Ganho_Potencial_Simulador", ascending=True)
+        .tail(20)
+    )
+
+    top_ganho_grafico["Ganho_Label"] = (
+        top_ganho_grafico["Ganho_Potencial_Simulador"]
+        .apply(moeda_br)
+    )
+
     fig = px.bar(
-        simulacao.head(20),
-        x="Produto" if "Produto" in simulacao.columns else "EAN",
-        y="Ganho_Potencial_Simulador",
-        title="Top 20 Produtos com Maior Ganho Projetado"
+        top_ganho_grafico,
+        x="Ganho_Potencial_Simulador",
+        y=eixo_produto_grafico,
+        orientation="h",
+        text="Ganho_Label",
+        title="Top 20 Produtos com Maior Ganho Projetado",
+        labels={
+            "Ganho_Potencial_Simulador": "Ganho Projetado",
+            eixo_produto_grafico: "Produto"
+        }
+    )
+
+    fig.update_traces(
+        textposition="outside",
+        cliponaxis=False
+    )
+
+    fig.update_layout(
+        height=650,
+        margin=dict(l=20, r=180, t=60, b=40),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(tickformat=",", showgrid=True),
+        yaxis=dict(automargin=True)
     )
 
     st.plotly_chart(
