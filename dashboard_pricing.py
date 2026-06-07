@@ -138,7 +138,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "mapa_sem_debug_20260607"
+VERSAO_APP = "sem_debug_colunas_definitivo_20260607"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -7373,15 +7373,7 @@ if not simulacao_global.empty:
 
 else:
 
-    
-
-    if not venda_rede.empty:
-        st.write("Colunas encontradas em VENDA_FINAL_TESTE:")
-        st.write(venda_rede.columns.tolist())
-
-    if not historico.empty:
-        st.write("Colunas encontradas em VENDA_TESTE:")
-        st.write(historico.columns.tolist())
+    pass
 
 
 # --------------------------------------------------
