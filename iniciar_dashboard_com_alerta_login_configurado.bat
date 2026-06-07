@@ -11,7 +11,7 @@ set SMTP_USER=pmarques097@gmail.com
 
 REM IMPORTANTE:
 REM Coloque abaixo a SENHA DE APP do Gmail, não a senha normal do e-mail.
-set SMTP_PASSWORD=Maraisa@031730
+set SMTP_PASSWORD=eipzydnkmjzygrze
 
 streamlit run dashboard_pricing.py
 
