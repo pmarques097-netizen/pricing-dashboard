@@ -4482,6 +4482,11 @@ st.subheader(
     f"🔎 Produtos da recomendação: {recomendacao_selecionada}"
 )
 
+# --------------------------------------------------
+# PRODUTOS DA RECOMENDAÇÃO
+# Exibe sempre a base principal e complementa com simulador/histórico quando existir.
+# --------------------------------------------------
+
 produtos_recomendacao = df_filtrado[
     df_filtrado["Recomendacao"] == recomendacao_selecionada
 ].copy()
@@ -4495,14 +4500,13 @@ if "EAN" in produtos_recomendacao.columns:
         .str.strip()
     )
 
-# --------------------------------------------------
-# CRUZAR COM SIMULADOR PELO EAN
-# --------------------------------------------------
+produtos_detalhe = produtos_recomendacao.copy()
 
+# Complementar com simulador quando existir
 if (
     "simulacao_global" in globals()
     and not simulacao_global.empty
-    and "EAN" in produtos_recomendacao.columns
+    and "EAN" in produtos_detalhe.columns
 ):
 
     simulador_base = simulacao_global.copy()
@@ -4514,75 +4518,64 @@ if (
         .str.strip()
     )
 
-    cadastro_produtos = (
-        produtos_recomendacao
-        .drop_duplicates(
-            subset=[
-                "EAN"
-            ]
-        )
-        .copy()
-    )
-
-    colunas_cadastro = []
+    sim_cols = []
 
     for coluna in [
         "EAN",
-        "Descricao_Unica",
-        "Produto",
-        "Laboratório",
-        "Família",
-        "CURVA",
-        "Recomendacao",
-        "Margem_%",
-        "Lucro_Unitario",
-        "Preco_Medio"
+        "Qtd_Vendida_Mes_Anterior",
+        "Venda_Preco_Antigo",
+        "Preco_Atual",
+        "Preco_Sugerido_Mercado",
+        "Venda_Projetada_Preco_Sugerido",
+        "Ganho_Unitario",
+        "Ganho_Potencial_Simulador",
+        "Produto_Simulador"
     ]:
 
-        if coluna in cadastro_produtos.columns:
-            colunas_cadastro.append(coluna)
+        if coluna in simulador_base.columns:
+            sim_cols.append(coluna)
 
-    produtos_detalhe = simulador_base.merge(
-        cadastro_produtos[colunas_cadastro],
+    produtos_detalhe = produtos_detalhe.merge(
+        simulador_base[sim_cols],
         on="EAN",
-        how="inner"
+        how="left"
     )
 
-    # --------------------------------------------------
-    # MENOR PREÇO E LOJA COM MENOR PREÇO
-    # --------------------------------------------------
+# Complementar com menor preço e loja
+if (
+    not historico.empty
+    and "EAN" in produtos_detalhe.columns
+    and "Preço (R$)" in historico.columns
+    and "Farmácia" in historico.columns
+):
 
-    if (
-        not historico.empty
-        and "Preço (R$)" in historico.columns
-        and "Farmácia" in historico.columns
-    ):
+    hist_menor = historico.copy()
 
-        hist_menor = historico.copy()
+    if "EAN" not in hist_menor.columns and "EAN (GTIN)" in hist_menor.columns:
+        hist_menor["EAN"] = hist_menor["EAN (GTIN)"]
 
-        if "EAN" not in hist_menor.columns and "EAN (GTIN)" in hist_menor.columns:
-            hist_menor["EAN"] = hist_menor["EAN (GTIN)"]
+    if "EAN" in hist_menor.columns:
 
-        if "EAN" in hist_menor.columns:
+        hist_menor["EAN"] = (
+            hist_menor["EAN"]
+            .astype(str)
+            .str.replace(".0", "", regex=False)
+            .str.strip()
+        )
 
-            hist_menor["EAN"] = (
-                hist_menor["EAN"]
-                .astype(str)
-                .str.replace(".0", "", regex=False)
-                .str.strip()
-            )
+        hist_menor["Preço (R$)"] = pd.to_numeric(
+            hist_menor["Preço (R$)"],
+            errors="coerce"
+        )
 
-            hist_menor["Preço (R$)"] = pd.to_numeric(
-                hist_menor["Preço (R$)"],
-                errors="coerce"
-            )
+        hist_menor = hist_menor.dropna(
+            subset=[
+                "EAN",
+                "Preço (R$)"
+            ]
+        )
 
-            hist_menor = hist_menor.dropna(
-                subset=[
-                    "EAN",
-                    "Preço (R$)"
-                ]
-            )
+        if not hist_menor.empty:
 
             idx_menor_preco = (
                 hist_menor
@@ -4591,20 +4584,26 @@ if (
                 .idxmin()
             )
 
+            colunas_menor = [
+                "EAN",
+                "Preço (R$)",
+                "Farmácia"
+            ]
+
+            if "Rede" in hist_menor.columns:
+                colunas_menor.append("Rede")
+
             menor_preco_loja = (
                 hist_menor
                 .loc[
                     idx_menor_preco,
-                    [
-                        "EAN",
-                        "Preço (R$)",
-                        "Farmácia"
-                    ]
+                    colunas_menor
                 ]
                 .rename(
                     columns={
                         "Preço (R$)": "Menor_Preco",
-                        "Farmácia": "Loja_Menor_Preco_Concorrente"
+                        "Farmácia": "Loja_Menor_Preco_Concorrente",
+                        "Rede": "Rede_Menor_Preco_Concorrente"
                     }
                 )
             )
@@ -4615,24 +4614,10 @@ if (
                 how="left"
             )
 
-    produtos_detalhe = produtos_detalhe.sort_values(
-        "Ganho_Potencial_Simulador",
-        ascending=False
-    )
-
-else:
-
-    produtos_detalhe = pd.DataFrame()
-
 if not produtos_detalhe.empty:
-
-    # --------------------------------------------------
-    # AJUSTES DE QUALIDADE DAS COLUNAS
-    # --------------------------------------------------
 
     produtos_detalhe = produtos_detalhe.copy()
 
-    # Se existir Produto_Simulador, usa como descrição principal quando Produto estiver vazio
     if "Produto_Simulador" in produtos_detalhe.columns:
 
         if "Produto" not in produtos_detalhe.columns:
@@ -4646,14 +4631,15 @@ if not produtos_detalhe.empty:
                 .fillna(produtos_detalhe["Produto_Simulador"])
             )
 
-    # Trocar None/nan por vazio nas colunas textuais
     for coluna in [
         "Descricao_Unica",
         "Produto",
         "Laboratório",
         "Família",
         "CURVA",
-        "Recomendacao"
+        "Recomendacao",
+        "Loja_Menor_Preco_Concorrente",
+        "Rede_Menor_Preco_Concorrente"
     ]:
 
         if coluna in produtos_detalhe.columns:
@@ -4671,33 +4657,43 @@ if not produtos_detalhe.empty:
                 )
             )
 
-    # Remove colunas cadastrais que vieram totalmente vazias
     for coluna in [
-        "Laboratório",
-        "Família",
-        "CURVA",
+        "Qtd_Vendida_Mes_Anterior",
+        "Venda_Preco_Antigo",
+        "Preco_Atual",
+        "Preco_Sugerido_Mercado",
+        "Venda_Projetada_Preco_Sugerido",
+        "Ganho_Unitario",
+        "Ganho_Potencial_Simulador",
+        "Menor_Preco",
         "Margem_%",
-        "Lucro_Unitario"
+        "Lucro_Unitario",
+        "Preco_Medio",
+        "Ganho_Potencial"
     ]:
 
         if coluna in produtos_detalhe.columns:
 
-            serie_limpa = (
-                produtos_detalhe[coluna]
-                .replace("", pd.NA)
+            produtos_detalhe[coluna] = pd.to_numeric(
+                produtos_detalhe[coluna],
+                errors="coerce"
             )
 
-            if serie_limpa.isna().all():
+    if "Ganho_Potencial_Simulador" in produtos_detalhe.columns:
 
-                produtos_detalhe = produtos_detalhe.drop(
-                    columns=[
-                        coluna
-                    ]
-                )
+        produtos_detalhe = produtos_detalhe.sort_values(
+            "Ganho_Potencial_Simulador",
+            ascending=False,
+            na_position="last"
+        )
 
-    # --------------------------------------------------
-    # COLUNAS PARA EXIBIÇÃO
-    # --------------------------------------------------
+    elif "Ganho_Potencial" in produtos_detalhe.columns:
+
+        produtos_detalhe = produtos_detalhe.sort_values(
+            "Ganho_Potencial",
+            ascending=False,
+            na_position="last"
+        )
 
     colunas_exibir = []
 
@@ -4715,8 +4711,10 @@ if not produtos_detalhe.empty:
         "Venda_Projetada_Preco_Sugerido",
         "Ganho_Unitario",
         "Ganho_Potencial_Simulador",
+        "Ganho_Potencial",
         "Menor_Preco",
         "Loja_Menor_Preco_Concorrente",
+        "Rede_Menor_Preco_Concorrente",
         "Margem_%",
         "Lucro_Unitario",
         "Preco_Medio"
@@ -4727,10 +4725,6 @@ if not produtos_detalhe.empty:
 
     produtos_exibir = produtos_detalhe[colunas_exibir].copy()
 
-    # --------------------------------------------------
-    # FORMATAR PADRÃO BRASIL
-    # --------------------------------------------------
-
     for coluna in [
         "Venda_Preco_Antigo",
         "Preco_Atual",
@@ -4738,6 +4732,7 @@ if not produtos_detalhe.empty:
         "Venda_Projetada_Preco_Sugerido",
         "Ganho_Unitario",
         "Ganho_Potencial_Simulador",
+        "Ganho_Potencial",
         "Menor_Preco",
         "Lucro_Unitario",
         "Preco_Medio"
@@ -4755,7 +4750,6 @@ if not produtos_detalhe.empty:
             .apply(numero_br)
         )
 
-    # Limpeza final para não exibir None/nan
     produtos_exibir = (
         produtos_exibir
         .replace(
@@ -4772,14 +4766,17 @@ if not produtos_detalhe.empty:
 
     produtos_exibir = produtos_exibir.rename(
         columns={
+            "Recomendacao": "Recomendação",
             "Preco_Atual": "Preço Atual",
             "Preco_Sugerido_Mercado": "Preço Sugerido Mercado",
             "Venda_Preco_Antigo": "Venda Preço Antigo",
             "Venda_Projetada_Preco_Sugerido": "Venda Projetada Preço Sugerido",
             "Ganho_Unitario": "Ganho Unitário",
             "Ganho_Potencial_Simulador": "Ganho Produto",
+            "Ganho_Potencial": "Ganho Potencial",
             "Menor_Preco": "Menor Preço",
             "Loja_Menor_Preco_Concorrente": "Loja Menor Preço Concorrente",
+            "Rede_Menor_Preco_Concorrente": "Rede Menor Preço Concorrente",
             "Qtd_Vendida_Mes_Anterior": "Qtd Vendida Mês Anterior",
             "Preco_Medio": "Preço Médio",
             "Margem_%": "Margem %",
@@ -4793,69 +4790,8 @@ if not produtos_detalhe.empty:
         height=420
     )
 
-    # --------------------------------------------------
-    # EXPORTAÇÃO DA RECOMENDAÇÃO
-    # --------------------------------------------------
-
-    exportar_recomendacao = produtos_detalhe[colunas_exibir].copy()
-
-    for coluna in [
-        "Venda_Preco_Antigo",
-        "Preco_Atual",
-        "Preco_Sugerido_Mercado",
-        "Venda_Projetada_Preco_Sugerido",
-        "Ganho_Unitario",
-        "Ganho_Potencial_Simulador",
-        "Menor_Preco",
-        "Lucro_Unitario",
-        "Preco_Medio"
-    ]:
-
-        if coluna in exportar_recomendacao.columns:
-            exportar_recomendacao[coluna] = exportar_recomendacao[coluna].apply(moeda_br)
-
-    if "Margem_%" in exportar_recomendacao.columns:
-        exportar_recomendacao["Margem_%"] = exportar_recomendacao["Margem_%"].apply(percentual_br)
-
-    if "Qtd_Vendida_Mes_Anterior" in exportar_recomendacao.columns:
-        exportar_recomendacao["Qtd_Vendida_Mes_Anterior"] = (
-            exportar_recomendacao["Qtd_Vendida_Mes_Anterior"]
-            .apply(numero_br)
-        )
-
-    exportar_recomendacao = (
-        exportar_recomendacao
-        .replace(
-            {
-                "None": "",
-                "nan": "",
-                "NaN": "",
-                "R$ nan": "",
-                "nan%": ""
-            }
-        )
-        .fillna("")
-    )
-
-    exportar_recomendacao = exportar_recomendacao.rename(
-        columns={
-            "Preco_Atual": "Preço Atual",
-            "Preco_Sugerido_Mercado": "Preço Sugerido Mercado",
-            "Venda_Preco_Antigo": "Venda Preço Antigo",
-            "Venda_Projetada_Preco_Sugerido": "Venda Projetada Preço Sugerido",
-            "Ganho_Unitario": "Ganho Unitário",
-            "Ganho_Potencial_Simulador": "Ganho Produto",
-            "Menor_Preco": "Menor Preço",
-            "Loja_Menor_Preco_Concorrente": "Loja Menor Preço Concorrente",
-            "Qtd_Vendida_Mes_Anterior": "Qtd Vendida Mês Anterior",
-            "Preco_Medio": "Preço Médio",
-            "Margem_%": "Margem %",
-            "Lucro_Unitario": "Lucro Unitário"
-        }
-    )
-
     csv_recomendacao = (
-        exportar_recomendacao
+        produtos_exibir
         .to_csv(
             index=False,
             sep=";"
@@ -4866,7 +4802,7 @@ if not produtos_detalhe.empty:
     st.download_button(
         "📥 Exportar produtos da recomendação",
         csv_recomendacao,
-        f"produtos_{recomendacao_selecionada.lower().replace(' ', '_')}.csv",
+        f"produtos_{str(recomendacao_selecionada).lower().replace(' ', '_')}.csv",
         "text/csv",
         key="exportar_recomendacao"
     )
@@ -4874,8 +4810,7 @@ if not produtos_detalhe.empty:
 else:
 
     st.warning(
-        "Não há produtos dessa recomendação com dados completos no Simulador. "
-        "Isso ocorre quando o EAN não existe na venda da rede ou não teve venda no período."
+        "Não há produtos para esta recomendação dentro dos filtros atuais."
     )
 
 
