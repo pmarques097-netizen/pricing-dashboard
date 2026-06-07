@@ -1,27 +1,19 @@
-EIROX DARK ENTERPRISE PREMIUM
+EIROX PRICING - V10
 
-Arquivo principal:
-- dashboard_pricing_dark_enterprise_premium.py
+Base utilizada:
+- dashboard_pricing(10).py
+
+Alteração aplicada:
+- Menu alterado de "Análise por Rede/Loja" para "Rede/Loja vs Concorrentes".
+- Título da tela também atualizado.
+- Código total pronto no arquivo dashboard_pricing.py.
 
 Como executar:
-1. Coloque estes arquivos na mesma pasta do seu projeto.
-2. Mantenha junto os arquivos:
+1. Extraia este ZIP.
+2. Coloque estes arquivos na mesma pasta do seu projeto.
+3. Mantenha junto:
    - Analise_Pricing.xlsx
    - pricing_utils.py
-   - logo eirox.png, se usar logo
-3. Clique em executar_dashboard.bat.
-
-Melhorias aplicadas:
-- Tema escuro premium
-- Sidebar enterprise
-- Cards KPI modernos
-- Bordas arredondadas
-- Sombras suaves
-- Tabelas mais elegantes
-- Gráficos Plotly em dark mode
-- Visual executivo sem trocar para tema claro
-
-
-AJUSTE APLICADO:
-- Logo da tela inicial aumentada para 460px
-- Logo do menu lateral aumentada para 280px
+   - logo eirox.png
+4. Clique em:
+   - executar_dashboard.bat
