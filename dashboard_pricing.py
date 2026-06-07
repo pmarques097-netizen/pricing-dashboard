@@ -1,13 +1,10 @@
 import streamlit as st
-import os
 import pandas as pd
 import plotly.express as px
+import plotly.io as pio
 import hashlib
-import smtplib
-import ssl
-from datetime import datetime
-from email.message import EmailMessage
-from pathlib import Path
+
+pio.templates.default = "plotly_dark"
 
 
 st.markdown(
@@ -206,6 +203,337 @@ st.set_page_config(
     layout="wide"
 )
 
+
+
+st.markdown(
+    """
+    <style>
+
+/* ==================================================
+   EIROX DARK ENTERPRISE PREMIUM
+   Tema escuro corporativo para Streamlit
+   ================================================== */
+
+:root {
+    --eirox-bg: #07111F;
+    --eirox-panel: #0B1B33;
+    --eirox-panel-2: #0F2747;
+    --eirox-border: rgba(120, 180, 255, 0.18);
+    --eirox-text: #F3F7FF;
+    --eirox-muted: #AFC7E8;
+    --eirox-blue: #2CA0FF;
+    --eirox-blue-2: #0E64C8;
+    --eirox-green: #2ED47A;
+    --eirox-yellow: #FFB946;
+    --eirox-red: #FF5C7A;
+    --eirox-orange: #FF8A3D;
+}
+
+html, body, [data-testid="stAppViewContainer"] {
+    background:
+        radial-gradient(circle at top left, rgba(44,160,255,0.15), transparent 32%),
+        linear-gradient(135deg, #050B14 0%, #07111F 45%, #0A1C34 100%) !important;
+    color: var(--eirox-text) !important;
+}
+
+[data-testid="stHeader"] {
+    background: rgba(5, 11, 20, 0.72) !important;
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(120, 180, 255, 0.10);
+}
+
+.block-container {
+    max-width: 100% !important;
+    padding-top: 1.2rem !important;
+    padding-left: 1.4rem !important;
+    padding-right: 1.4rem !important;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background:
+        radial-gradient(circle at top, rgba(44,160,255,0.28), transparent 30%),
+        linear-gradient(180deg, #0E2A4F 0%, #071A33 58%, #04101F 100%) !important;
+    border-right: 1px solid rgba(120, 180, 255, 0.18);
+    box-shadow: 8px 0 28px rgba(0, 0, 0, 0.26);
+}
+
+section[data-testid="stSidebar"] .block-container {
+    padding-top: 1.2rem !important;
+}
+
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3,
+section[data-testid="stSidebar"] label,
+section[data-testid="stSidebar"] p,
+section[data-testid="stSidebar"] span {
+    color: #FFFFFF !important;
+}
+
+.sidebar-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
+    border: 1px solid rgba(180, 215, 255, 0.18);
+    border-radius: 18px;
+    padding: 16px 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
+    backdrop-filter: blur(10px);
+}
+
+.sidebar-title {
+    font-size: 19px;
+    font-weight: 900;
+    letter-spacing: .02em;
+    color: #FFFFFF;
+    margin-bottom: 4px;
+}
+
+.sidebar-subtitle {
+    font-size: 12px;
+    color: #C8DFFF;
+}
+
+.sidebar-section {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: #9FD0FF !important;
+    margin-top: 18px;
+    margin-bottom: 8px;
+}
+
+.sidebar-pill {
+    display: inline-block;
+    background: linear-gradient(135deg, rgba(44,160,255,.32), rgba(46,212,122,.16));
+    border: 1px solid rgba(44,160,255,.48);
+    color: #E6F4FF;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    margin-top: 6px;
+}
+
+section[data-testid="stSidebar"] div[role="radiogroup"] label {
+    background: rgba(255,255,255,0.065);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 13px;
+    padding: 10px 10px;
+    margin-bottom: 7px;
+    transition: all .18s ease;
+}
+
+section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+    background: rgba(44,160,255,0.18);
+    border-color: rgba(44,160,255,0.42);
+    transform: translateX(3px);
+}
+
+/* Títulos */
+h1, h2, h3 {
+    color: #F6FAFF !important;
+    letter-spacing: -0.02em;
+}
+
+h1 {
+    font-weight: 900 !important;
+}
+
+h4, p, span, label {
+    color: var(--eirox-muted) !important;
+}
+
+/* Cards e containers */
+div[data-testid="stMetric"] {
+    background:
+        linear-gradient(135deg, rgba(15,39,71,.98), rgba(8,20,38,.95));
+    border: 1px solid rgba(120,180,255,.18);
+    border-radius: 18px;
+    padding: 18px 18px;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.26);
+    position: relative;
+    overflow: hidden;
+}
+
+div[data-testid="stMetric"]::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(90deg, #2CA0FF, #2ED47A);
+}
+
+div[data-testid="stMetricLabel"] {
+    color: #AFC7E8 !important;
+    font-weight: 700;
+}
+
+div[data-testid="stMetricValue"] {
+    color: #FFFFFF !important;
+    font-weight: 900;
+    font-size: 28px !important;
+}
+
+/* Alertas Streamlit */
+div[data-testid="stAlert"] {
+    background: linear-gradient(135deg, rgba(14,42,79,.88), rgba(7,26,51,.88)) !important;
+    border: 1px solid rgba(120,180,255,.18) !important;
+    border-radius: 16px !important;
+    color: #EAF4FF !important;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .18);
+}
+
+/* Inputs */
+.stTextInput input,
+.stSelectbox div[data-baseweb="select"] > div,
+.stMultiSelect div[data-baseweb="select"] > div {
+    background: rgba(6, 18, 34, 0.96) !important;
+    color: #F6FAFF !important;
+    border: 1px solid rgba(120,180,255,.22) !important;
+    border-radius: 12px !important;
+}
+
+.stTextInput input:focus {
+    border-color: rgba(44,160,255,.75) !important;
+    box-shadow: 0 0 0 2px rgba(44,160,255,.18) !important;
+}
+
+/* Botões */
+.stButton button,
+.stDownloadButton button,
+button[kind="primary"],
+button[kind="secondary"] {
+    background: linear-gradient(135deg, #0E64C8, #2CA0FF) !important;
+    color: #FFFFFF !important;
+    border: 1px solid rgba(255,255,255,.18) !important;
+    border-radius: 13px !important;
+    font-weight: 800 !important;
+    box-shadow: 0 10px 24px rgba(44,160,255,.25);
+    transition: all .18s ease;
+}
+
+.stButton button:hover,
+.stDownloadButton button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 32px rgba(44,160,255,.34);
+}
+
+/* Dataframes */
+div[data-testid="stDataFrame"] {
+    width: 100% !important;
+    border-radius: 18px !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(120,180,255,.16);
+    box-shadow: 0 16px 38px rgba(0, 0, 0, .24);
+}
+
+div[data-testid="stDataFrame"] > div {
+    width: 100% !important;
+    background: rgba(7, 17, 31, .88) !important;
+}
+
+/* Tabs e radios */
+div[role="radiogroup"] label {
+    color: #EAF4FF !important;
+}
+
+.stRadio label {
+    color: #EAF4FF !important;
+}
+
+/* Plotly */
+.js-plotly-plot,
+.plotly,
+.plot-container {
+    border-radius: 18px !important;
+}
+
+/* Cards customizados opcionais */
+.eirox-card {
+    background: linear-gradient(135deg, rgba(15,39,71,.96), rgba(8,20,38,.94));
+    border: 1px solid rgba(120,180,255,.17);
+    border-radius: 18px;
+    padding: 18px;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, .26);
+    margin-bottom: 16px;
+}
+
+.eirox-section-title {
+    font-size: 13px;
+    color: #9FD0FF;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    font-weight: 900;
+    margin-bottom: 8px;
+}
+
+.eirox-hero {
+    background:
+        radial-gradient(circle at top right, rgba(44,160,255,.22), transparent 28%),
+        linear-gradient(135deg, rgba(15,39,71,.96), rgba(7,17,31,.96));
+    border: 1px solid rgba(120,180,255,.18);
+    border-radius: 22px;
+    padding: 22px 24px;
+    margin-bottom: 18px;
+    box-shadow: 0 18px 45px rgba(0,0,0,.30);
+}
+
+.eirox-hero h1 {
+    margin: 0;
+    font-size: 30px;
+}
+
+.eirox-hero p {
+    margin: 6px 0 0 0;
+    color: #BFD7FF !important;
+}
+
+/* Destaques por prioridade em HTML */
+.tag-critical {
+    background: rgba(255,92,122,.14);
+    color: #FFD6DE;
+    border: 1px solid rgba(255,92,122,.36);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-weight: 800;
+}
+
+.tag-high {
+    background: rgba(255,138,61,.14);
+    color: #FFE3CF;
+    border: 1px solid rgba(255,138,61,.36);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-weight: 800;
+}
+
+.tag-medium {
+    background: rgba(255,185,70,.14);
+    color: #FFF1CF;
+    border: 1px solid rgba(255,185,70,.36);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-weight: 800;
+}
+
+.tag-low {
+    background: rgba(46,212,122,.14);
+    color: #D7FFE8;
+    border: 1px solid rgba(46,212,122,.36);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-weight: 800;
+}
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # --------------------------------------------------
 # LOGIN E CONTROLE DE ACESSO
 # --------------------------------------------------
@@ -263,308 +591,41 @@ USUARIOS = {
 PERMISSOES_TELAS = {
     "Diretoria": [
         "📊 Dashboard Geral",
-        "🔎 Análise por Rede/Loja",
+        "🔎 Rede/Loja vs Concorrentes",
         "🛒 Negociação Compras",
-        "🚨 Central de Alertas"
+        "🚨 Central de Alertas",
+        "📈 Simulador Inteligente",
+        "🏢 Dashboard Executivo"
     ],
     "Pricing": [
         "📊 Dashboard Geral",
-        "🔎 Análise por Rede/Loja",
+        "🔎 Rede/Loja vs Concorrentes",
         "🛒 Negociação Compras",
-        "🚨 Central de Alertas"
+        "🚨 Central de Alertas",
+        "📈 Simulador Inteligente",
+        "🏢 Dashboard Executivo"
     ],
     "Comercial": [
         "📊 Dashboard Geral",
-        "🔎 Análise por Rede/Loja",
+        "🔎 Rede/Loja vs Concorrentes",
         "🛒 Negociação Compras",
-        "🚨 Central de Alertas"
+        "🚨 Central de Alertas",
+        "📈 Simulador Inteligente",
+        "🏢 Dashboard Executivo"
     ],
     "Regional": [
         "📊 Dashboard Geral",
-        "🔎 Análise por Rede/Loja",
+        "🔎 Rede/Loja vs Concorrentes",
         "🛒 Negociação Compras",
-        "🚨 Central de Alertas"
+        "🚨 Central de Alertas",
+        "📈 Simulador Inteligente",
+        "🏢 Dashboard Executivo"
     ],
     "Consulta": [
-        "📊 Dashboard Geral"
+        "📊 Dashboard Geral",
+        "🏢 Dashboard Executivo"
     ]
 }
-
-
-# --------------------------------------------------
-# AUDITORIA DE LOGIN E NOTIFICAÇÃO
-# --------------------------------------------------
-
-BASE_DIR_LOGIN = Path(__file__).resolve().parent
-
-ARQUIVO_LOG_ACESSO = (
-    BASE_DIR_LOGIN / "logs_acesso.csv"
-)
-
-LOGIN_EMAIL_DESTINO = os.getenv(
-    "LOGIN_EMAIL_DESTINO",
-    "pmarques097@gmail.com,paulomarquesintedados@gmail.com"
-)
-
-LOGIN_SMTP_HOST = os.getenv(
-    "SMTP_HOST",
-    "smtp.gmail.com"
-)
-
-LOGIN_SMTP_PORT = int(
-    os.getenv(
-        "SMTP_PORT",
-        "465"
-    )
-)
-
-LOGIN_SMTP_USER = os.getenv(
-    "SMTP_USER",
-    ""
-)
-
-LOGIN_SMTP_PASSWORD = os.getenv(
-    "SMTP_PASSWORD",
-    ""
-)
-
-
-def registrar_acesso(
-    usuario,
-    nome,
-    perfil
-):
-
-    agora = datetime.now()
-
-    novo_log = pd.DataFrame(
-        [
-            {
-                "Data_Hora": agora.strftime("%d/%m/%Y %H:%M:%S"),
-                "Usuario": usuario,
-                "Nome": nome,
-                "Perfil": perfil
-            }
-        ]
-    )
-
-    if ARQUIVO_LOG_ACESSO.exists():
-
-        try:
-
-            log_atual = pd.read_csv(
-                ARQUIVO_LOG_ACESSO,
-                sep=";",
-                encoding="utf-8-sig"
-            )
-
-            log_final = pd.concat(
-                [
-                    log_atual,
-                    novo_log
-                ],
-                ignore_index=True
-            )
-
-        except Exception:
-
-            log_final = novo_log
-
-    else:
-
-        log_final = novo_log
-
-    log_final.to_csv(
-        ARQUIVO_LOG_ACESSO,
-        index=False,
-        sep=";",
-        encoding="utf-8-sig"
-    )
-
-    return log_final
-
-
-def montar_html_login(
-    usuario,
-    nome,
-    perfil,
-    log_final
-):
-
-    agora = datetime.now().strftime(
-        "%d/%m/%Y %H:%M:%S"
-    )
-
-    total_acessos = len(log_final)
-
-    ultimos = (
-        log_final
-        .tail(20)
-        .copy()
-    )
-
-    tabela_html = ultimos.to_html(
-        index=False,
-        escape=False
-    )
-
-    html = f"""
-    <html>
-        <body style="font-family: Arial, sans-serif;">
-            <h2>🔐 Novo acesso ao Dashboard Eirox</h2>
-
-            <p>Um usuário acabou de acessar a plataforma.</p>
-
-            <table style="border-collapse: collapse; margin-bottom: 20px;">
-                <tr>
-                    <td style="border:1px solid #ddd; padding:8px;"><b>Data/Hora</b></td>
-                    <td style="border:1px solid #ddd; padding:8px;">{agora}</td>
-                </tr>
-                <tr>
-                    <td style="border:1px solid #ddd; padding:8px;"><b>Usuário</b></td>
-                    <td style="border:1px solid #ddd; padding:8px;">{usuario}</td>
-                </tr>
-                <tr>
-                    <td style="border:1px solid #ddd; padding:8px;"><b>Nome</b></td>
-                    <td style="border:1px solid #ddd; padding:8px;">{nome}</td>
-                </tr>
-                <tr>
-                    <td style="border:1px solid #ddd; padding:8px;"><b>Perfil</b></td>
-                    <td style="border:1px solid #ddd; padding:8px;">{perfil}</td>
-                </tr>
-                <tr>
-                    <td style="border:1px solid #ddd; padding:8px;"><b>Total de acessos registrados</b></td>
-                    <td style="border:1px solid #ddd; padding:8px;">{total_acessos}</td>
-                </tr>
-            </table>
-
-            <h3>Últimos 20 acessos</h3>
-
-            {tabela_html}
-
-            <p style="font-size:12px; color:#777;">
-                Este e-mail foi gerado automaticamente pela auditoria de login do Dashboard Eirox.
-            </p>
-        </body>
-    </html>
-    """
-
-    return html
-
-
-def enviar_email_login(
-    usuario,
-    nome,
-    perfil,
-    log_final
-):
-
-    if (
-        not LOGIN_EMAIL_DESTINO
-        or not LOGIN_SMTP_USER
-        or not LOGIN_SMTP_PASSWORD
-    ):
-
-        return
-
-    destinatarios = [
-        email.strip()
-        for email in LOGIN_EMAIL_DESTINO.split(",")
-        if email.strip()
-    ]
-
-    if not destinatarios:
-
-        return
-
-    agora = datetime.now().strftime(
-        "%d/%m/%Y %H:%M:%S"
-    )
-
-    msg = EmailMessage()
-
-    msg["Subject"] = (
-        f"🔐 Login no Dashboard Eirox - {usuario} - {agora}"
-    )
-
-    msg["From"] = LOGIN_SMTP_USER
-    msg["To"] = ", ".join(
-        destinatarios
-    )
-
-    msg.set_content(
-        f"O usuário {usuario} acessou o Dashboard Eirox em {agora}."
-    )
-
-    msg.add_alternative(
-        montar_html_login(
-            usuario,
-            nome,
-            perfil,
-            log_final
-        ),
-        subtype="html"
-    )
-
-    if ARQUIVO_LOG_ACESSO.exists():
-
-        with open(
-            ARQUIVO_LOG_ACESSO,
-            "rb"
-        ) as arquivo:
-
-            msg.add_attachment(
-                arquivo.read(),
-                maintype="text",
-                subtype="csv",
-                filename="logs_acesso_dashboard_eirox.csv"
-            )
-
-    contexto = ssl.create_default_context()
-
-    with smtplib.SMTP_SSL(
-        LOGIN_SMTP_HOST,
-        LOGIN_SMTP_PORT,
-        context=contexto
-    ) as servidor:
-
-        servidor.login(
-            LOGIN_SMTP_USER,
-            LOGIN_SMTP_PASSWORD
-        )
-
-        servidor.send_message(
-            msg
-        )
-
-
-def auditar_login(
-    usuario,
-    nome,
-    perfil
-):
-
-    log_final = registrar_acesso(
-        usuario,
-        nome,
-        perfil
-    )
-
-    try:
-
-        enviar_email_login(
-            usuario,
-            nome,
-            perfil,
-            log_final
-        )
-
-    except Exception as erro:
-
-        print(
-            f"Falha ao enviar e-mail de login: {erro}"
-        )
-
 
 
 def autenticar_usuario(usuario, senha):
@@ -624,12 +685,6 @@ def tela_login():
             st.session_state["usuario"] = usuario_key
             st.session_state["nome_usuario"] = USUARIOS[usuario_key]["nome"]
             st.session_state["perfil_usuario"] = USUARIOS[usuario_key]["perfil"]
-
-            auditar_login(
-                usuario_key,
-                USUARIOS[usuario_key]["nome"],
-                USUARIOS[usuario_key]["perfil"]
-            )
 
             st.rerun()
 
@@ -750,7 +805,7 @@ try:
 
     st.image(
         "logo eirox.png",
-        width=350
+        width=460
     )
 
 except:
@@ -758,17 +813,11 @@ except:
 
 st.markdown(
     """
-    <h1 style='margin-bottom:0px;'>
-        📊 Eirox - Ferramenta de Inteligência de Pricing
-    </h1>
-
-    <h4 style='
-        margin-top:0px;
-        color:#B0B0B0;
-        font-weight:400;
-    '>
-        Consulta e comparação de preços concorrência
-    </h4>
+    <div class="eirox-hero">
+        <div class="eirox-section-title">Eirox Pricing Enterprise</div>
+        <h1>📊 Inteligência de Pricing & Competitividade</h1>
+        <p>Monitoramento executivo de preços, concorrência, margem, alertas e oportunidades comerciais.</p>
+    </div>
     """,
     unsafe_allow_html=True
 )
@@ -1227,7 +1276,7 @@ try:
 
     st.sidebar.image(
         "logo eirox.png",
-        width=220
+        width=280
     )
 
 except Exception:
@@ -1263,7 +1312,8 @@ st.sidebar.markdown(
 paginas_liberadas = PERMISSOES_TELAS.get(
     perfil_usuario,
     [
-        "📊 Dashboard Geral"
+        "📊 Dashboard Geral",
+        "🏢 Dashboard Executivo"
     ]
 )
 
@@ -1379,14 +1429,751 @@ if busca:
         )
     ]
 
+
+
 # --------------------------------------------------
-# ANÁLISE POR REDE / LOJA
+# SIMULADOR INTELIGENTE DE PRICING
 # --------------------------------------------------
 
-if pagina == "🔎 Análise por Rede/Loja":
+if pagina == "📈 Simulador Inteligente":
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">Pricing Intelligence</div>
+            <h1>📈 Simulador Inteligente de Pricing</h1>
+            <p>Simule preço, margem, competitividade e impacto financeiro usando automaticamente os dados da base pelo EAN/código de barras.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    base_sim = df_filtrado.copy()
+
+    if "EAN" in base_sim.columns:
+        base_sim["EAN"] = (
+            base_sim["EAN"]
+            .astype(str)
+            .str.replace(".0", "", regex=False)
+            .str.strip()
+        )
+
+    # --------------------------------------------------
+    # FUNÇÕES AUXILIARES DO SIMULADOR
+    # --------------------------------------------------
+
+    def _num_sim(valor, padrao=0.0):
+        try:
+            if valor is None:
+                return padrao
+
+            if str(valor).strip().lower() in ["", "none", "nan", "nat"]:
+                return padrao
+
+            v = pd.to_numeric(valor, errors="coerce")
+
+            if pd.isna(v):
+                return padrao
+
+            return float(v)
+
+        except Exception:
+            return padrao
+
+    def _primeiro_valor_linha(linha, colunas, padrao=0.0):
+        for col in colunas:
+            if col in linha.index:
+                v = _num_sim(linha.get(col), None)
+                if v is not None and not pd.isna(v) and float(v) != 0:
+                    return float(v)
+        return float(padrao)
+
+    def _buscar_coluna(base, opcoes):
+        for col in opcoes:
+            if col in base.columns:
+                return col
+        return None
+
+    # --------------------------------------------------
+    # FILTRO POR CÓDIGO DE BARRAS / EAN
+    # --------------------------------------------------
+
+    ean_digitado = "78911222"
+
+    # Se o usuário já filtrou no menu lateral por EAN/produto, aproveita automaticamente.
+    try:
+        busca_global = str(busca).strip()
+    except Exception:
+        busca_global = ""
+
+    if busca_global and busca_global.isdigit():
+        ean_digitado = busca_global
+    elif not busca_global:
+        ean_digitado = "78911222"
+
+    col_ean_base = "EAN" if "EAN" in base_sim.columns else None
+
+    ean_input = st.text_input(
+        "Código de barras / EAN para simular",
+        value=ean_digitado,
+        placeholder="Digite ou cole o EAN do produto",
+        key="sim_ean_codigo_barras"
+    )
+
+    base_lookup = base_sim.copy()
+
+    if ean_input and col_ean_base:
+        ean_limpo = (
+            str(ean_input)
+            .replace(".0", "")
+            .strip()
+        )
+
+        ean_series_filtro = (
+            base_lookup[col_ean_base]
+            .astype(str)
+            .str.replace(".0", "", regex=False)
+            .str.strip()
+        )
+
+        base_lookup = base_lookup[
+            ean_series_filtro.str.startswith(ean_limpo, na=False)
+            | ean_series_filtro.str.contains(ean_limpo, na=False)
+        ].copy()
+
+        if base_lookup.empty:
+            st.warning(
+                "Nenhum produto encontrado para esse EAN/código de barras dentro dos filtros atuais."
+            )
+            st.stop()
+
+    col_produto_sim = "Descricao_Unica" if "Descricao_Unica" in base_lookup.columns else "Produto"
+
+    if col_produto_sim in base_lookup.columns and not base_lookup.empty:
+
+        opcoes_produto = (
+            base_lookup[col_produto_sim]
+            .dropna()
+            .astype(str)
+            .sort_values()
+            .unique()
+            .tolist()
+        )
+
+        # Se houver apenas um produto pelo EAN, ele já fica selecionado automaticamente.
+        produto_selecionado_sim = st.selectbox(
+            "Selecione o produto para simular",
+            opcoes_produto,
+            index=0,
+            key="produto_simulador_inteligente"
+        )
+
+        item_sim = base_lookup[
+            base_lookup[col_produto_sim].astype(str) == str(produto_selecionado_sim)
+        ].head(1).copy()
+
+        if not item_sim.empty:
+
+            item = item_sim.iloc[0]
+
+            ean_sim = str(item.get("EAN", "")).replace(".0", "").strip()
+
+            # --------------------------------------------------
+            # DADOS AUTOMÁTICOS DA BASE PRINCIPAL
+            # --------------------------------------------------
+
+            preco_atual_padrao = _primeiro_valor_linha(
+                item,
+                [
+                    "Preco_Medio",
+                    "Preço Médio",
+                    "Preco_Atual",
+                    "Preço Atual",
+                    "Preço Venda",
+                    "Preco Venda",
+                    "Preço (R$)",
+                    "Preco (R$)",
+                    "Valor Unitário",
+                    "Valor Unitario"
+                ],
+                0.0
+            )
+
+            lucro_atual_padrao = _primeiro_valor_linha(
+                item,
+                [
+                    "Lucro_Unitario",
+                    "Lucro Unitário",
+                    "Lucro Atual"
+                ],
+                0.0
+            )
+
+            margem_atual_padrao = _primeiro_valor_linha(
+                item,
+                [
+                    "Margem_%",
+                    "Margem %",
+                    "Margem"
+                ],
+                0.0
+            )
+
+            custo_padrao = _primeiro_valor_linha(
+                item,
+                [
+                    "Custo",
+                    "Custo Médio",
+                    "Custo_Medio",
+                    "Custo Unitário",
+                    "Custo_Unitario"
+                ],
+                0.0
+            )
+
+            if custo_padrao == 0 and preco_atual_padrao > 0 and lucro_atual_padrao != 0:
+                custo_padrao = max(preco_atual_padrao - lucro_atual_padrao, 0)
+
+            if custo_padrao == 0 and preco_atual_padrao > 0 and margem_atual_padrao > 0:
+                custo_padrao = preco_atual_padrao * (1 - margem_atual_padrao / 100)
+
+            qtd_padrao = 1.0
+            menor_concorrente_padrao = 0.0
+            preco_sugerido_padrao = preco_atual_padrao
+
+            # --------------------------------------------------
+            # DADOS AUTOMÁTICOS DO SIMULADOR GLOBAL
+            # --------------------------------------------------
+
+            if (
+                "simulacao_global" in globals()
+                and not simulacao_global.empty
+                and ean_sim
+                and "EAN" in simulacao_global.columns
+            ):
+                sim_auto = simulacao_global.copy()
+                sim_auto["EAN"] = (
+                    sim_auto["EAN"]
+                    .astype(str)
+                    .str.replace(".0", "", regex=False)
+                    .str.strip()
+                )
+
+                sim_auto = sim_auto[sim_auto["EAN"] == ean_sim]
+
+                if not sim_auto.empty:
+                    linha_sim = sim_auto.iloc[0]
+
+                    qtd_padrao = _primeiro_valor_linha(
+                        linha_sim,
+                        ["Qtd_Vendida_Mes_Anterior"],
+                        qtd_padrao
+                    )
+
+                    preco_atual_padrao = _primeiro_valor_linha(
+                        linha_sim,
+                        ["Preco_Atual"],
+                        preco_atual_padrao
+                    )
+
+                    preco_sugerido_padrao = _primeiro_valor_linha(
+                        linha_sim,
+                        ["Preco_Sugerido_Mercado"],
+                        preco_sugerido_padrao
+                    )
+
+            # --------------------------------------------------
+            # MENOR PREÇO CONCORRENTE PELO HISTÓRICO
+            # --------------------------------------------------
+
+            if (
+                not historico.empty
+                and ean_sim
+            ):
+                hist_sim = historico.copy()
+
+                if "EAN" not in hist_sim.columns and "EAN (GTIN)" in hist_sim.columns:
+                    hist_sim["EAN"] = hist_sim["EAN (GTIN)"]
+
+                if "EAN" in hist_sim.columns:
+                    hist_sim["EAN"] = (
+                        hist_sim["EAN"]
+                        .astype(str)
+                        .str.replace(".0", "", regex=False)
+                        .str.strip()
+                    )
+
+                if "Preço (R$)" not in hist_sim.columns:
+                    for col_preco_alt in [
+                        "Preco (R$)",
+                        "Preço",
+                        "Preco",
+                        "Valor",
+                        "Valor Unitário",
+                        "Valor Unitario"
+                    ]:
+                        if col_preco_alt in hist_sim.columns:
+                            hist_sim["Preço (R$)"] = hist_sim[col_preco_alt]
+                            break
+
+                if "Preço (R$)" in hist_sim.columns and "EAN" in hist_sim.columns:
+                    hist_sim["Preço (R$)"] = pd.to_numeric(
+                        hist_sim["Preço (R$)"],
+                        errors="coerce"
+                    )
+
+                    hist_ean = hist_sim[hist_sim["EAN"] == ean_sim].copy()
+
+                    if not hist_ean.empty:
+                        menor_concorrente_padrao = (
+                            hist_ean["Preço (R$)"]
+                            .dropna()
+                            .min()
+                        )
+
+                        if pd.isna(menor_concorrente_padrao):
+                            menor_concorrente_padrao = 0.0
+
+            if menor_concorrente_padrao and menor_concorrente_padrao > 0:
+                preco_sugerido_padrao = menor_concorrente_padrao
+
+            st.markdown("### 🧾 Produto carregado automaticamente")
+
+            info1, info2, info3, info4 = st.columns(4)
+
+            info1.metric("EAN", ean_sim if ean_sim else "Não informado")
+            info2.metric("Preço atual base", moeda_br(preco_atual_padrao))
+            info3.metric("Menor concorrente", moeda_br(menor_concorrente_padrao))
+            info4.metric("Qtd mês base", numero_br(qtd_padrao))
+
+            st.markdown("### 🎛️ Parâmetros da simulação")
+
+            c1, c2, c3, c4 = st.columns(4)
+
+            with c1:
+                preco_atual = st.number_input(
+                    "Preço atual",
+                    min_value=0.0,
+                    value=float(preco_atual_padrao if preco_atual_padrao is not None else 0),
+                    step=0.10,
+                    format="%.2f",
+                    key=f"sim_preco_atual_{ean_sim}"
+                )
+
+            with c2:
+                novo_preco = st.number_input(
+                    "Novo preço simulado",
+                    min_value=0.0,
+                    value=float(preco_sugerido_padrao if preco_sugerido_padrao is not None else (preco_atual_padrao if preco_atual_padrao is not None else 0)),
+                    step=0.10,
+                    format="%.2f",
+                    key=f"sim_novo_preco_{ean_sim}"
+                )
+
+            with c3:
+                custo = st.number_input(
+                    "Custo",
+                    min_value=0.0,
+                    value=float(custo_padrao if custo_padrao is not None else 0),
+                    step=0.10,
+                    format="%.2f",
+                    key=f"sim_custo_{ean_sim}"
+                )
+
+            with c4:
+                qtd_mes = st.number_input(
+                    "Qtd vendida/mês",
+                    min_value=0.0,
+                    value=float(qtd_padrao if qtd_padrao is not None else 1),
+                    step=1.0,
+                    format="%.0f",
+                    key=f"sim_qtd_mes_{ean_sim}"
+                )
+
+            c5, c6, c7, c8 = st.columns(4)
+
+            with c5:
+                menor_concorrente = st.number_input(
+                    "Menor preço concorrente",
+                    min_value=0.0,
+                    value=float(menor_concorrente_padrao if menor_concorrente_padrao is not None else 0),
+                    step=0.10,
+                    format="%.2f",
+                    key=f"sim_menor_concorrente_{ean_sim}"
+                )
+
+            with c6:
+                cenario = st.selectbox(
+                    "Cenário",
+                    [
+                        "Manual",
+                        "Conservador",
+                        "Competitivo",
+                        "Agressivo",
+                        "Maximizar margem"
+                    ],
+                    key=f"sim_cenario_{ean_sim}"
+                )
+
+            if cenario != "Manual":
+
+                if cenario == "Conservador":
+                    novo_preco_calc = preco_atual * 1.03
+
+                elif cenario == "Competitivo" and menor_concorrente > 0:
+                    novo_preco_calc = menor_concorrente
+
+                elif cenario == "Agressivo" and menor_concorrente > 0:
+                    novo_preco_calc = menor_concorrente * 0.98
+
+                elif cenario == "Maximizar margem":
+                    novo_preco_calc = preco_atual * 1.08
+
+                else:
+                    novo_preco_calc = novo_preco
+
+                novo_preco = float(novo_preco_calc)
+
+                with c7:
+                    st.metric("Preço sugerido", moeda_br(novo_preco))
+
+            lucro_atual_calc = preco_atual - custo
+            lucro_novo_calc = novo_preco - custo
+
+            margem_atual_calc = (lucro_atual_calc / preco_atual * 100) if preco_atual > 0 else 0
+            margem_nova_calc = (lucro_novo_calc / novo_preco * 100) if novo_preco > 0 else 0
+
+            dif_preco_rs = novo_preco - preco_atual
+            dif_preco_perc = (dif_preco_rs / preco_atual * 100) if preco_atual > 0 else 0
+
+            venda_atual = preco_atual * qtd_mes
+            venda_nova = novo_preco * qtd_mes
+
+            lucro_total_atual = lucro_atual_calc * qtd_mes
+            lucro_total_novo = lucro_novo_calc * qtd_mes
+
+            impacto_faturamento = venda_nova - venda_atual
+            impacto_lucro = lucro_total_novo - lucro_total_atual
+            impacto_anual = impacto_lucro * 12
+
+            if menor_concorrente > 0:
+                dif_vs_concorrente = novo_preco - menor_concorrente
+                dif_vs_concorrente_perc = dif_vs_concorrente / menor_concorrente * 100
+            else:
+                dif_vs_concorrente = 0
+                dif_vs_concorrente_perc = 0
+
+            if menor_concorrente > 0 and novo_preco > menor_concorrente * 1.10:
+                risco = "🔴 Alto risco competitivo"
+            elif menor_concorrente > 0 and novo_preco > menor_concorrente * 1.03:
+                risco = "🟡 Atenção competitiva"
+            else:
+                risco = "🟢 Seguro"
+
+            st.markdown("### 📌 Resultado da simulação")
+
+            k1, k2, k3, k4 = st.columns(4)
+
+            k1.metric(
+                "Diferença de preço",
+                moeda_br(dif_preco_rs),
+                percentual_br(dif_preco_perc)
+            )
+
+            k2.metric(
+                "Margem simulada",
+                percentual_br(margem_nova_calc),
+                percentual_br(margem_nova_calc - margem_atual_calc)
+            )
+
+            k3.metric(
+                "Impacto lucro/mês",
+                moeda_br(impacto_lucro)
+            )
+
+            k4.metric(
+                "Impacto lucro/ano",
+                moeda_br(impacto_anual)
+            )
+
+            k5, k6, k7, k8 = st.columns(4)
+
+            k5.metric(
+                "Venda atual/mês",
+                moeda_br(venda_atual)
+            )
+
+            k6.metric(
+                "Venda simulada/mês",
+                moeda_br(venda_nova)
+            )
+
+            k7.metric(
+                "Dif. vs concorrente",
+                moeda_br(dif_vs_concorrente),
+                percentual_br(dif_vs_concorrente_perc)
+            )
+
+            k8.metric(
+                "Risco",
+                risco
+            )
+
+            st.markdown("### 📊 Comparativo visual")
+
+            grafico_sim = pd.DataFrame(
+                {
+                    "Cenário": [
+                        "Preço atual",
+                        "Novo preço",
+                        "Menor concorrente",
+                        "Custo"
+                    ],
+                    "Valor": [
+                        preco_atual,
+                        novo_preco,
+                        menor_concorrente,
+                        custo
+                    ]
+                }
+            )
+
+            fig = px.bar(
+                grafico_sim,
+                x="Cenário",
+                y="Valor",
+                text="Valor",
+                title="Comparação de preço, concorrência e custo"
+            )
+
+            fig.update_traces(
+                texttemplate="R$ %{text:.2f}",
+                textposition="outside"
+            )
+
+            fig.update_layout(
+                height=420,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)"
+            )
+
+            st.plotly_chart(
+                fig,
+                use_container_width=True
+            )
+
+            st.markdown("### 📋 Resumo decisório")
+
+            resumo_sim = pd.DataFrame(
+                [
+                    {
+                        "Produto": item.get("Produto", produto_selecionado_sim),
+                        "EAN": ean_sim,
+                        "Preço Atual": moeda_br(preco_atual),
+                        "Novo Preço": moeda_br(novo_preco),
+                        "Custo": moeda_br(custo),
+                        "Qtd Vendida/Mês": numero_br(qtd_mes),
+                        "Menor Concorrente": moeda_br(menor_concorrente),
+                        "Margem Atual": percentual_br(margem_atual_calc),
+                        "Margem Simulada": percentual_br(margem_nova_calc),
+                        "Impacto Faturamento Mensal": moeda_br(impacto_faturamento),
+                        "Impacto Lucro Mensal": moeda_br(impacto_lucro),
+                        "Impacto Lucro Anual": moeda_br(impacto_anual),
+                        "Risco Competitivo": risco
+                    }
+                ]
+            )
+
+            st.dataframe(
+                resumo_sim,
+                use_container_width=True,
+                height=140
+            )
+
+            csv_sim = (
+                resumo_sim
+                .to_csv(index=False, sep=";")
+                .encode("utf-8-sig")
+            )
+
+            st.download_button(
+                "📥 Exportar simulação",
+                csv_sim,
+                "simulacao_inteligente_pricing.csv",
+                "text/csv",
+                key=f"exportar_simulador_inteligente_{ean_sim}"
+            )
+
+    else:
+
+        st.warning(
+            "Não foi possível carregar produtos para simulação. Verifique se a base possui Produto ou Descricao_Unica."
+        )
+
+    st.stop()
+
+
+
+# --------------------------------------------------
+# DASHBOARD EXECUTIVO PREMIUM
+# --------------------------------------------------
+
+if pagina == "🏢 Dashboard Executivo":
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">Diretoria</div>
+            <h1>🏢 Dashboard Executivo Premium</h1>
+            <p>Resumo estratégico para tomada de decisão: riscos, oportunidades, margem e ganho potencial.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    base_exec = df_filtrado.copy()
+
+    total_produtos = len(base_exec)
+
+    ganho_total = 0
+    if "Ganho_Potencial" in base_exec.columns:
+        ganho_total = pd.to_numeric(
+            base_exec["Ganho_Potencial"],
+            errors="coerce"
+        ).fillna(0).sum()
+
+    margem_media = 0
+    if "Margem_%" in base_exec.columns:
+        margem_media = pd.to_numeric(
+            base_exec["Margem_%"],
+            errors="coerce"
+        ).dropna().mean()
+
+    produtos_curva_a = 0
+    if "CURVA" in base_exec.columns:
+        produtos_curva_a = (
+            base_exec["CURVA"]
+            .astype(str)
+            .str.upper()
+            .eq("A")
+            .sum()
+        )
+
+    sem_custo = 0
+    if "Recomendacao" in base_exec.columns:
+        sem_custo = (
+            base_exec["Recomendacao"]
+            .astype(str)
+            .str.upper()
+            .str.contains("SEM CUSTO", na=False)
+            .sum()
+        )
+
+    k1, k2, k3, k4 = st.columns(4)
+
+    k1.metric(
+        "Produtos Monitorados",
+        f"{total_produtos:,}".replace(",", ".")
+    )
+
+    k2.metric(
+        "Ganho Potencial",
+        moeda_br(ganho_total)
+    )
+
+    k3.metric(
+        "Margem Média",
+        percentual_br(margem_media)
+    )
+
+    k4.metric(
+        "Produtos Curva A",
+        f"{produtos_curva_a:,}".replace(",", ".")
+    )
+
+    k5, k6, k7, k8 = st.columns(4)
+
+    k5.metric(
+        "Produtos Sem Custo",
+        f"{sem_custo:,}".replace(",", ".")
+    )
+
+    if "Laboratório" in base_exec.columns:
+        k6.metric(
+            "Laboratórios",
+            base_exec["Laboratório"].dropna().nunique()
+        )
+
+    if "Família" in base_exec.columns:
+        k7.metric(
+            "Famílias",
+            base_exec["Família"].dropna().nunique()
+        )
+
+    if "EAN" in base_exec.columns:
+        k8.metric(
+            "EANs Únicos",
+            base_exec["EAN"].dropna().astype(str).nunique()
+        )
+
+    st.markdown("### 🏆 Top oportunidades financeiras")
+
+    top = base_exec.copy()
+
+    if "Ganho_Potencial" in top.columns:
+        top["Ganho_Potencial"] = pd.to_numeric(
+            top["Ganho_Potencial"],
+            errors="coerce"
+        ).fillna(0)
+
+        top = top.sort_values(
+            "Ganho_Potencial",
+            ascending=False
+        )
+
+    cols_top = [
+        c for c in [
+            "EAN",
+            "Produto",
+            "Laboratório",
+            "Família",
+            "CURVA",
+            "Recomendacao",
+            "Preco_Medio",
+            "Margem_%",
+            "Ganho_Potencial"
+        ] if c in top.columns
+    ]
+
+    top_exibir = top[cols_top].head(20).copy()
+
+    if "Preco_Medio" in top_exibir.columns:
+        top_exibir["Preco_Medio"] = top_exibir["Preco_Medio"].apply(moeda_br)
+
+    if "Margem_%" in top_exibir.columns:
+        top_exibir["Margem_%"] = top_exibir["Margem_%"].apply(percentual_br)
+
+    if "Ganho_Potencial" in top_exibir.columns:
+        top_exibir["Ganho_Potencial"] = top_exibir["Ganho_Potencial"].apply(moeda_br)
+
+    st.dataframe(
+        top_exibir,
+        use_container_width=True,
+        height=520
+    )
+
+    st.stop()
+
+
+
+# --------------------------------------------------
+# REDE/LOJA VS CONCORRENTES
+# --------------------------------------------------
+
+if pagina == "🔎 Rede/Loja vs Concorrentes":
 
     st.subheader(
-        "🔎 Análise por Rede/Loja"
+        "🔎 Rede/Loja vs Concorrentes"
     )
 
     st.info(
