@@ -138,7 +138,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "leitura_xls_xlsx_corrigida_20260607"
+VERSAO_APP = "busca_recursiva_venda_final_20260607"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -274,6 +274,147 @@ identificar_rede,
 curva_abc
 )
 
+
+
+
+# --------------------------------------------------
+# BUSCA RECURSIVA DE BASES POR COLUNAS
+# --------------------------------------------------
+
+def carregar_base_recursiva_por_colunas(
+    nome_base,
+    colunas_obrigatorias,
+    ignorar_pastas=None
+):
+
+    """
+    Procura arquivos .xls, .xlsx, .xlsm e .csv em todo o projeto,
+    identifica a base pelas colunas obrigatórias e concatena os arquivos encontrados.
+
+    Útil para Streamlit Cloud quando a pasta foi criada fora do local esperado
+    ou quando o GitHub mudou a estrutura de diretórios.
+    """
+
+    ignorar_pastas = ignorar_pastas or [
+        ".git",
+        ".streamlit",
+        "__pycache__",
+        ".venv",
+        "venv"
+    ]
+
+    arquivos = []
+
+    for ext in [
+        "*.xls",
+        "*.xlsx",
+        "*.xlsm",
+        "*.csv"
+    ]:
+
+        arquivos.extend(
+            list(
+                Path(".").rglob(ext)
+            )
+        )
+
+    bases = []
+    erros = []
+
+    obrigatorias_norm = [
+        str(c).strip().lower()
+        for c in colunas_obrigatorias
+    ]
+
+    for arquivo in sorted(arquivos):
+
+        partes = [
+            p.lower()
+            for p in arquivo.parts
+        ]
+
+        if any(p in partes for p in ignorar_pastas):
+            continue
+
+        # Evita reler a planilha principal como venda final.
+        if arquivo.name.lower() == "analise_pricing.xlsx":
+            continue
+
+        try:
+
+            if arquivo.suffix.lower() == ".csv":
+
+                try:
+                    temp = pd.read_csv(
+                        arquivo,
+                        sep=";",
+                        encoding="utf-8-sig"
+                    )
+                except Exception:
+                    temp = pd.read_csv(
+                        arquivo,
+                        encoding="utf-8-sig"
+                    )
+
+            else:
+
+                temp = pd.read_excel(
+                    arquivo
+                )
+
+            if temp.empty:
+                continue
+
+            temp.columns = (
+                temp.columns
+                .astype(str)
+                .str.strip()
+            )
+
+            colunas_norm = [
+                str(c).strip().lower()
+                for c in temp.columns
+            ]
+
+            encontrou = all(
+                col in colunas_norm
+                for col in obrigatorias_norm
+            )
+
+            if encontrou:
+
+                temp["Arquivo_Origem"] = arquivo.name
+                temp["Fonte_Carregamento"] = str(arquivo.parent)
+                bases.append(temp)
+
+        except Exception as erro:
+
+            erros.append(
+                {
+                    "Arquivo": str(arquivo),
+                    "Erro": str(erro)
+                }
+            )
+
+    if bases:
+
+        base = pd.concat(
+            bases,
+            ignore_index=True
+        )
+
+        base.columns = (
+            base.columns
+            .astype(str)
+            .str.strip()
+        )
+
+        return base
+
+    # Guarda erros para diagnóstico se necessário
+    globals()[f"ERROS_CARGA_{nome_base}"] = erros
+
+    return pd.DataFrame()
 
 
 # --------------------------------------------------
@@ -1704,6 +1845,18 @@ if venda_rede.empty:
         "VENDA_FINAL_TESTE"
     )
 
+# Última tentativa: procurar a venda final em qualquer pasta do projeto
+# identificando automaticamente arquivos com Cód. Barras/Etiq., Itens e Venda.
+if venda_rede.empty:
+    venda_rede = carregar_base_recursiva_por_colunas(
+        "VENDA_FINAL_TESTE",
+        [
+            "Cód. Barras/Etiq.",
+            "Itens",
+            "Venda"
+        ]
+    )
+
 if estoque.empty:
     estoque = carregar_pasta_excel_compat(
         ["ESTOQUE_TESTE", "ESTOQUE"],
@@ -2170,6 +2323,40 @@ if pagina == "🧪 Diagnóstico":
             st.error("Analise_Pricing.xlsx não encontrado.")
     except Exception as erro:
         st.error(f"Erro ao conferir Analise_Pricing.xlsx: {erro}")
+
+
+    st.markdown("### Diagnóstico da VENDA_FINAL_TESTE")
+
+    try:
+        candidatos_venda_final = []
+
+        for ext in ["*.xls", "*.xlsx", "*.xlsm", "*.csv"]:
+            for arquivo in Path(".").rglob(ext):
+                if arquivo.name.lower() != "analise_pricing.xlsx":
+                    candidatos_venda_final.append(
+                        {
+                            "Arquivo": str(arquivo),
+                            "Tamanho_KB": round(arquivo.stat().st_size / 1024, 2),
+                            "Pasta": str(arquivo.parent)
+                        }
+                    )
+
+        st.dataframe(
+            pd.DataFrame(candidatos_venda_final),
+            use_container_width=True,
+            height=240
+        )
+
+        if "ERROS_CARGA_VENDA_FINAL_TESTE" in globals() and ERROS_CARGA_VENDA_FINAL_TESTE:
+            st.warning("Alguns arquivos Excel/CSV foram encontrados, mas deram erro na leitura.")
+            st.dataframe(
+                pd.DataFrame(ERROS_CARGA_VENDA_FINAL_TESTE),
+                use_container_width=True,
+                height=240
+            )
+
+    except Exception as erro:
+        st.error(f"Erro no diagnóstico da VENDA_FINAL_TESTE: {erro}")
 
 
     st.markdown("### Bases carregadas")
