@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import hashlib
 
 
 st.markdown(
@@ -100,6 +101,217 @@ st.set_page_config(
     page_title="Eirox Pricing Enterprise",
     layout="wide"
 )
+
+# --------------------------------------------------
+# LOGIN E CONTROLE DE ACESSO
+# --------------------------------------------------
+
+USUARIOS = {
+    "admin": {
+        "senha_hash": hashlib.sha256("admin123".encode()).hexdigest(),
+        "nome": "Administrador",
+        "perfil": "Diretoria"
+    },
+    "paulo": {
+        "senha_hash": hashlib.sha256("paulo123".encode()).hexdigest(),
+        "nome": "Paulo Marques",
+        "perfil": "Diretoria"
+    },
+    "paulomarques": {
+        "senha_hash": hashlib.sha256("031730".encode()).hexdigest(),
+        "nome": "Paulo Marques",
+        "perfil": "Diretoria"
+    },
+    "vanderlei": {
+        "senha_hash": hashlib.sha256("031730".encode()).hexdigest(),
+        "nome": "Vanderlei",
+        "perfil": "Diretoria"
+    },
+    "ubiratan": {
+        "senha_hash": hashlib.sha256("031730".encode()).hexdigest(),
+        "nome": "Ubiratan",
+        "perfil": "Diretoria"
+    },
+
+    "pricing": {
+        "senha_hash": hashlib.sha256("pricing123".encode()).hexdigest(),
+        "nome": "Equipe Pricing",
+        "perfil": "Pricing"
+    },
+    "comercial": {
+        "senha_hash": hashlib.sha256("comercial123".encode()).hexdigest(),
+        "nome": "Equipe Comercial",
+        "perfil": "Comercial"
+    },
+    "regional": {
+        "senha_hash": hashlib.sha256("regional123".encode()).hexdigest(),
+        "nome": "Gerente Regional",
+        "perfil": "Regional"
+    },
+    "consulta": {
+        "senha_hash": hashlib.sha256("consulta123".encode()).hexdigest(),
+        "nome": "Consulta",
+        "perfil": "Consulta"
+    }
+}
+
+
+PERMISSOES_TELAS = {
+    "Diretoria": [
+        "📊 Dashboard Geral",
+        "🔎 Análise por Rede/Loja"
+    ],
+    "Pricing": [
+        "📊 Dashboard Geral",
+        "🔎 Análise por Rede/Loja",
+        "💵 Simulador",
+        "📈 Curva ABC"
+    ],
+    "Comercial": [
+        "📊 Dashboard Geral",
+        "🔎 Análise por Rede/Loja"
+    ],
+    "Regional": [
+        "📊 Dashboard Geral",
+        "🔎 Análise por Rede/Loja"
+    ],
+    "Consulta": [
+        "📊 Dashboard Geral"
+    ]
+}
+
+
+def autenticar_usuario(usuario, senha):
+
+    usuario = str(usuario).strip().lower()
+
+    if usuario not in USUARIOS:
+        return False
+
+    senha_hash = hashlib.sha256(
+        str(senha).encode()
+    ).hexdigest()
+
+    return senha_hash == USUARIOS[usuario]["senha_hash"]
+
+
+def tela_login():
+
+    st.markdown(
+        """
+        <div style="text-align:center; margin-top:30px;">
+            <h1>📊 Eirox Pricing</h1>
+            <h3 style="font-weight:400; color:#B0B0B0;">
+                Ferramenta de Inteligência de Pricing
+            </h3>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    with st.form("form_login"):
+
+        usuario = st.text_input(
+            "Usuário"
+        )
+
+        senha = st.text_input(
+            "Senha",
+            type="password"
+        )
+
+        entrar = st.form_submit_button(
+            "Entrar",
+            use_container_width=True
+        )
+
+    if entrar:
+
+        if autenticar_usuario(
+            usuario,
+            senha
+        ):
+
+            usuario_key = str(usuario).strip().lower()
+
+            st.session_state["logado"] = True
+            st.session_state["usuario"] = usuario_key
+            st.session_state["nome_usuario"] = USUARIOS[usuario_key]["nome"]
+            st.session_state["perfil_usuario"] = USUARIOS[usuario_key]["perfil"]
+
+            st.rerun()
+
+        else:
+
+            st.error(
+                "Usuário ou senha inválidos."
+            )
+
+
+def exigir_login():
+
+    if "logado" not in st.session_state:
+        st.session_state["logado"] = False
+
+    if not st.session_state["logado"]:
+
+        tela_login()
+        st.stop()
+
+
+def logout():
+
+    st.session_state["logado"] = False
+    st.session_state["usuario"] = None
+    st.session_state["nome_usuario"] = None
+    st.session_state["perfil_usuario"] = None
+    st.rerun()
+
+
+exigir_login()
+
+perfil_usuario = st.session_state.get(
+    "perfil_usuario",
+    "Consulta"
+)
+
+nome_usuario = st.session_state.get(
+    "nome_usuario",
+    ""
+)
+
+pode_exportar = perfil_usuario in [
+    "Diretoria",
+    "Pricing"
+]
+
+pode_ver_margem = perfil_usuario in [
+    "Diretoria",
+    "Pricing"
+]
+
+# Controle global de exportação por perfil
+_st_download_button_original = st.download_button
+
+def download_button_controlado(*args, **kwargs):
+
+    if pode_exportar:
+        return _st_download_button_original(*args, **kwargs)
+
+    label = args[0] if len(args) > 0 else kwargs.get("label", "Download")
+
+    return _st_download_button_original(
+        label=f"{label} 🔒",
+        data="Seu perfil não tem permissão para exportar.",
+        file_name="sem_permissao.txt",
+        mime="text/plain",
+        disabled=True
+    )
+
+st.download_button = download_button_controlado
+
+
+
 
 # --------------------------------------------------
 
@@ -630,7 +842,52 @@ except Exception:
 
     pass
 
+st.sidebar.header("Menu")
+
+st.sidebar.markdown(
+    f"**Usuário:** {nome_usuario}"
+)
+
+st.sidebar.markdown(
+    f"**Perfil:** {perfil_usuario}"
+)
+
+if st.sidebar.button(
+    "Sair",
+    use_container_width=True
+):
+
+    logout()
+
+st.sidebar.markdown("---")
+
+paginas_liberadas = PERMISSOES_TELAS.get(
+    perfil_usuario,
+    [
+        "📊 Dashboard Geral"
+    ]
+)
+
+pagina = st.sidebar.radio(
+    "Navegação",
+    paginas_liberadas,
+    key="menu_principal"
+)
+
+st.sidebar.markdown("---")
+
+if not pode_exportar:
+    st.sidebar.info(
+        "Seu perfil possui exportação bloqueada."
+    )
+
+if not pode_ver_margem:
+    st.sidebar.info(
+        "Seu perfil possui visão de margem/custo restrita."
+    )
+
 st.sidebar.header("Filtros")
+
 
 laboratorio = st.sidebar.multiselect(
     "Laboratório",
@@ -712,6 +969,516 @@ if busca:
             )
         )
     ]
+
+# --------------------------------------------------
+# ANÁLISE POR REDE / LOJA
+# --------------------------------------------------
+
+if pagina == "🔎 Análise por Rede/Loja":
+
+    st.subheader(
+        "🔎 Análise por Rede/Loja"
+    )
+
+    st.info(
+        "A rede ou farmácia selecionada será tratada como principal. "
+        "Todas as demais lojas da base serão consideradas concorrentes para comparação."
+    )
+
+    if (
+        not historico.empty
+        and "Farmácia" in historico.columns
+        and "Preço (R$)" in historico.columns
+    ):
+
+        analise_hist = historico.copy()
+
+        if "Rede" not in analise_hist.columns:
+
+            analise_hist["Rede"] = (
+                analise_hist["Farmácia"]
+                .apply(identificar_rede)
+            )
+
+        if "EAN" not in analise_hist.columns and "EAN (GTIN)" in analise_hist.columns:
+
+            analise_hist["EAN"] = analise_hist["EAN (GTIN)"]
+
+        if "EAN" in analise_hist.columns:
+
+            analise_hist["EAN"] = (
+                analise_hist["EAN"]
+                .astype(str)
+                .str.replace(".0", "", regex=False)
+                .str.strip()
+            )
+
+        analise_hist["Preço (R$)"] = pd.to_numeric(
+            analise_hist["Preço (R$)"],
+            errors="coerce"
+        )
+
+        tipo_analise = st.radio(
+            "Analisar por",
+            [
+                "Rede",
+                "Farmácia"
+            ],
+            horizontal=True,
+            key="tipo_analise_rede_loja"
+        )
+
+        if tipo_analise == "Rede":
+
+            opcoes_analise = (
+                analise_hist["Rede"]
+                .dropna()
+                .astype(str)
+                .sort_values()
+                .unique()
+                .tolist()
+            )
+
+        else:
+
+            opcoes_analise = (
+                analise_hist["Farmácia"]
+                .dropna()
+                .astype(str)
+                .sort_values()
+                .unique()
+                .tolist()
+            )
+
+        indice_padrao_analise = 0
+
+        for i, opcao in enumerate(opcoes_analise):
+
+            if "ZANOL" in str(opcao).upper():
+                indice_padrao_analise = i
+                break
+
+        selecionado_analise = st.selectbox(
+            f"Selecione a {tipo_analise.lower()}",
+            opcoes_analise,
+            index=indice_padrao_analise,
+            key="select_rede_loja_analise"
+        )
+
+        if tipo_analise == "Rede":
+
+            base_selecionada = analise_hist[
+                analise_hist["Rede"] == selecionado_analise
+            ].copy()
+
+        else:
+
+            base_selecionada = analise_hist[
+                analise_hist["Farmácia"] == selecionado_analise
+            ].copy()
+
+        if not base_selecionada.empty:
+
+            preco_selecionado = (
+                base_selecionada
+                .dropna(
+                    subset=[
+                        "EAN",
+                        "Preço (R$)"
+                    ]
+                )
+                .groupby("EAN")
+                .agg(
+                    Produto_Pesquisa=("Produto", "first"),
+                    Preco_Selecionado=("Preço (R$)", "mean"),
+                    Qtd_Pesquisas_Selecionado=("Preço (R$)", "count"),
+                    Farmacia_Selecionada=("Farmácia", "first"),
+                    Rede_Selecionada=("Rede", "first")
+                )
+                .reset_index()
+            )
+
+            hist_validos = analise_hist.dropna(
+                subset=[
+                    "EAN",
+                    "Preço (R$)"
+                ]
+            ).copy()
+
+            # --------------------------------------------------
+            # DEFINIR PRINCIPAL E CONCORRENTES
+            # --------------------------------------------------
+
+            if tipo_analise == "Rede":
+
+                hist_concorrentes = hist_validos[
+                    hist_validos["Rede"] != selecionado_analise
+                ].copy()
+
+            else:
+
+                hist_concorrentes = hist_validos[
+                    hist_validos["Farmácia"] != selecionado_analise
+                ].copy()
+
+            # Todos os demais são concorrentes
+            hist_concorrentes["Tipo_Comparacao"] = "Concorrente"
+
+            # Menor preço apenas entre concorrentes
+            idx_menor = (
+                hist_concorrentes
+                .groupby("EAN")
+                ["Preço (R$)"]
+                .idxmin()
+            )
+
+            menor_mercado = (
+                hist_concorrentes
+                .loc[
+                    idx_menor,
+                    [
+                        "EAN",
+                        "Preço (R$)",
+                        "Farmácia",
+                        "Rede"
+                    ]
+                ]
+                .rename(
+                    columns={
+                        "Preço (R$)": "Menor_Preco_Concorrente",
+                        "Farmácia": "Loja_Menor_Preco_Concorrente_Concorrente",
+                        "Rede": "Rede_Menor_Preco_Concorrente_Concorrente"
+                    }
+                )
+            )
+
+            qtd_mercado = (
+                hist_concorrentes
+                .groupby("EAN")
+                ["Preço (R$)"]
+                .count()
+                .reset_index()
+                .rename(
+                    columns={
+                        "Preço (R$)": "Qtd_Pesquisas_Concorrentes"
+                    }
+                )
+            )
+
+            analise_produtos = (
+                preco_selecionado
+                .merge(
+                    menor_mercado,
+                    on="EAN",
+                    how="left"
+                )
+                .merge(
+                    qtd_mercado,
+                    on="EAN",
+                    how="left"
+                )
+            )
+
+            if "EAN" in df_filtrado.columns:
+
+                df_cadastro = df_filtrado.copy()
+
+                df_cadastro["EAN"] = (
+                    df_cadastro["EAN"]
+                    .astype(str)
+                    .str.replace(".0", "", regex=False)
+                    .str.strip()
+                )
+
+                cadastro_cols = []
+
+                for coluna in [
+                    "EAN",
+                    "Produto",
+                    "Laboratório",
+                    "Família",
+                    "CURVA",
+                    "Recomendacao",
+                    "Ganho_Potencial",
+                    "Margem_%",
+                    "Lucro_Unitario",
+                    "Preco_Medio"
+                ]:
+
+                    if coluna in df_cadastro.columns:
+                        cadastro_cols.append(coluna)
+
+                df_cadastro = (
+                    df_cadastro[cadastro_cols]
+                    .drop_duplicates(
+                        subset=[
+                            "EAN"
+                        ]
+                    )
+                )
+
+                analise_produtos = analise_produtos.merge(
+                    df_cadastro,
+                    on="EAN",
+                    how="left"
+                )
+
+            if (
+                "simulacao_global" in globals()
+                and not simulacao_global.empty
+            ):
+
+                sim = simulacao_global.copy()
+
+                sim["EAN"] = (
+                    sim["EAN"]
+                    .astype(str)
+                    .str.replace(".0", "", regex=False)
+                    .str.strip()
+                )
+
+                sim_cols = []
+
+                for coluna in [
+                    "EAN",
+                    "Qtd_Vendida_Mes_Anterior",
+                    "Venda_Preco_Antigo",
+                    "Preco_Atual",
+                    "Preco_Sugerido_Mercado",
+                    "Venda_Projetada_Preco_Sugerido",
+                    "Ganho_Unitario",
+                    "Ganho_Potencial_Simulador"
+                ]:
+
+                    if coluna in sim.columns:
+                        sim_cols.append(coluna)
+
+                analise_produtos = analise_produtos.merge(
+                    sim[sim_cols],
+                    on="EAN",
+                    how="left"
+                )
+
+            analise_produtos["Dif_vs_Concorrente_R$"] = (
+                analise_produtos["Preco_Selecionado"]
+                - analise_produtos["Menor_Preco_Concorrente"]
+            )
+
+            analise_produtos["Dif_vs_Concorrente_%"] = (
+                analise_produtos["Dif_vs_Concorrente_R$"]
+                / analise_produtos["Menor_Preco_Concorrente"]
+                * 100
+            )
+
+            analise_produtos["Status_vs_Concorrente"] = analise_produtos[
+                "Dif_vs_Concorrente_R$"
+            ].apply(
+                lambda x:
+                "MENOR QUE CONCORRENTE"
+                if pd.notna(x) and abs(x) < 0.01
+                else "ACIMA DO CONCORRENTE"
+                if pd.notna(x) and x > 0
+                else "ABAIXO DO CONCORRENTE"
+                if pd.notna(x) and x < 0
+                else ""
+            )
+
+            if "Ganho_Potencial_Simulador" in analise_produtos.columns:
+
+                analise_produtos = analise_produtos.sort_values(
+                    "Ganho_Potencial_Simulador",
+                    ascending=False
+                )
+
+            k1, k2, k3, k4 = st.columns(4)
+
+            k1.metric(
+                "Produtos comuns",
+                len(analise_produtos)
+            )
+
+            k2.metric(
+                "Pesquisas da seleção",
+                int(
+                    analise_produtos[
+                        "Qtd_Pesquisas_Selecionado"
+                    ].sum()
+                )
+            )
+
+            if "Ganho_Potencial_Simulador" in analise_produtos.columns:
+
+                k3.metric(
+                    "Ganho potencial",
+                    moeda_br(
+                        analise_produtos[
+                            "Ganho_Potencial_Simulador"
+                        ].sum()
+                    )
+                )
+
+            k4.metric(
+                "Diferença média vs concorrente",
+                moeda_br(
+                    analise_produtos[
+                        "Dif_vs_Concorrente_R$"
+                    ].mean()
+                )
+            )
+
+            colunas_exibir = []
+
+            for coluna in [
+                "EAN",
+                "Produto",
+                "Produto_Pesquisa",
+                "Laboratório",
+                "Família",
+                "CURVA",
+                "Recomendacao",
+                "Qtd_Pesquisas_Selecionado",
+                "Qtd_Pesquisas_Concorrentes",
+                "Rede_Selecionada",
+                "Farmacia_Selecionada",
+                "Preco_Selecionado",
+                "Menor_Preco_Concorrente",
+                "Loja_Menor_Preco_Concorrente",
+                "Rede_Menor_Preco_Concorrente",
+                "Dif_vs_Concorrente_R$",
+                "Dif_vs_Concorrente_%",
+                "Status_vs_Concorrente",
+                "Qtd_Vendida_Mes_Anterior",
+                "Venda_Preco_Antigo",
+                "Preco_Atual",
+                "Preco_Sugerido_Mercado",
+                "Venda_Projetada_Preco_Sugerido",
+                "Ganho_Unitario",
+                "Ganho_Potencial_Simulador",
+                "Ganho_Potencial",
+                "Margem_%",
+                "Lucro_Unitario",
+                "Preco_Medio"
+            ]:
+
+                if coluna in analise_produtos.columns:
+                    colunas_exibir.append(coluna)
+
+            analise_exibir = analise_produtos[colunas_exibir].copy()
+
+            for coluna in [
+                "Preco_Selecionado",
+                "Menor_Preco_Concorrente",
+                "Dif_vs_Concorrente_R$",
+                "Venda_Preco_Antigo",
+                "Preco_Atual",
+                "Preco_Sugerido_Mercado",
+                "Venda_Projetada_Preco_Sugerido",
+                "Ganho_Unitario",
+                "Ganho_Potencial_Simulador",
+                "Ganho_Potencial",
+                "Lucro_Unitario",
+                "Preco_Medio"
+            ]:
+
+                if coluna in analise_exibir.columns:
+                    analise_exibir[coluna] = analise_exibir[coluna].apply(moeda_br)
+
+            for coluna in [
+                "Dif_vs_Concorrente_%",
+                "Margem_%"
+            ]:
+
+                if coluna in analise_exibir.columns:
+                    analise_exibir[coluna] = analise_exibir[coluna].apply(percentual_br)
+
+            for coluna in [
+                "Qtd_Vendida_Mes_Anterior"
+            ]:
+
+                if coluna in analise_exibir.columns:
+                    analise_exibir[coluna] = analise_exibir[coluna].apply(numero_br)
+
+            analise_exibir = (
+                analise_exibir
+                .replace(
+                    {
+                        "None": "",
+                        "nan": "",
+                        "NaN": "",
+                        "R$ nan": "",
+                        "nan%": ""
+                    }
+                )
+                .fillna("")
+            )
+
+            analise_exibir = analise_exibir.rename(
+                columns={
+                    "Produto_Pesquisa": "Produto na Pesquisa",
+                    "Rede_Selecionada": "Rede Principal",
+                    "Farmacia_Selecionada": "Farmácia Principal",
+                    "Recomendacao": "Recomendação",
+                    "Qtd_Pesquisas_Selecionado": "Qtd Pesquisas Seleção",
+                    "Qtd_Pesquisas_Concorrentes": "Qtd Pesquisas Concorrentes",
+                    "Preco_Selecionado": "Preço Principal",
+                    "Menor_Preco_Concorrente": "Menor Preço Concorrente",
+                    "Loja_Menor_Preco_Concorrente": "Loja Menor Preço Concorrente",
+                    "Rede_Menor_Preco_Concorrente": "Rede Menor Preço Concorrente",
+                    "Dif_vs_Concorrente_R$": "Dif. vs Concorrente R$",
+                    "Dif_vs_Concorrente_%": "Dif. vs Concorrente %",
+                    "Status_vs_Concorrente": "Status vs Concorrente",
+                    "Qtd_Vendida_Mes_Anterior": "Qtd Vendida Mês Anterior",
+                    "Venda_Preco_Antigo": "Venda Preço Antigo",
+                    "Preco_Atual": "Preço Atual",
+                    "Preco_Sugerido_Mercado": "Preço Sugerido Mercado",
+                    "Venda_Projetada_Preco_Sugerido": "Venda Projetada Preço Sugerido",
+                    "Ganho_Unitario": "Ganho Unitário",
+                    "Ganho_Potencial_Simulador": "Ganho Produto",
+                    "Ganho_Potencial": "Ganho Potencial",
+                    "Margem_%": "Margem %",
+                    "Lucro_Unitario": "Lucro Unitário",
+                    "Preco_Medio": "Preço Médio"
+                }
+            )
+
+            st.dataframe(
+                analise_exibir,
+                use_container_width=True,
+                height=520
+            )
+
+            csv_analise = (
+                analise_exibir
+                .to_csv(
+                    index=False,
+                    sep=";"
+                )
+                .encode("utf-8-sig")
+            )
+
+            st.download_button(
+                "📥 Exportar análise por Rede/Loja",
+                csv_analise,
+                f"analise_{tipo_analise.lower()}_{selecionado_analise}.csv",
+                "text/csv",
+                key="exportar_analise_rede_loja"
+            )
+
+        else:
+
+            st.info(
+                "Não foram encontrados produtos para a rede ou loja selecionada."
+            )
+
+    else:
+
+        st.warning(
+            "A base VENDA_TESTE não possui as colunas necessárias para essa análise."
+        )
+
+    st.stop()
+
+
 
 # --------------------------------------------------
 # KPIS
@@ -1027,7 +1794,7 @@ if (
                 .rename(
                     columns={
                         "Preço (R$)": "Menor_Preco",
-                        "Farmácia": "Loja_Menor_Preco"
+                        "Farmácia": "Loja_Menor_Preco_Concorrente"
                     }
                 )
             )
@@ -1139,7 +1906,7 @@ if not produtos_detalhe.empty:
         "Ganho_Unitario",
         "Ganho_Potencial_Simulador",
         "Menor_Preco",
-        "Loja_Menor_Preco",
+        "Loja_Menor_Preco_Concorrente",
         "Margem_%",
         "Lucro_Unitario",
         "Preco_Medio"
@@ -1202,7 +1969,7 @@ if not produtos_detalhe.empty:
             "Ganho_Unitario": "Ganho Unitário",
             "Ganho_Potencial_Simulador": "Ganho Produto",
             "Menor_Preco": "Menor Preço",
-            "Loja_Menor_Preco": "Loja Menor Preço",
+            "Loja_Menor_Preco_Concorrente": "Loja Menor Preço Concorrente",
             "Qtd_Vendida_Mes_Anterior": "Qtd Vendida Mês Anterior",
             "Preco_Medio": "Preço Médio",
             "Margem_%": "Margem %",
@@ -1269,7 +2036,7 @@ if not produtos_detalhe.empty:
             "Ganho_Unitario": "Ganho Unitário",
             "Ganho_Potencial_Simulador": "Ganho Produto",
             "Menor_Preco": "Menor Preço",
-            "Loja_Menor_Preco": "Loja Menor Preço",
+            "Loja_Menor_Preco_Concorrente": "Loja Menor Preço Concorrente",
             "Qtd_Vendida_Mes_Anterior": "Qtd Vendida Mês Anterior",
             "Preco_Medio": "Preço Médio",
             "Margem_%": "Margem %",
@@ -1300,6 +2067,7 @@ else:
         "Não há produtos dessa recomendação com dados completos no Simulador. "
         "Isso ocorre quando o EAN não existe na venda da rede ou não teve venda no período."
     )
+
 
 # CURVA ABC
 # --------------------------------------------------
@@ -1377,7 +2145,7 @@ if (
             columns={
                 "Descricao_Unica": "Produto",
                 "Preço (R$)": "Menor_Preco",
-                "Rede": "Rede_Menor_Preco",
+                "Rede": "Rede_Menor_Preco_Concorrente",
                 "Farmácia": "Farmacia_Menor_Preco",
                 "Data Emissão": "Data_Pesquisa"
             }
@@ -1396,7 +2164,7 @@ if (
 
 for coluna in [
     "Menor_Preco",
-    "Rede_Menor_Preco",
+    "Rede_Menor_Preco_Concorrente",
     "Farmacia_Menor_Preco",
     "Data_Pesquisa"
 ]:
@@ -1473,7 +2241,7 @@ st.dataframe(
             "Produto",
             "Ganho_Potencial",
             "Menor_Preco",
-            "Rede_Menor_Preco",
+            "Rede_Menor_Preco_Concorrente",
             "Farmacia_Menor_Preco",
             "Data_Pesquisa",
             "Perc_Acum",
