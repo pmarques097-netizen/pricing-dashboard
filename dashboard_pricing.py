@@ -1,8 +1,11 @@
 import streamlit as st
+import os
 import pandas as pd
 import plotly.express as px
 import plotly.io as pio
 import hashlib
+from pathlib import Path
+from datetime import datetime
 
 pio.templates.default = "plotly_dark"
 
@@ -126,6 +129,13 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+
+# --------------------------------------------------
+# VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
+# --------------------------------------------------
+
+VERSAO_APP = "debug_dados_20260607_133846"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -876,6 +886,222 @@ st.markdown(
 )
 
 
+
+# --------------------------------------------------
+# DIAGNÓSTICO DE ARQUIVOS CARREGADOS
+# --------------------------------------------------
+
+def listar_arquivos_diagnostico(pasta):
+
+    pasta_path = Path(pasta)
+
+    if not pasta_path.exists():
+
+        return pd.DataFrame(
+            [
+                {
+                    "Pasta": str(pasta),
+                    "Arquivo": "PASTA NÃO ENCONTRADA",
+                    "Tamanho_KB": "",
+                    "Modificado": ""
+                }
+            ]
+        )
+
+    registros = []
+
+    for arquivo in sorted(pasta_path.glob("*")):
+
+        if arquivo.is_file():
+
+            registros.append(
+                {
+                    "Pasta": str(pasta),
+                    "Arquivo": arquivo.name,
+                    "Tamanho_KB": round(arquivo.stat().st_size / 1024, 2),
+                    "Modificado": datetime.fromtimestamp(
+                        arquivo.stat().st_mtime
+                    ).strftime("%d/%m/%Y %H:%M:%S")
+                }
+            )
+
+    if not registros:
+
+        registros.append(
+            {
+                "Pasta": str(pasta),
+                "Arquivo": "PASTA VAZIA",
+                "Tamanho_KB": "",
+                "Modificado": ""
+            }
+        )
+
+    return pd.DataFrame(registros)
+
+
+def mostrar_diagnostico_dados(df, historico, compra, venda_rede, estoque):
+
+    with st.expander(
+        "🧪 Diagnóstico de dados carregados / online vs localhost",
+        expanded=False
+    ):
+
+        st.warning(
+            "Use esta área para conferir se o Streamlit online está lendo os mesmos arquivos do computador local."
+        )
+
+        st.write("**Versão do app:**", VERSAO_APP)
+        st.write("**Diretório atual:**", os.getcwd())
+
+        try:
+
+            itens_raiz = []
+
+            for item in sorted(Path(".").iterdir()):
+
+                itens_raiz.append(
+                    {
+                        "Nome": item.name,
+                        "Tipo": "Pasta" if item.is_dir() else "Arquivo",
+                        "Tamanho_KB": round(item.stat().st_size / 1024, 2) if item.is_file() else "",
+                        "Modificado": datetime.fromtimestamp(
+                            item.stat().st_mtime
+                        ).strftime("%d/%m/%Y %H:%M:%S")
+                    }
+                )
+
+            st.markdown("### Arquivos/pastas na raiz")
+            st.dataframe(
+                pd.DataFrame(itens_raiz),
+                use_container_width=True,
+                height=260
+            )
+
+        except Exception as erro:
+
+            st.error(f"Erro ao listar raiz do projeto: {erro}")
+
+        st.markdown("### Pastas de dados encontradas")
+
+        diagnostico_pastas = pd.concat(
+            [
+                listar_arquivos_diagnostico("VENDA_TESTE"),
+                listar_arquivos_diagnostico("VENDA_FINAL_TESTE"),
+                listar_arquivos_diagnostico("ESTOQUE_TESTE"),
+                listar_arquivos_diagnostico("VENDA_TESTE_FINAL")
+            ],
+            ignore_index=True
+        )
+
+        st.dataframe(
+            diagnostico_pastas,
+            use_container_width=True,
+            height=300
+        )
+
+        st.markdown("### Bases carregadas em memória")
+
+        resumo_bases = pd.DataFrame(
+            [
+                {
+                    "Base": "df / Analise_Pricing.xlsx",
+                    "Linhas": len(df) if isinstance(df, pd.DataFrame) else 0,
+                    "Colunas": len(df.columns) if isinstance(df, pd.DataFrame) else 0
+                },
+                {
+                    "Base": "historico / VENDA_TESTE",
+                    "Linhas": len(historico) if isinstance(historico, pd.DataFrame) else 0,
+                    "Colunas": len(historico.columns) if isinstance(historico, pd.DataFrame) else 0
+                },
+                {
+                    "Base": "compra",
+                    "Linhas": len(compra) if isinstance(compra, pd.DataFrame) else 0,
+                    "Colunas": len(compra.columns) if isinstance(compra, pd.DataFrame) else 0
+                },
+                {
+                    "Base": "venda_rede / VENDA_FINAL_TESTE",
+                    "Linhas": len(venda_rede) if isinstance(venda_rede, pd.DataFrame) else 0,
+                    "Colunas": len(venda_rede.columns) if isinstance(venda_rede, pd.DataFrame) else 0
+                },
+                {
+                    "Base": "estoque / ESTOQUE_TESTE",
+                    "Linhas": len(estoque) if isinstance(estoque, pd.DataFrame) else 0,
+                    "Colunas": len(estoque.columns) if isinstance(estoque, pd.DataFrame) else 0
+                },
+                {
+                    "Base": "simulacao_global",
+                    "Linhas": len(simulacao_global) if "simulacao_global" in globals() and isinstance(simulacao_global, pd.DataFrame) else 0,
+                    "Colunas": len(simulacao_global.columns) if "simulacao_global" in globals() and isinstance(simulacao_global, pd.DataFrame) else 0
+                }
+            ]
+        )
+
+        st.dataframe(
+            resumo_bases,
+            use_container_width=True
+        )
+
+        st.markdown("### Colunas principais")
+
+        c1, c2 = st.columns(2)
+
+        with c1:
+            st.write("**df / Analise_Pricing.xlsx**")
+            st.write(df.columns.tolist() if isinstance(df, pd.DataFrame) else [])
+            st.write("**historico / VENDA_TESTE**")
+            st.write(historico.columns.tolist() if isinstance(historico, pd.DataFrame) else [])
+
+        with c2:
+            st.write("**venda_rede / VENDA_FINAL_TESTE**")
+            st.write(venda_rede.columns.tolist() if isinstance(venda_rede, pd.DataFrame) else [])
+            st.write("**estoque / ESTOQUE_TESTE**")
+            st.write(estoque.columns.tolist() if isinstance(estoque, pd.DataFrame) else [])
+
+        st.markdown("### Top 30 da simulação")
+
+        if (
+            "simulacao_global" in globals()
+            and isinstance(simulacao_global, pd.DataFrame)
+            and not simulacao_global.empty
+        ):
+
+            cols_amostra = [
+                c for c in [
+                    "EAN",
+                    "Produto_Simulador",
+                    "Produto",
+                    "Qtd_Vendida_Mes_Anterior",
+                    "Preco_Atual",
+                    "Preco_Sugerido_Mercado",
+                    "Ganho_Unitario",
+                    "Ganho_Potencial_Simulador"
+                ]
+                if c in simulacao_global.columns
+            ]
+
+            amostra = simulacao_global[cols_amostra].copy()
+
+            if "Ganho_Potencial_Simulador" in amostra.columns:
+                amostra["_ordem"] = pd.to_numeric(
+                    amostra["Ganho_Potencial_Simulador"],
+                    errors="coerce"
+                )
+                amostra = (
+                    amostra
+                    .sort_values("_ordem", ascending=False)
+                    .drop(columns=["_ordem"])
+                    .head(30)
+                )
+
+            st.dataframe(
+                amostra,
+                use_container_width=True,
+                height=350
+            )
+
+        else:
+            st.info("simulacao_global está vazia ou não foi criada.")
+
 # --------------------------------------------------
 # DADOS
 # --------------------------------------------------
@@ -1557,6 +1783,16 @@ if not simulacao_global.empty and "EAN" in df.columns:
         .fillna(0)
     )
 
+
+# Mostrar diagnóstico para comparar localhost x Streamlit Cloud
+mostrar_diagnostico_dados(
+    df,
+    historico,
+    compra,
+    venda_rede,
+    estoque
+)
+
 # --------------------------------------------------
 # MENU LATERAL / FILTROS
 # --------------------------------------------------
@@ -1591,6 +1827,11 @@ st.sidebar.markdown(
     </div>
     """,
     unsafe_allow_html=True
+)
+
+
+st.sidebar.caption(
+    f"Versão: {VERSAO_APP}"
 )
 
 st.sidebar.markdown(
