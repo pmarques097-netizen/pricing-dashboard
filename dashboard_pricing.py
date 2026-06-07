@@ -136,7 +136,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "corrigido_ganho_oficial_20260607"
+VERSAO_APP = "ganho_100pct_analise_pricing_20260607"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -194,6 +194,47 @@ def percentual_br(valor):
 
     except Exception:
         return ""
+
+
+def preparar_ganho_oficial_dashboard(base):
+    """
+    Usa exclusivamente o Ganho_Potencial da Analise_Pricing.xlsx.
+    Não usa simulacao_global, histórico ou fallback.
+    """
+
+    base = base.copy()
+
+    if "Ganho_Potencial" not in base.columns:
+        base["Ganho_Potencial"] = 0
+
+    base["Ganho_Potencial"] = pd.to_numeric(
+        base["Ganho_Potencial"],
+        errors="coerce"
+    ).fillna(0)
+
+    # Remove Total Geral, caso exista
+    for coluna_nome in ["Produto", "Marca", "Laboratório", "Descricao_Unica"]:
+
+        if coluna_nome in base.columns:
+
+            base = base[
+                ~base[coluna_nome]
+                .astype(str)
+                .str.upper()
+                .str.strip()
+                .eq("TOTAL GERAL")
+            ].copy()
+
+    # Remove ganhos absurdos provocados por leitura/fallback indevido
+    base = base[
+        base["Ganho_Potencial"].between(
+            0,
+            10_000_000
+        )
+    ].copy()
+
+    return base
+
 
 
 from pricing_utils import (
@@ -1501,50 +1542,15 @@ if simulacao_global.empty and not historico.empty:
     if not simulacao_global.empty:
         origem_simulacao_global = "historico_pesquisa"
 
-if (
-    not simulacao_global.empty
-    and "EAN" in df.columns
-    and origem_simulacao_global == "venda_rede"
-):
-
-    df["EAN"] = (
-        df["EAN"]
-        .astype(str)
-        .str.replace(".0", "", regex=False)
-        .str.strip()
-    )
-
-    ganho_simulador = (
-        simulacao_global[
-            [
-                "EAN",
-                "Ganho_Potencial_Simulador"
-            ]
-        ]
-        .rename(
-            columns={
-                "Ganho_Potencial_Simulador": "Ganho_Potencial"
-            }
-        )
-    )
-
-    df = df.drop(
-        columns=[
-            "Ganho_Potencial"
-        ],
-        errors="ignore"
-    )
-
-    df = df.merge(
-        ganho_simulador,
-        on="EAN",
-        how="left"
-    )
-
-    df["Ganho_Potencial"] = (
-        df["Ganho_Potencial"]
-        .fillna(0)
-    )
+# Ganho_Potencial oficial deve vir apenas da Analise_Pricing.xlsx.
+# Não sobrescrever com simulacao_global para evitar diferença localhost x online.
+if "Ganho_Potencial" in df.columns:
+    df["Ganho_Potencial"] = pd.to_numeric(
+        df["Ganho_Potencial"],
+        errors="coerce"
+    ).fillna(0)
+else:
+    df["Ganho_Potencial"] = 0
 
 # --------------------------------------------------
 # MENU LATERAL / FILTROS
@@ -1847,6 +1853,26 @@ if pagina == "🧪 Diagnóstico":
         st.error(
             f"Erro ao listar pastas de dados: {erro}"
         )
+
+    st.markdown("### Conferência do arquivo principal")
+
+    try:
+        arquivo_principal = Path("Analise_Pricing.xlsx")
+        if arquivo_principal.exists():
+            st.write(
+                {
+                    "Arquivo": "Analise_Pricing.xlsx",
+                    "Tamanho_KB": round(arquivo_principal.stat().st_size / 1024, 2),
+                    "Modificado": datetime.fromtimestamp(
+                        arquivo_principal.stat().st_mtime
+                    ).strftime("%d/%m/%Y %H:%M:%S")
+                }
+            )
+        else:
+            st.error("Analise_Pricing.xlsx não encontrado.")
+    except Exception as erro:
+        st.error(f"Erro ao conferir Analise_Pricing.xlsx: {erro}")
+
 
     st.markdown("### Bases carregadas")
 
@@ -6801,34 +6827,41 @@ if not simulacao_global.empty:
         width="stretch"
     )
 
-    top_ganho_grafico = simulacao.copy()
-    top_ganho_grafico["Ganho_Potencial_Simulador"] = pd.to_numeric(
-        top_ganho_grafico["Ganho_Potencial_Simulador"],
-        errors="coerce"
-    ).fillna(0)
+    # Gráfico oficial do Dashboard: usa apenas Analise_Pricing.xlsx
+    base_ganho_oficial = preparar_ganho_oficial_dashboard(
+        df_filtrado
+    )
 
-    eixo_produto_grafico = "Produto" if "Produto" in top_ganho_grafico.columns else "EAN"
+    eixo_produto_grafico = (
+        "Produto"
+        if "Produto" in base_ganho_oficial.columns
+        else "EAN"
+    )
 
     top_ganho_grafico = (
-        top_ganho_grafico
-        .sort_values("Ganho_Potencial_Simulador", ascending=True)
+        base_ganho_oficial
+        .sort_values(
+            "Ganho_Potencial",
+            ascending=True
+        )
         .tail(20)
+        .copy()
     )
 
     top_ganho_grafico["Ganho_Label"] = (
-        top_ganho_grafico["Ganho_Potencial_Simulador"]
+        top_ganho_grafico["Ganho_Potencial"]
         .apply(moeda_br)
     )
 
     fig = px.bar(
         top_ganho_grafico,
-        x="Ganho_Potencial_Simulador",
+        x="Ganho_Potencial",
         y=eixo_produto_grafico,
         orientation="h",
         text="Ganho_Label",
         title="Top 20 Produtos com Maior Ganho Projetado",
         labels={
-            "Ganho_Potencial_Simulador": "Ganho Projetado",
+            "Ganho_Potencial": "Ganho Projetado",
             eixo_produto_grafico: "Produto"
         }
     )
@@ -6840,17 +6873,27 @@ if not simulacao_global.empty:
 
     fig.update_layout(
         height=650,
-        margin=dict(l=20, r=180, t=60, b=40),
+        margin=dict(
+            l=20,
+            r=180,
+            t=60,
+            b=40
+        ),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(tickformat=",", showgrid=True),
-        yaxis=dict(automargin=True)
+        xaxis=dict(
+            tickformat=",",
+            showgrid=True
+        ),
+        yaxis=dict(
+            automargin=True
+        )
     )
 
     st.plotly_chart(
         fig,
         width="stretch",
-        key="simulador_ganho_reajuste"
+        key="dashboard_ganho_oficial"
     )
 
 else:
