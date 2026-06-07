@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import zipfile
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
@@ -137,7 +138,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "mapa_geografico_20260607"
+VERSAO_APP = "ganho_replicado_com_mapa_20260607"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -197,6 +198,32 @@ def percentual_br(valor):
         return ""
 
 
+def propagar_ganho_potencial(base):
+    """
+    Garante que todos os indicadores usem o mesmo Ganho_Potencial.
+    """
+
+    if not isinstance(base, pd.DataFrame) or base.empty:
+        return base
+
+    base = base.copy()
+
+    if "Ganho_Potencial" not in base.columns:
+        base["Ganho_Potencial"] = 0
+
+    base["Ganho_Potencial"] = pd.to_numeric(
+        base["Ganho_Potencial"],
+        errors="coerce"
+    ).fillna(0)
+
+    # Aliases seguros para telas ou exportações que precisem do ganho atualizado.
+    base["Ganho_Potencial_Atualizado"] = base["Ganho_Potencial"]
+    base["Ganho_Potencial_Final"] = base["Ganho_Potencial"]
+
+    return base
+
+
+
 def preparar_ganho_oficial_dashboard(base):
     """
     Usa exclusivamente o Ganho_Potencial da Analise_Pricing.xlsx.
@@ -246,6 +273,439 @@ carregar_estoque,
 identificar_rede,
 curva_abc
 )
+
+
+# --------------------------------------------------
+# MOTOR INTELIGENTE DE GANHO POTENCIAL
+# --------------------------------------------------
+
+def ler_base_pasta_ou_zip(pastas, zips):
+
+    bases = []
+
+    for pasta_nome in pastas:
+
+        pasta = Path(pasta_nome)
+
+        if pasta.exists() and pasta.is_dir():
+
+            arquivos = []
+
+            for ext in ["*.xlsx", "*.xls", "*.csv"]:
+                arquivos.extend(list(pasta.glob(ext)))
+
+            for arq in arquivos:
+
+                try:
+
+                    if arq.suffix.lower() == ".csv":
+
+                        try:
+                            temp = pd.read_csv(arq, sep=";", encoding="utf-8-sig")
+                        except Exception:
+                            temp = pd.read_csv(arq, encoding="utf-8-sig")
+
+                    else:
+
+                        temp = pd.read_excel(arq)
+
+                    if not temp.empty:
+                        temp["Arquivo_Origem"] = arq.name
+                        bases.append(temp)
+
+                except Exception as erro:
+                    print(f"Falha ao ler {arq}: {erro}")
+
+    if not bases:
+
+        for zip_nome in zips:
+
+            zip_path = Path(zip_nome)
+
+            if not zip_path.exists():
+                continue
+
+            try:
+
+                with zipfile.ZipFile(zip_path, "r") as z:
+
+                    for nome in z.namelist():
+
+                        if not nome.lower().endswith((".xlsx", ".xls", ".csv")):
+                            continue
+
+                        try:
+
+                            with z.open(nome) as f:
+
+                                if nome.lower().endswith(".csv"):
+
+                                    try:
+                                        temp = pd.read_csv(f, sep=";", encoding="utf-8-sig")
+                                    except Exception:
+                                        f.seek(0)
+                                        temp = pd.read_csv(f, encoding="utf-8-sig")
+
+                                else:
+
+                                    temp = pd.read_excel(f)
+
+                            if not temp.empty:
+                                temp["Arquivo_Origem"] = nome
+                                bases.append(temp)
+
+                        except Exception as erro:
+                            print(f"Falha ao ler {nome}: {erro}")
+
+            except Exception as erro:
+                print(f"Falha ao abrir zip {zip_nome}: {erro}")
+
+    if bases:
+
+        base = pd.concat(bases, ignore_index=True)
+        base.columns = base.columns.astype(str).str.strip()
+        return base
+
+    return pd.DataFrame()
+
+
+def achar_coluna(base, exatos, contem):
+
+    if not isinstance(base, pd.DataFrame) or base.empty:
+        return None
+
+    for alvo in exatos:
+
+        for col in base.columns:
+
+            if str(col).strip().lower() == str(alvo).strip().lower():
+                return col
+
+    for termo in contem:
+
+        termo = str(termo).lower()
+
+        for col in base.columns:
+
+            if termo in str(col).lower():
+                return col
+
+    return None
+
+
+def converter_numero_brasil(serie):
+    """
+    Converte números em formatos brasileiros e americanos.
+    Ex.: '1.234,56', '1234,56', '1,234.56', '1234.56'
+    """
+
+    if isinstance(serie, pd.Series):
+
+        s = (
+            serie
+            .astype(str)
+            .str.strip()
+            .str.replace("R$", "", regex=False)
+            .str.replace("%", "", regex=False)
+            .str.replace(" ", "", regex=False)
+        )
+
+        # Se tiver vírgula, assume vírgula como decimal e ponto como milhar.
+        tem_virgula = s.str.contains(",", regex=False)
+
+        s_br = (
+            s[tem_virgula]
+            .str.replace(".", "", regex=False)
+            .str.replace(",", ".", regex=False)
+        )
+
+        s_us = (
+            s[~tem_virgula]
+            .str.replace(",", "", regex=False)
+        )
+
+        out = pd.Series(index=serie.index, dtype="float64")
+        out.loc[s_br.index] = pd.to_numeric(s_br, errors="coerce")
+        out.loc[s_us.index] = pd.to_numeric(s_us, errors="coerce")
+
+        return out
+
+    return pd.to_numeric(serie, errors="coerce")
+
+
+
+def preco_referencia_seguro(valores):
+
+    s = pd.to_numeric(valores, errors="coerce").dropna()
+    s = s[(s > 0) & (s <= 5000)]
+
+    if s.empty:
+        return np.nan
+
+    if len(s) >= 4:
+
+        q1 = s.quantile(0.25)
+        q3 = s.quantile(0.75)
+        iqr = q3 - q1
+
+        s2 = s[
+            (s >= max(q1 - 1.5 * iqr, 0))
+            & (s <= q3 + 1.5 * iqr)
+        ]
+
+        if not s2.empty:
+            s = s2
+
+    # Percentil 75 gera oportunidade sem usar preço extremo.
+    return float(s.quantile(0.75))
+
+
+def recalcular_ganho_inteligente(df_base, venda_rede_base, historico_base):
+
+    if (
+        not isinstance(df_base, pd.DataFrame)
+        or df_base.empty
+        or not isinstance(venda_rede_base, pd.DataFrame)
+        or venda_rede_base.empty
+        or not isinstance(historico_base, pd.DataFrame)
+        or historico_base.empty
+    ):
+        return df_base.copy(), pd.DataFrame(), "sem_base_completa"
+
+    df_calc = df_base.copy()
+    venda = venda_rede_base.copy()
+    hist = historico_base.copy()
+
+    df_calc.columns = df_calc.columns.astype(str).str.strip()
+    venda.columns = venda.columns.astype(str).str.strip()
+    hist.columns = hist.columns.astype(str).str.strip()
+
+    col_ean_venda = achar_coluna(
+        venda,
+        ["EAN", "EAN (GTIN)", "GTIN", "Código de Barras", "Codigo de Barras", "Cód. Barras/Etiq."],
+        ["ean", "gtin", "barras"]
+    )
+
+    col_qtd = achar_coluna(
+        venda,
+        [
+            "Itens",
+            "Item",
+            "Quantidade",
+            "Qtd",
+            "QTD",
+            "Qtde",
+            "Quantidade Vendida",
+            "Qtd Vendida",
+            "Unidades"
+        ],
+        [
+            "itens",
+            "item",
+            "qtd",
+            "quant",
+            "qtde",
+            "unid"
+        ]
+    )
+
+    col_preco_venda = achar_coluna(
+        venda,
+        [
+            "Preço Venda",
+            "Preco Venda",
+            "Preço (R$)",
+            "Preco (R$)",
+            "Valor Unitário",
+            "Valor Unitario",
+            "Preço Médio",
+            "Preco Medio",
+            "Preco_Medio"
+        ],
+        [
+            "preço",
+            "preco",
+            "unit",
+            "medio",
+            "médio"
+        ]
+    )
+
+    col_valor_total = achar_coluna(
+        venda,
+        [
+            "Venda",
+            "Valor Venda",
+            "Faturamento",
+            "Valor Líquido",
+            "Valor Liquido",
+            "Total Venda",
+            "Valor Total"
+        ],
+        [
+            "venda",
+            "fatur",
+            "liquido",
+            "líquido"
+        ]
+    )
+
+    col_prod_venda = achar_coluna(
+        venda,
+        ["Produto", "Descrição", "Descricao", "Nome Produto", "Embalagem"],
+        ["produto", "descr", "embalagem"]
+    )
+
+    col_ean_hist = achar_coluna(
+        hist,
+        ["EAN", "EAN (GTIN)", "GTIN", "Código de Barras", "Codigo de Barras"],
+        ["ean", "gtin", "barras"]
+    )
+
+    col_preco_hist = achar_coluna(
+        hist,
+        ["Preço (R$)", "Preco (R$)", "Preço", "Preco", "Valor"],
+        ["preço", "preco", "valor"]
+    )
+
+    # Em bases tipo VENDA_FINAL_TESTE, a coluna "Venda" é total e "Itens" é quantidade.
+    # Quando existir Venda + Itens, usar essa combinação para preço atual.
+    if col_valor_total and col_qtd:
+        col_preco_venda = None
+
+    if (
+        not col_ean_venda
+        or not col_qtd
+        or not col_ean_hist
+        or not col_preco_hist
+        or not (col_preco_venda or col_valor_total)
+        or "EAN" not in df_calc.columns
+    ):
+        return df_calc, pd.DataFrame(), "colunas_incompletas"
+
+    venda["EAN"] = venda[col_ean_venda].astype(str).str.replace(".0", "", regex=False).str.strip()
+    hist["EAN"] = hist[col_ean_hist].astype(str).str.replace(".0", "", regex=False).str.strip()
+    df_calc["EAN"] = df_calc["EAN"].astype(str).str.replace(".0", "", regex=False).str.strip()
+
+    venda[col_qtd] = converter_numero_brasil(venda[col_qtd])
+    hist[col_preco_hist] = converter_numero_brasil(hist[col_preco_hist])
+
+    hist = hist[(hist[col_preco_hist] > 0) & (hist[col_preco_hist] <= 5000)].copy()
+
+    if col_preco_venda:
+
+        venda[col_preco_venda] = converter_numero_brasil(venda[col_preco_venda])
+
+        vendas = (
+            venda
+            .dropna(subset=["EAN", col_qtd, col_preco_venda])
+            .groupby("EAN")
+            .agg(
+                Qtd_Vendida_Mes_Anterior=(col_qtd, "sum"),
+                Preco_Atual=(col_preco_venda, "mean")
+            )
+            .reset_index()
+        )
+
+        vendas["Venda_Preco_Antigo"] = vendas["Qtd_Vendida_Mes_Anterior"] * vendas["Preco_Atual"]
+
+    else:
+
+        venda[col_valor_total] = converter_numero_brasil(venda[col_valor_total])
+
+        vendas = (
+            venda
+            .dropna(subset=["EAN", col_qtd, col_valor_total])
+            .groupby("EAN")
+            .agg(
+                Qtd_Vendida_Mes_Anterior=(col_qtd, "sum"),
+                Venda_Preco_Antigo=(col_valor_total, "sum")
+            )
+            .reset_index()
+        )
+
+        vendas = vendas[vendas["Qtd_Vendida_Mes_Anterior"] > 0].copy()
+        vendas["Preco_Atual"] = vendas["Venda_Preco_Antigo"] / vendas["Qtd_Vendida_Mes_Anterior"]
+
+    mercado = (
+        hist
+        .dropna(subset=["EAN", col_preco_hist])
+        .groupby("EAN")[col_preco_hist]
+        .apply(preco_referencia_seguro)
+        .reset_index()
+        .rename(columns={col_preco_hist: "Preco_Sugerido_Mercado"})
+    )
+
+    simulacao = vendas.merge(mercado, on="EAN", how="inner")
+
+    simulacao["Preco_Atual"] = pd.to_numeric(simulacao["Preco_Atual"], errors="coerce")
+    simulacao["Preco_Sugerido_Mercado"] = pd.to_numeric(simulacao["Preco_Sugerido_Mercado"], errors="coerce")
+
+    simulacao = simulacao[
+        (simulacao["Qtd_Vendida_Mes_Anterior"] > 0)
+        & (simulacao["Preco_Atual"] > 0)
+        & (simulacao["Preco_Sugerido_Mercado"] > 0)
+        & (simulacao["Preco_Sugerido_Mercado"] <= simulacao["Preco_Atual"] * 3)
+        & (simulacao["Preco_Sugerido_Mercado"] >= simulacao["Preco_Atual"] * 0.5)
+    ].copy()
+
+    simulacao["Venda_Projetada_Preco_Sugerido"] = simulacao["Qtd_Vendida_Mes_Anterior"] * simulacao["Preco_Sugerido_Mercado"]
+    simulacao["Ganho_Unitario"] = simulacao["Preco_Sugerido_Mercado"] - simulacao["Preco_Atual"]
+    simulacao["Ganho_Potencial_Simulador"] = simulacao["Venda_Projetada_Preco_Sugerido"] - simulacao["Venda_Preco_Antigo"]
+
+    simulacao = simulacao[simulacao["Ganho_Potencial_Simulador"] > 0].copy()
+
+    if col_prod_venda and not simulacao.empty:
+
+        prod_ref = (
+            venda
+            .groupby("EAN")[col_prod_venda]
+            .agg(lambda x: x.mode().iloc[0] if not x.mode().empty else x.iloc[0])
+            .reset_index()
+            .rename(columns={col_prod_venda: "Produto_Simulador"})
+        )
+
+        simulacao = simulacao.merge(prod_ref, on="EAN", how="left")
+
+    for c in [
+        "Preco_Atual",
+        "Preco_Sugerido_Mercado",
+        "Ganho_Unitario",
+        "Venda_Preco_Antigo",
+        "Venda_Projetada_Preco_Sugerido",
+        "Ganho_Potencial_Simulador",
+        "Qtd_Vendida_Mes_Anterior"
+    ]:
+        if c in simulacao.columns:
+            simulacao[c] = pd.to_numeric(simulacao[c], errors="coerce").round(2)
+
+    if "Ganho_Potencial" in df_calc.columns:
+        df_calc["Ganho_Potencial_Oficial"] = pd.to_numeric(df_calc["Ganho_Potencial"], errors="coerce").fillna(0)
+    else:
+        df_calc["Ganho_Potencial_Oficial"] = 0
+
+    if simulacao.empty:
+        df_calc["Ganho_Potencial"] = df_calc["Ganho_Potencial_Oficial"]
+        return df_calc, simulacao, "sem_oportunidade_valida"
+
+    ganho = simulacao[["EAN", "Ganho_Potencial_Simulador"]].rename(
+        columns={"Ganho_Potencial_Simulador": "Ganho_Potencial_Inteligente"}
+    )
+
+    df_calc = df_calc.merge(ganho, on="EAN", how="left")
+
+    df_calc["Ganho_Potencial_Inteligente"] = pd.to_numeric(
+        df_calc["Ganho_Potencial_Inteligente"],
+        errors="coerce"
+    ).fillna(0)
+
+    # Regra premium: usa o maior ganho válido entre o oficial e o recalculado.
+    df_calc["Ganho_Potencial"] = df_calc[
+        ["Ganho_Potencial_Oficial", "Ganho_Potencial_Inteligente"]
+    ].max(axis=1)
+
+    return df_calc, simulacao, "venda_rede_historico_inteligente"
+
 
 
 # --------------------------------------------------
@@ -1120,6 +1580,30 @@ compra = carregar_compra()
 venda_rede = carregar_venda_rede()
 estoque = carregar_estoque()
 
+if historico.empty:
+    historico = ler_base_pasta_ou_zip(
+        ["VENDA_TESTE"],
+        ["VENDA_TESTE.zip"]
+    )
+
+if compra.empty:
+    compra = ler_base_pasta_ou_zip(
+        ["COMPRA_TESTE", "COMPRA", "COMPRAS_TESTE"],
+        ["COMPRA_TESTE.zip", "COMPRA.zip"]
+    )
+
+if venda_rede.empty:
+    venda_rede = ler_base_pasta_ou_zip(
+        ["VENDA_FINAL_TESTE", "VENDA_TESTE_FINAL", "VENDA_FINAL", "VENDA_REDE"],
+        ["VENDA_FINAL_TESTE.zip", "VENDA_TESTE_FINAL.zip", "VENDA_FINAL.zip"]
+    )
+
+if estoque.empty:
+    estoque = ler_base_pasta_ou_zip(
+        ["ESTOQUE_TESTE", "ESTOQUE"],
+        ["ESTOQUE_TESTE.zip", "ESTOQUE.zip"]
+    )
+
 # Fallback robusto para Streamlit Cloud / GitHub
 if historico.empty:
     historico = carregar_base_robusta(
@@ -1229,333 +1713,32 @@ if not historico.empty:
 
 
 # --------------------------------------------------
-# GANHO POTENCIAL PADRÃO SIMULADOR
+# GANHO POTENCIAL INTELIGENTE
 # --------------------------------------------------
 
-def encontrar_coluna_global(base, opcoes):
-
-    for coluna in opcoes:
-
-        if coluna in base.columns:
-            return coluna
-
-    return None
-
-
 simulacao_global = pd.DataFrame()
-origem_simulacao_global = "vazia"
+origem_simulacao_global = "sem_calculo"
 
-if (
-    not venda_rede.empty
-    and not historico.empty
-):
+df, simulacao_global, origem_simulacao_global = recalcular_ganho_inteligente(
+    df,
+    venda_rede,
+    historico
+)
 
-    venda_rede.columns = (
-        venda_rede.columns
-        .astype(str)
-        .str.strip()
-    )
+# Ganho potencial único para todas as visões e indicadores.
+df = propagar_ganho_potencial(df)
 
-    col_ean_venda_global = encontrar_coluna_global(
-        venda_rede,
-        [
-            "EAN",
-            "EAN (GTIN)",
-            "GTIN",
-            "Código de Barras",
-            "Codigo de Barras",
-            "CODIGO_BARRAS",
-            "Cód. Barras",
-            "Cod Barras",
-            "Cód. Barras/Etiq.",
-            "Cod. Barras/Etiq.",
-            "Codigo Barras/Etiq",
-            "Código Barras/Etiq"
-        ]
-    )
+if isinstance(simulacao_global, pd.DataFrame) and not simulacao_global.empty:
 
-    col_produto_venda_global = encontrar_coluna_global(
-        venda_rede,
-        [
-            "Produto",
-            "Descrição",
-            "Descricao",
-            "DESCRICAO",
-            "Nome Produto",
-            "Embalagem"
-        ]
-    )
+    if "Ganho_Potencial_Simulador" in simulacao_global.columns:
 
-    col_qtd_global = encontrar_coluna_global(
-        venda_rede,
-        [
-            "Quantidade",
-            "Qtd",
-            "QTD",
-            "Qtde",
-            "Quantidade Vendida",
-            "Qtd Vendida",
-            "Unidades",
-            "UNIDADES",
-            "Itens"
-        ]
-    )
-
-    col_valor_total_global = encontrar_coluna_global(
-        venda_rede,
-        [
-            "Venda",
-            "Valor Venda",
-            "Valor Total",
-            "Total Venda",
-            "Faturamento",
-            "Valor Líquido",
-            "Valor Liquido"
-        ]
-    )
-
-    col_preco_atual_global = encontrar_coluna_global(
-        venda_rede,
-        [
-            "Preço Venda",
-            "Preco Venda",
-            "Preço de Venda",
-            "Preco de Venda",
-            "Preço (R$)",
-            "Preco (R$)",
-            "Valor Unitário",
-            "Valor Unitario",
-            "Preço Médio",
-            "Preco Medio",
-            "Preco_Medio"
-        ]
-    )
-
-    col_ean_hist_global = "EAN" if "EAN" in historico.columns else None
-
-    if (
-        col_ean_hist_global is None
-        and "EAN (GTIN)" in historico.columns
-    ):
-
-        historico["EAN"] = historico["EAN (GTIN)"]
-        col_ean_hist_global = "EAN"
-
-    if (
-        col_ean_venda_global
-        and col_ean_hist_global
-        and col_qtd_global
-        and "Preço (R$)" in historico.columns
-        and (
-            col_preco_atual_global
-            or col_valor_total_global
-        )
-    ):
-
-        venda_rede["EAN"] = (
-            venda_rede[col_ean_venda_global]
-            .astype(str)
-            .str.replace(".0", "", regex=False)
-            .str.strip()
-        )
-
-        historico["EAN"] = (
-            historico[col_ean_hist_global]
-            .astype(str)
-            .str.replace(".0", "", regex=False)
-            .str.strip()
-        )
-
-        venda_rede[col_qtd_global] = pd.to_numeric(
-            venda_rede[col_qtd_global],
+        simulacao_global["Ganho_Potencial"] = pd.to_numeric(
+            simulacao_global["Ganho_Potencial_Simulador"],
             errors="coerce"
-        )
+        ).fillna(0)
 
-        historico["Preço (R$)"] = pd.to_numeric(
-            historico["Preço (R$)"],
-            errors="coerce"
-        )
-
-        if col_valor_total_global:
-
-            venda_rede[col_valor_total_global] = pd.to_numeric(
-                venda_rede[col_valor_total_global],
-                errors="coerce"
-            )
-
-        if col_preco_atual_global:
-
-            venda_rede[col_preco_atual_global] = pd.to_numeric(
-                venda_rede[col_preco_atual_global],
-                errors="coerce"
-            )
-
-        mercado_global = (
-            historico
-            .dropna(
-                subset=[
-                    "EAN",
-                    "Preço (R$)"
-                ]
-            )
-            .groupby("EAN")
-            ["Preço (R$)"]
-            .min()
-            .reset_index()
-            .rename(
-                columns={
-                    "Preço (R$)": "Preco_Sugerido_Mercado"
-                }
-            )
-        )
-
-        if col_preco_atual_global:
-
-            vendas_global = (
-                venda_rede
-                .dropna(
-                    subset=[
-                        "EAN",
-                        col_qtd_global,
-                        col_preco_atual_global
-                    ]
-                )
-                .groupby("EAN")
-                .agg({
-                    col_qtd_global: "sum",
-                    col_preco_atual_global: "mean"
-                })
-                .reset_index()
-                .rename(
-                    columns={
-                        col_qtd_global: "Qtd_Vendida_Mes_Anterior",
-                        col_preco_atual_global: "Preco_Atual"
-                    }
-                )
-            )
-
-            vendas_global["Venda_Preco_Antigo"] = (
-                vendas_global["Qtd_Vendida_Mes_Anterior"]
-                * vendas_global["Preco_Atual"]
-            )
-
-        else:
-
-            vendas_global = (
-                venda_rede
-                .dropna(
-                    subset=[
-                        "EAN",
-                        col_qtd_global,
-                        col_valor_total_global
-                    ]
-                )
-                .groupby("EAN")
-                .agg({
-                    col_qtd_global: "sum",
-                    col_valor_total_global: "sum"
-                })
-                .reset_index()
-                .rename(
-                    columns={
-                        col_qtd_global: "Qtd_Vendida_Mes_Anterior",
-                        col_valor_total_global: "Venda_Preco_Antigo"
-                    }
-                )
-            )
-
-            vendas_global["Preco_Atual"] = (
-                vendas_global["Venda_Preco_Antigo"]
-                / vendas_global["Qtd_Vendida_Mes_Anterior"]
-            )
-
-        simulacao_global = vendas_global.merge(
-            mercado_global,
-            on="EAN",
-            how="left"
-        )
-
-        origem_simulacao_global = "venda_rede"
-
-        if col_produto_venda_global:
-
-            desc_global = (
-                venda_rede
-                .groupby("EAN")[col_produto_venda_global]
-                .agg(
-                    lambda x:
-                    x.mode().iloc[0]
-                    if not x.mode().empty
-                    else x.iloc[0]
-                )
-                .reset_index()
-                .rename(
-                    columns={
-                        col_produto_venda_global: "Produto_Simulador"
-                    }
-                )
-            )
-
-            simulacao_global = simulacao_global.merge(
-                desc_global,
-                on="EAN",
-                how="left"
-            )
-
-        simulacao_global["Venda_Projetada_Preco_Sugerido"] = (
-            simulacao_global["Qtd_Vendida_Mes_Anterior"]
-            * simulacao_global["Preco_Sugerido_Mercado"]
-        )
-
-        simulacao_global["Ganho_Unitario"] = (
-            simulacao_global["Preco_Sugerido_Mercado"]
-            - simulacao_global["Preco_Atual"]
-        )
-
-        simulacao_global["Ganho_Potencial_Simulador"] = (
-            simulacao_global["Venda_Projetada_Preco_Sugerido"]
-            - simulacao_global["Venda_Preco_Antigo"]
-        )
-
-        simulacao_global = simulacao_global[
-            simulacao_global["Ganho_Potencial_Simulador"] > 0
-        ].copy()
-
-        for coluna in [
-            "Preco_Atual",
-            "Preco_Sugerido_Mercado",
-            "Ganho_Unitario",
-            "Venda_Preco_Antigo",
-            "Venda_Projetada_Preco_Sugerido",
-            "Ganho_Potencial_Simulador",
-            "Qtd_Vendida_Mes_Anterior"
-        ]:
-
-            if coluna in simulacao_global.columns:
-
-                simulacao_global[coluna] = (
-                    simulacao_global[coluna]
-                    .round(2)
-                )
-
-# Fallback: se a venda final não conseguir montar a simulação,
-# usa o histórico apenas como diagnóstico/consulta operacional.
-# IMPORTANTE: essa simulação NÃO deve substituir o Ganho_Potencial oficial
-# da Analise_Pricing.xlsx, para evitar diferença entre localhost e online.
-if simulacao_global.empty and not historico.empty:
-    simulacao_global = criar_simulacao_por_historico(historico)
-    if not simulacao_global.empty:
-        origem_simulacao_global = "historico_pesquisa"
-
-# Ganho_Potencial oficial deve vir apenas da Analise_Pricing.xlsx.
-# Não sobrescrever com simulacao_global para evitar diferença localhost x online.
-if "Ganho_Potencial" in df.columns:
-    df["Ganho_Potencial"] = pd.to_numeric(
-        df["Ganho_Potencial"],
-        errors="coerce"
-    ).fillna(0)
-else:
-    df["Ganho_Potencial"] = 0
+        simulacao_global["Ganho_Potencial_Atualizado"] = simulacao_global["Ganho_Potencial"]
+        simulacao_global["Ganho_Potencial_Final"] = simulacao_global["Ganho_Potencial"]
 
 # --------------------------------------------------
 # MENU LATERAL / FILTROS
@@ -1724,6 +1907,10 @@ if busca:
     ]
 
 
+
+
+# Garante que todas as telas após os filtros recebam o ganho atualizado.
+df_filtrado = propagar_ganho_potencial(df_filtrado)
 
 
 # --------------------------------------------------
@@ -1994,6 +2181,7 @@ if pagina == "📈 Simulador Inteligente":
     )
 
     base_sim = df_filtrado.copy()
+    base_sim = propagar_ganho_potencial(base_sim)
 
     if "EAN" in base_sim.columns:
         base_sim["EAN"] = (
@@ -2577,6 +2765,7 @@ if pagina == "🏢 Dashboard Executivo":
     )
 
     base_exec = df_filtrado.copy()
+    base_exec = propagar_ganho_potencial(base_exec)
 
     total_produtos = len(base_exec)
 
@@ -2686,7 +2875,9 @@ if pagina == "🏢 Dashboard Executivo":
             "Recomendacao",
             "Preco_Medio",
             "Margem_%",
-            "Ganho_Potencial"
+            "Ganho_Potencial",
+            "Ganho_Potencial_Atualizado",
+            "Ganho_Potencial_Final"
         ] if c in top.columns
     ]
 
@@ -2700,6 +2891,14 @@ if pagina == "🏢 Dashboard Executivo":
 
     if "Ganho_Potencial" in top_exibir.columns:
         top_exibir["Ganho_Potencial"] = top_exibir["Ganho_Potencial"].apply(moeda_br)
+
+    for _col_ganho in [
+        "Ganho_Potencial",
+        "Ganho_Potencial_Atualizado",
+        "Ganho_Potencial_Final"
+    ]:
+        if _col_ganho in top_exibir.columns:
+            top_exibir[_col_ganho] = top_exibir[_col_ganho].apply(moeda_br)
 
     st.dataframe(
         top_exibir,
@@ -2730,24 +2929,16 @@ if pagina == "🌎 Mapa Geográfico de Concorrência":
     )
 
     if historico.empty:
-
-        st.warning(
-            "Não há dados de pesquisa de preços carregados em VENDA_TESTE para montar o mapa."
-        )
+        st.warning("Não há dados de pesquisa de preços carregados em VENDA_TESTE para montar o mapa.")
         st.stop()
 
     mapa_base = historico.copy()
     mapa_base.columns = mapa_base.columns.astype(str).str.strip()
 
-    # --------------------------------------------------
-    # IDENTIFICAÇÃO DE COLUNAS
-    # --------------------------------------------------
-
     col_lat = None
     col_lon = None
 
     for c in mapa_base.columns:
-
         nome = str(c).strip().lower()
 
         if nome in ["lat", "latitude"]:
@@ -2757,76 +2948,40 @@ if pagina == "🌎 Mapa Geográfico de Concorrência":
             col_lon = c
 
     if col_lat is None or col_lon is None:
-
-        st.error(
-            "Não encontrei as colunas de latitude/longitude. A base precisa ter colunas como lat/lon ou latitude/longitude."
-        )
-
-        st.write(
-            "Colunas encontradas:",
-            mapa_base.columns.tolist()
-        )
-
+        st.error("Não encontrei as colunas de latitude/longitude. A base precisa ter lat/lon ou latitude/longitude.")
+        st.write("Colunas encontradas:", mapa_base.columns.tolist())
         st.stop()
 
     if "Farmácia" not in mapa_base.columns:
-
-        st.error(
-            "Não encontrei a coluna Farmácia na base de pesquisas."
-        )
+        st.error("Não encontrei a coluna Farmácia na base de pesquisas.")
         st.stop()
 
     if "Rede" not in mapa_base.columns:
+        mapa_base["Rede"] = mapa_base["Farmácia"].apply(identificar_rede)
 
-        mapa_base["Rede"] = (
-            mapa_base["Farmácia"]
-            .apply(identificar_rede)
-        )
+    if "Preço (R$)" not in mapa_base.columns:
+        for col_alt in ["Preco (R$)", "Preço", "Preco", "Valor", "Valor Unitário", "Valor Unitario"]:
+            if col_alt in mapa_base.columns:
+                mapa_base["Preço (R$)"] = mapa_base[col_alt]
+                break
 
     if "Preço (R$)" in mapa_base.columns:
-
-        mapa_base["Preço (R$)"] = pd.to_numeric(
-            mapa_base["Preço (R$)"],
-            errors="coerce"
-        )
-
+        mapa_base["Preço (R$)"] = pd.to_numeric(mapa_base["Preço (R$)"], errors="coerce")
     else:
-
         mapa_base["Preço (R$)"] = None
 
-    mapa_base[col_lat] = pd.to_numeric(
-        mapa_base[col_lat],
-        errors="coerce"
-    )
+    mapa_base[col_lat] = pd.to_numeric(mapa_base[col_lat], errors="coerce")
+    mapa_base[col_lon] = pd.to_numeric(mapa_base[col_lon], errors="coerce")
 
-    mapa_base[col_lon] = pd.to_numeric(
-        mapa_base[col_lon],
-        errors="coerce"
-    )
-
-    mapa_base = mapa_base.dropna(
-        subset=[
-            col_lat,
-            col_lon
-        ]
-    ).copy()
+    mapa_base = mapa_base.dropna(subset=[col_lat, col_lon]).copy()
 
     if mapa_base.empty:
-
-        st.warning(
-            "Não existem registros com latitude e longitude válidos para montar o mapa."
-        )
+        st.warning("Não existem registros com latitude e longitude válidos para montar o mapa.")
         st.stop()
 
-    # --------------------------------------------------
-    # CLASSIFICAÇÃO DA REDE
-    # --------------------------------------------------
-
     def classificar_rede_mapa(row):
-
         farmacia = str(row.get("Farmácia", "")).upper()
         rede = str(row.get("Rede", "")).upper()
-
         texto = f"{farmacia} {rede}"
 
         if "ZANOL" in texto or "THOMAZ" in texto:
@@ -2837,138 +2992,54 @@ if pagina == "🌎 Mapa Geográfico de Concorrência":
 
         return "CONCORRENTE"
 
-    mapa_base["Tipo_Loja"] = mapa_base.apply(
-        classificar_rede_mapa,
-        axis=1
-    )
+    mapa_base["Tipo_Loja"] = mapa_base.apply(classificar_rede_mapa, axis=1)
 
-    # --------------------------------------------------
-    # FILTROS DA TELA
-    # --------------------------------------------------
-
-    c1, c2, c3 = st.columns(
-        [
-            1.2,
-            1.2,
-            2
-        ]
-    )
+    c1, c2, c3 = st.columns([1.2, 1.2, 2])
 
     with c1:
-
-        opcoes_tipo = [
-            "Todas",
-            "ZANOL E THOMAZ LTDA",
-            "TRIANGULO DROGARIA LTDA",
-            "CONCORRENTE"
-        ]
-
         tipo_filtro = st.selectbox(
             "Tipo de loja",
-            opcoes_tipo,
+            ["Todas", "ZANOL E THOMAZ LTDA", "TRIANGULO DROGARIA LTDA", "CONCORRENTE"],
             index=0,
             key="mapa_tipo_loja"
         )
 
     with c2:
-
-        redes_mapa = (
-            mapa_base["Rede"]
-            .dropna()
-            .astype(str)
-            .sort_values()
-            .unique()
-            .tolist()
-        )
-
-        rede_filtro = st.multiselect(
-            "Filtrar redes",
-            redes_mapa,
-            key="mapa_redes"
-        )
+        redes_mapa = mapa_base["Rede"].dropna().astype(str).sort_values().unique().tolist()
+        rede_filtro = st.multiselect("Filtrar redes", redes_mapa, key="mapa_redes")
 
     with c3:
-
-        busca_mapa = st.text_input(
-            "Buscar farmácia, rede, bairro ou cidade",
-            key="mapa_busca"
-        )
+        busca_mapa = st.text_input("Buscar farmácia, rede, bairro ou cidade", key="mapa_busca")
 
     mapa_filtrado = mapa_base.copy()
 
     if tipo_filtro != "Todas":
-
-        mapa_filtrado = mapa_filtrado[
-            mapa_filtrado["Tipo_Loja"] == tipo_filtro
-        ]
+        mapa_filtrado = mapa_filtrado[mapa_filtrado["Tipo_Loja"] == tipo_filtro]
 
     if rede_filtro:
-
-        mapa_filtrado = mapa_filtrado[
-            mapa_filtrado["Rede"].astype(str).isin(rede_filtro)
-        ]
+        mapa_filtrado = mapa_filtrado[mapa_filtrado["Rede"].astype(str).isin(rede_filtro)]
 
     if busca_mapa:
-
         cols_busca = [
-            c for c in [
-                "Farmácia",
-                "Rede",
-                "Bairro",
-                "Cidade",
-                "Logradouro",
-                "Produto"
-            ]
+            c for c in ["Farmácia", "Rede", "Bairro", "Cidade", "Logradouro", "Produto"]
             if c in mapa_filtrado.columns
         ]
 
         if cols_busca:
-
-            mask = False
+            mask = pd.Series(False, index=mapa_filtrado.index)
 
             for c in cols_busca:
-
-                mask = mask | mapa_filtrado[c].astype(str).str.contains(
-                    busca_mapa,
-                    case=False,
-                    na=False
-                )
+                mask = mask | mapa_filtrado[c].astype(str).str.contains(busca_mapa, case=False, na=False)
 
             mapa_filtrado = mapa_filtrado[mask].copy()
 
     if mapa_filtrado.empty:
-
-        st.warning(
-            "Nenhum ponto encontrado para os filtros selecionados."
-        )
+        st.warning("Nenhum ponto encontrado para os filtros selecionados.")
         st.stop()
 
-    # --------------------------------------------------
-    # AGRUPAR PONTOS POR FARMÁCIA / LOCAL
-    # --------------------------------------------------
+    group_cols = ["Farmácia", "Rede", "Tipo_Loja"]
 
-    agg_map = {
-        col_lat: "mean",
-        col_lon: "mean",
-        "Qtd_Pesquisas": ("Farmácia", "count")
-    }
-
-    if "Preço (R$)" in mapa_filtrado.columns:
-        pass
-
-    group_cols = [
-        "Farmácia",
-        "Rede",
-        "Tipo_Loja"
-    ]
-
-    for c in [
-        "Cidade",
-        "Bairro",
-        "Logradouro",
-        "Número"
-    ]:
-
+    for c in ["Cidade", "Bairro", "Logradouro", "Número"]:
         if c in mapa_filtrado.columns:
             group_cols.append(c)
 
@@ -2984,15 +3055,8 @@ if pagina == "🌎 Mapa Geográfico de Concorrência":
         .reset_index()
     )
 
-    mapa_agrupado["Preco_Medio"] = pd.to_numeric(
-        mapa_agrupado["Preco_Medio"],
-        errors="coerce"
-    )
-
-    mapa_agrupado["Preco_Medio_Label"] = (
-        mapa_agrupado["Preco_Medio"]
-        .apply(moeda_br)
-    )
+    mapa_agrupado["Preco_Medio"] = pd.to_numeric(mapa_agrupado["Preco_Medio"], errors="coerce")
+    mapa_agrupado["Preco_Medio_Label"] = mapa_agrupado["Preco_Medio"].apply(moeda_br)
 
     mapa_agrupado["Texto_Mapa"] = (
         "<b>" + mapa_agrupado["Farmácia"].astype(str) + "</b>"
@@ -3008,35 +3072,12 @@ if pagina == "🌎 Mapa Geográfico de Concorrência":
     if "Bairro" in mapa_agrupado.columns:
         mapa_agrupado["Texto_Mapa"] += "<br>Bairro: " + mapa_agrupado["Bairro"].astype(str)
 
-    # --------------------------------------------------
-    # KPIS DO MAPA
-    # --------------------------------------------------
-
     k1, k2, k3, k4 = st.columns(4)
 
-    k1.metric(
-        "Farmácias no mapa",
-        f"{mapa_agrupado['Farmácia'].nunique():,}".replace(",", ".")
-    )
-
-    k2.metric(
-        "Redes monitoradas",
-        f"{mapa_agrupado['Rede'].nunique():,}".replace(",", ".")
-    )
-
-    k3.metric(
-        "Pesquisas de preço",
-        f"{int(mapa_agrupado['Qtd_Pesquisas'].sum()):,}".replace(",", ".")
-    )
-
-    k4.metric(
-        "Preço médio",
-        moeda_br(mapa_agrupado["Preco_Medio"].mean())
-    )
-
-    # --------------------------------------------------
-    # MAPA INTERATIVO
-    # --------------------------------------------------
+    k1.metric("Farmácias no mapa", f"{mapa_agrupado['Farmácia'].nunique():,}".replace(",", "."))
+    k2.metric("Redes monitoradas", f"{mapa_agrupado['Rede'].nunique():,}".replace(",", "."))
+    k3.metric("Pesquisas de preço", f"{int(mapa_agrupado['Qtd_Pesquisas'].sum()):,}".replace(",", "."))
+    k4.metric("Preço médio", moeda_br(mapa_agrupado["Preco_Medio"].mean()))
 
     centro_lat = mapa_agrupado["Latitude"].mean()
     centro_lon = mapa_agrupado["Longitude"].mean()
@@ -3049,16 +3090,13 @@ if pagina == "🌎 Mapa Geográfico de Concorrência":
         }
     ).fillna("#FF3B30")
 
-    mapa_agrupado["Tamanho"] = (
-        mapa_agrupado["Qtd_Pesquisas"]
-        .clip(lower=1)
-        .apply(lambda x: min(10 + x ** 0.5 * 4, 34))
+    mapa_agrupado["Tamanho"] = mapa_agrupado["Qtd_Pesquisas"].clip(lower=1).apply(
+        lambda x: min(10 + x ** 0.5 * 4, 34)
     )
 
     fig_mapa = go.Figure()
 
     for tipo, base_tipo in mapa_agrupado.groupby("Tipo_Loja"):
-
         fig_mapa.add_trace(
             go.Scattermapbox(
                 lat=base_tipo["Latitude"],
@@ -3078,61 +3116,24 @@ if pagina == "🌎 Mapa Geográfico de Concorrência":
     fig_mapa.update_layout(
         mapbox=dict(
             style="carto-darkmatter",
-            center=dict(
-                lat=centro_lat,
-                lon=centro_lon
-            ),
+            center=dict(lat=centro_lat, lon=centro_lon),
             zoom=11
         ),
         height=680,
-        margin=dict(
-            l=0,
-            r=0,
-            t=20,
-            b=0
-        ),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="left",
-            x=0
-        ),
+        margin=dict(l=0, r=0, t=20, b=0),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
         paper_bgcolor="rgba(0,0,0,0)"
     )
 
-    st.plotly_chart(
-        fig_mapa,
-        use_container_width=True,
-        key="mapa_geografico_concorrencia"
-    )
-
-    # --------------------------------------------------
-    # RANKING GEOGRÁFICO
-    # --------------------------------------------------
+    st.plotly_chart(fig_mapa, use_container_width=True, key="mapa_geografico_concorrencia")
 
     st.markdown("### 🏆 Ranking de lojas por quantidade de pesquisas")
 
-    ranking_mapa = (
-        mapa_agrupado
-        .sort_values(
-            "Qtd_Pesquisas",
-            ascending=False
-        )
-        .copy()
-    )
+    ranking_mapa = mapa_agrupado.sort_values("Qtd_Pesquisas", ascending=False).copy()
 
     ranking_exibir = ranking_mapa[
         [
-            c for c in [
-                "Farmácia",
-                "Rede",
-                "Tipo_Loja",
-                "Cidade",
-                "Bairro",
-                "Qtd_Pesquisas",
-                "Preco_Medio_Label"
-            ]
+            c for c in ["Farmácia", "Rede", "Tipo_Loja", "Cidade", "Bairro", "Qtd_Pesquisas", "Preco_Medio_Label"]
             if c in ranking_mapa.columns
         ]
     ].rename(
@@ -3143,17 +3144,9 @@ if pagina == "🌎 Mapa Geográfico de Concorrência":
         }
     )
 
-    st.dataframe(
-        ranking_exibir,
-        use_container_width=True,
-        height=420
-    )
+    st.dataframe(ranking_exibir, use_container_width=True, height=420)
 
-    csv_mapa = (
-        ranking_exibir
-        .to_csv(index=False, sep=";")
-        .encode("utf-8-sig")
-    )
+    csv_mapa = ranking_exibir.to_csv(index=False, sep=";").encode("utf-8-sig")
 
     st.download_button(
         "📥 Exportar ranking geográfico",
@@ -3397,6 +3390,8 @@ if pagina == "🔎 Rede/Loja vs Concorrentes":
                     "CURVA",
                     "Recomendacao",
                     "Ganho_Potencial",
+                    "Ganho_Potencial_Atualizado",
+                    "Ganho_Potencial_Final",
                     "Margem_%",
                     "Lucro_Unitario",
                     "Preco_Medio"
@@ -3919,6 +3914,8 @@ if pagina == "🛒 Negociação Compras":
                     "CURVA",
                     "Recomendacao",
                     "Ganho_Potencial",
+                    "Ganho_Potencial_Atualizado",
+                    "Ganho_Potencial_Final",
                     "Margem_%",
                     "Lucro_Unitario",
                     "Preco_Medio"
@@ -4624,6 +4621,8 @@ if pagina == "🚨 Central de Alertas":
                     "CURVA",
                     "Recomendacao",
                     "Ganho_Potencial",
+                    "Ganho_Potencial_Atualizado",
+                    "Ganho_Potencial_Final",
                     "Margem_%",
                     "Lucro_Unitario",
                     "Preco_Medio"
@@ -5298,6 +5297,21 @@ if origem_simulacao_global == "historico_pesquisa":
         "mas o Ganho Potencial exibido no dashboard permanece o valor oficial da Analise_Pricing.xlsx."
     )
 
+
+if "origem_simulacao_global" in globals():
+    if origem_simulacao_global == "venda_rede_historico_inteligente":
+        pass
+
+    else:
+        st.info("ℹ️ Motor inteligente sem base completa. Usando Ganho_Potencial oficial da Analise_Pricing.xlsx.")
+
+if "Ganho_Potencial" in df_filtrado.columns:
+    ganho_total_atualizado = pd.to_numeric(
+        df_filtrado["Ganho_Potencial"],
+        errors="coerce"
+    ).fillna(0).sum()
+else:
+    ganho_total_atualizado = 0
 
 # --------------------------------------------------
 # KPIS
@@ -7359,9 +7373,7 @@ if not simulacao_global.empty:
 
 else:
 
-    st.warning(
-        "As bases necessárias ainda não possuem dados compatíveis para simulação."
-    )
+    st.info("ℹ️ O simulador usa o motor inteligente quando VENDA_FINAL_TESTE contém Cód. Barras/Etiq., Itens e Venda.")
 
     if not venda_rede.empty:
         st.write("Colunas encontradas em VENDA_FINAL_TESTE:")
