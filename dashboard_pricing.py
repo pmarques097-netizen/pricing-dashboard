@@ -135,7 +135,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "debug_dados_20260607_133846"
+VERSAO_APP = "debug_estavel_20260607_141644"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -193,59 +193,6 @@ def percentual_br(valor):
 
     except Exception:
         return ""
-
-
-def preco_mercado_seguro(serie):
-    """
-    Calcula uma referência de mercado segura para simulação.
-
-    Regras:
-    - remove preços vazios, negativos ou zero;
-    - remove preços absurdos acima de R$ 5.000;
-    - remove outliers pelo método IQR;
-    - usa a mediana dos preços válidos.
-    """
-
-    try:
-
-        s = pd.to_numeric(
-            serie,
-            errors="coerce"
-        ).dropna()
-
-        s = s[
-            (s > 0)
-            & (s <= 5000)
-        ]
-
-        if s.empty:
-            return None
-
-        if len(s) >= 4:
-
-            q1 = s.quantile(0.25)
-            q3 = s.quantile(0.75)
-            iqr = q3 - q1
-
-            limite_superior = q3 + (1.5 * iqr)
-            limite_inferior = max(q1 - (1.5 * iqr), 0)
-
-            s_filtrada = s[
-                (s >= limite_inferior)
-                & (s <= limite_superior)
-            ]
-
-            if not s_filtrada.empty:
-                s = s_filtrada
-
-        return float(
-            s.median()
-        )
-
-    except Exception:
-
-        return None
-
 
 
 from pricing_utils import (
@@ -657,6 +604,7 @@ PERMISSOES_TELAS = {
         "🔎 Rede/Loja vs Concorrentes",
         "🛒 Negociação Compras",
         "🚨 Central de Alertas",
+        "🧪 Diagnóstico",
         "📈 Simulador Inteligente",
         "🏢 Dashboard Executivo"
     ],
@@ -665,6 +613,7 @@ PERMISSOES_TELAS = {
         "🔎 Rede/Loja vs Concorrentes",
         "🛒 Negociação Compras",
         "🚨 Central de Alertas",
+        "🧪 Diagnóstico",
         "📈 Simulador Inteligente",
         "🏢 Dashboard Executivo"
     ],
@@ -673,6 +622,7 @@ PERMISSOES_TELAS = {
         "🔎 Rede/Loja vs Concorrentes",
         "🛒 Negociação Compras",
         "🚨 Central de Alertas",
+        "🧪 Diagnóstico",
         "📈 Simulador Inteligente",
         "🏢 Dashboard Executivo"
     ],
@@ -681,6 +631,7 @@ PERMISSOES_TELAS = {
         "🔎 Rede/Loja vs Concorrentes",
         "🛒 Negociação Compras",
         "🚨 Central de Alertas",
+        "🧪 Diagnóstico",
         "📈 Simulador Inteligente",
         "🏢 Dashboard Executivo"
     ],
@@ -885,222 +836,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-
-
-# --------------------------------------------------
-# DIAGNÓSTICO DE ARQUIVOS CARREGADOS
-# --------------------------------------------------
-
-def listar_arquivos_diagnostico(pasta):
-
-    pasta_path = Path(pasta)
-
-    if not pasta_path.exists():
-
-        return pd.DataFrame(
-            [
-                {
-                    "Pasta": str(pasta),
-                    "Arquivo": "PASTA NÃO ENCONTRADA",
-                    "Tamanho_KB": "",
-                    "Modificado": ""
-                }
-            ]
-        )
-
-    registros = []
-
-    for arquivo in sorted(pasta_path.glob("*")):
-
-        if arquivo.is_file():
-
-            registros.append(
-                {
-                    "Pasta": str(pasta),
-                    "Arquivo": arquivo.name,
-                    "Tamanho_KB": round(arquivo.stat().st_size / 1024, 2),
-                    "Modificado": datetime.fromtimestamp(
-                        arquivo.stat().st_mtime
-                    ).strftime("%d/%m/%Y %H:%M:%S")
-                }
-            )
-
-    if not registros:
-
-        registros.append(
-            {
-                "Pasta": str(pasta),
-                "Arquivo": "PASTA VAZIA",
-                "Tamanho_KB": "",
-                "Modificado": ""
-            }
-        )
-
-    return pd.DataFrame(registros)
-
-
-def mostrar_diagnostico_dados(df, historico, compra, venda_rede, estoque):
-
-    with st.expander(
-        "🧪 Diagnóstico de dados carregados / online vs localhost",
-        expanded=False
-    ):
-
-        st.warning(
-            "Use esta área para conferir se o Streamlit online está lendo os mesmos arquivos do computador local."
-        )
-
-        st.write("**Versão do app:**", VERSAO_APP)
-        st.write("**Diretório atual:**", os.getcwd())
-
-        try:
-
-            itens_raiz = []
-
-            for item in sorted(Path(".").iterdir()):
-
-                itens_raiz.append(
-                    {
-                        "Nome": item.name,
-                        "Tipo": "Pasta" if item.is_dir() else "Arquivo",
-                        "Tamanho_KB": round(item.stat().st_size / 1024, 2) if item.is_file() else "",
-                        "Modificado": datetime.fromtimestamp(
-                            item.stat().st_mtime
-                        ).strftime("%d/%m/%Y %H:%M:%S")
-                    }
-                )
-
-            st.markdown("### Arquivos/pastas na raiz")
-            st.dataframe(
-                pd.DataFrame(itens_raiz),
-                use_container_width=True,
-                height=260
-            )
-
-        except Exception as erro:
-
-            st.error(f"Erro ao listar raiz do projeto: {erro}")
-
-        st.markdown("### Pastas de dados encontradas")
-
-        diagnostico_pastas = pd.concat(
-            [
-                listar_arquivos_diagnostico("VENDA_TESTE"),
-                listar_arquivos_diagnostico("VENDA_FINAL_TESTE"),
-                listar_arquivos_diagnostico("ESTOQUE_TESTE"),
-                listar_arquivos_diagnostico("VENDA_TESTE_FINAL")
-            ],
-            ignore_index=True
-        )
-
-        st.dataframe(
-            diagnostico_pastas,
-            use_container_width=True,
-            height=300
-        )
-
-        st.markdown("### Bases carregadas em memória")
-
-        resumo_bases = pd.DataFrame(
-            [
-                {
-                    "Base": "df / Analise_Pricing.xlsx",
-                    "Linhas": len(df) if isinstance(df, pd.DataFrame) else 0,
-                    "Colunas": len(df.columns) if isinstance(df, pd.DataFrame) else 0
-                },
-                {
-                    "Base": "historico / VENDA_TESTE",
-                    "Linhas": len(historico) if isinstance(historico, pd.DataFrame) else 0,
-                    "Colunas": len(historico.columns) if isinstance(historico, pd.DataFrame) else 0
-                },
-                {
-                    "Base": "compra",
-                    "Linhas": len(compra) if isinstance(compra, pd.DataFrame) else 0,
-                    "Colunas": len(compra.columns) if isinstance(compra, pd.DataFrame) else 0
-                },
-                {
-                    "Base": "venda_rede / VENDA_FINAL_TESTE",
-                    "Linhas": len(venda_rede) if isinstance(venda_rede, pd.DataFrame) else 0,
-                    "Colunas": len(venda_rede.columns) if isinstance(venda_rede, pd.DataFrame) else 0
-                },
-                {
-                    "Base": "estoque / ESTOQUE_TESTE",
-                    "Linhas": len(estoque) if isinstance(estoque, pd.DataFrame) else 0,
-                    "Colunas": len(estoque.columns) if isinstance(estoque, pd.DataFrame) else 0
-                },
-                {
-                    "Base": "simulacao_global",
-                    "Linhas": len(simulacao_global) if "simulacao_global" in globals() and isinstance(simulacao_global, pd.DataFrame) else 0,
-                    "Colunas": len(simulacao_global.columns) if "simulacao_global" in globals() and isinstance(simulacao_global, pd.DataFrame) else 0
-                }
-            ]
-        )
-
-        st.dataframe(
-            resumo_bases,
-            use_container_width=True
-        )
-
-        st.markdown("### Colunas principais")
-
-        c1, c2 = st.columns(2)
-
-        with c1:
-            st.write("**df / Analise_Pricing.xlsx**")
-            st.write(df.columns.tolist() if isinstance(df, pd.DataFrame) else [])
-            st.write("**historico / VENDA_TESTE**")
-            st.write(historico.columns.tolist() if isinstance(historico, pd.DataFrame) else [])
-
-        with c2:
-            st.write("**venda_rede / VENDA_FINAL_TESTE**")
-            st.write(venda_rede.columns.tolist() if isinstance(venda_rede, pd.DataFrame) else [])
-            st.write("**estoque / ESTOQUE_TESTE**")
-            st.write(estoque.columns.tolist() if isinstance(estoque, pd.DataFrame) else [])
-
-        st.markdown("### Top 30 da simulação")
-
-        if (
-            "simulacao_global" in globals()
-            and isinstance(simulacao_global, pd.DataFrame)
-            and not simulacao_global.empty
-        ):
-
-            cols_amostra = [
-                c for c in [
-                    "EAN",
-                    "Produto_Simulador",
-                    "Produto",
-                    "Qtd_Vendida_Mes_Anterior",
-                    "Preco_Atual",
-                    "Preco_Sugerido_Mercado",
-                    "Ganho_Unitario",
-                    "Ganho_Potencial_Simulador"
-                ]
-                if c in simulacao_global.columns
-            ]
-
-            amostra = simulacao_global[cols_amostra].copy()
-
-            if "Ganho_Potencial_Simulador" in amostra.columns:
-                amostra["_ordem"] = pd.to_numeric(
-                    amostra["Ganho_Potencial_Simulador"],
-                    errors="coerce"
-                )
-                amostra = (
-                    amostra
-                    .sort_values("_ordem", ascending=False)
-                    .drop(columns=["_ordem"])
-                    .head(30)
-                )
-
-            st.dataframe(
-                amostra,
-                use_container_width=True,
-                height=350
-            )
-
-        else:
-            st.info("simulacao_global está vazia ou não foi criada.")
 
 # --------------------------------------------------
 # DADOS
@@ -1470,42 +1205,6 @@ if (
                 how="left"
             )
 
-
-        # Proteção contra preços fora da curva que distorcem o ganho
-        if (
-            "Preco_Atual" in simulacao_global.columns
-            and "Preco_Sugerido_Mercado" in simulacao_global.columns
-        ):
-
-            simulacao_global["Preco_Sugerido_Mercado"] = pd.to_numeric(
-                simulacao_global["Preco_Sugerido_Mercado"],
-                errors="coerce"
-            )
-
-            simulacao_global["Preco_Atual"] = pd.to_numeric(
-                simulacao_global["Preco_Atual"],
-                errors="coerce"
-            )
-
-            simulacao_global = simulacao_global[
-                (
-                    simulacao_global["Preco_Sugerido_Mercado"].notna()
-                )
-                & (
-                    simulacao_global["Preco_Atual"].notna()
-                )
-                & (
-                    simulacao_global["Preco_Sugerido_Mercado"] > 0
-                )
-                & (
-                    simulacao_global["Preco_Atual"] > 0
-                )
-                & (
-                    simulacao_global["Preco_Sugerido_Mercado"]
-                    <= simulacao_global["Preco_Atual"] * 3
-                )
-            ].copy()
-
         simulacao_global["Venda_Projetada_Preco_Sugerido"] = (
             simulacao_global["Qtd_Vendida_Mes_Anterior"]
             * simulacao_global["Preco_Sugerido_Mercado"]
@@ -1541,206 +1240,6 @@ if (
                     simulacao_global[coluna]
                     .round(2)
                 )
-
-
-# --------------------------------------------------
-# FALLBACK AUTOMÁTICO DO SIMULADOR
-# --------------------------------------------------
-# Quando VENDA_FINAL_TESTE não possui colunas de venda compatíveis,
-# o sistema monta uma simulação usando VENDA_TESTE/HISTÓRICO:
-# - EAN (GTIN) / EAN
-# - Produto
-# - Preço (R$)
-# - quantidade de pesquisas como base de volume
-# - preço médio atual da pesquisa
-# - preço sugerido pelo maior preço encontrado no mercado
-#
-# Isso evita que o painel fique vazio quando a base online possui
-# somente a pesquisa de preços.
-
-if simulacao_global.empty and not historico.empty:
-
-    try:
-
-        hist_fallback = historico.copy()
-
-        hist_fallback.columns = (
-            hist_fallback.columns
-            .astype(str)
-            .str.strip()
-        )
-
-        col_ean_fallback = encontrar_coluna_global(
-            hist_fallback,
-            [
-                "EAN",
-                "EAN (GTIN)",
-                "GTIN",
-                "Código de Barras",
-                "Codigo de Barras",
-                "CODIGO_BARRAS",
-                "Cód. Barras",
-                "Cod Barras"
-            ]
-        )
-
-        col_produto_fallback = encontrar_coluna_global(
-            hist_fallback,
-            [
-                "Produto",
-                "Descrição",
-                "Descricao",
-                "DESCRICAO",
-                "Nome Produto",
-                "Termo Pesquisado"
-            ]
-        )
-
-        col_preco_fallback = encontrar_coluna_global(
-            hist_fallback,
-            [
-                "Preço (R$)",
-                "Preco (R$)",
-                "Preço",
-                "Preco",
-                "Valor",
-                "Valor Unitário",
-                "Valor Unitario",
-                "Preço Médio",
-                "Preco Medio"
-            ]
-        )
-
-        if (
-            col_ean_fallback
-            and col_preco_fallback
-        ):
-
-            hist_fallback["EAN"] = (
-                hist_fallback[col_ean_fallback]
-                .astype(str)
-                .str.replace(".0", "", regex=False)
-                .str.strip()
-            )
-
-            hist_fallback["Preco_Pesquisa"] = pd.to_numeric(
-                hist_fallback[col_preco_fallback],
-                errors="coerce"
-            )
-
-            hist_fallback = hist_fallback.dropna(
-                subset=[
-                    "EAN",
-                    "Preco_Pesquisa"
-                ]
-            )
-
-            if not hist_fallback.empty:
-
-                # Preço atual estimado = média das pesquisas do produto
-                # Volume estimado = quantidade de pesquisas do EAN
-                vendas_fallback = (
-                    hist_fallback
-                    .groupby("EAN")
-                    .agg(
-                        Qtd_Vendida_Mes_Anterior=("Preco_Pesquisa", "count"),
-                        Preco_Atual=("Preco_Pesquisa", "mean")
-                    )
-                    .reset_index()
-                )
-
-                # Preço sugerido = maior preço observado no mercado
-                # Para oportunidade de ganho, faz mais sentido do que o menor preço.
-                mercado_fallback = (
-                    hist_fallback
-                    .groupby("EAN")
-                    .agg(
-                        Preco_Sugerido_Mercado=("Preco_Pesquisa", "max")
-                    )
-                    .reset_index()
-                )
-
-                simulacao_global = vendas_fallback.merge(
-                    mercado_fallback,
-                    on="EAN",
-                    how="left"
-                )
-
-                if col_produto_fallback:
-
-                    desc_fallback = (
-                        hist_fallback
-                        .groupby("EAN")[col_produto_fallback]
-                        .agg(
-                            lambda x:
-                            x.mode().iloc[0]
-                            if not x.mode().empty
-                            else x.iloc[0]
-                        )
-                        .reset_index()
-                        .rename(
-                            columns={
-                                col_produto_fallback: "Produto_Simulador"
-                            }
-                        )
-                    )
-
-                    simulacao_global = simulacao_global.merge(
-                        desc_fallback,
-                        on="EAN",
-                        how="left"
-                    )
-
-                simulacao_global["Venda_Preco_Antigo"] = (
-                    simulacao_global["Qtd_Vendida_Mes_Anterior"]
-                    * simulacao_global["Preco_Atual"]
-                )
-
-                simulacao_global["Venda_Projetada_Preco_Sugerido"] = (
-                    simulacao_global["Qtd_Vendida_Mes_Anterior"]
-                    * simulacao_global["Preco_Sugerido_Mercado"]
-                )
-
-                simulacao_global["Ganho_Unitario"] = (
-                    simulacao_global["Preco_Sugerido_Mercado"]
-                    - simulacao_global["Preco_Atual"]
-                )
-
-                simulacao_global["Ganho_Potencial_Simulador"] = (
-                    simulacao_global["Venda_Projetada_Preco_Sugerido"]
-                    - simulacao_global["Venda_Preco_Antigo"]
-                )
-
-                # Mantém somente oportunidades reais de aumento.
-                simulacao_global = simulacao_global[
-                    simulacao_global["Ganho_Potencial_Simulador"] > 0
-                ].copy()
-
-                for coluna in [
-                    "Preco_Atual",
-                    "Preco_Sugerido_Mercado",
-                    "Ganho_Unitario",
-                    "Venda_Preco_Antigo",
-                    "Venda_Projetada_Preco_Sugerido",
-                    "Ganho_Potencial_Simulador",
-                    "Qtd_Vendida_Mes_Anterior"
-                ]:
-
-                    if coluna in simulacao_global.columns:
-
-                        simulacao_global[coluna] = (
-                            pd.to_numeric(
-                                simulacao_global[coluna],
-                                errors="coerce"
-                            )
-                            .round(2)
-                        )
-
-    except Exception as erro_fallback_simulador:
-
-        print(
-            f"Falha no fallback automático do simulador: {erro_fallback_simulador}"
-        )
 
 if not simulacao_global.empty and "EAN" in df.columns:
 
@@ -1783,16 +1282,6 @@ if not simulacao_global.empty and "EAN" in df.columns:
         .fillna(0)
     )
 
-
-# Mostrar diagnóstico para comparar localhost x Streamlit Cloud
-mostrar_diagnostico_dados(
-    df,
-    historico,
-    compra,
-    venda_rede,
-    estoque
-)
-
 # --------------------------------------------------
 # MENU LATERAL / FILTROS
 # --------------------------------------------------
@@ -1829,15 +1318,15 @@ st.sidebar.markdown(
     unsafe_allow_html=True
 )
 
+st.sidebar.markdown(
+    '<div class="sidebar-section">Navegação</div>',
+    unsafe_allow_html=True
+)
 
 st.sidebar.caption(
     f"Versão: {VERSAO_APP}"
 )
 
-st.sidebar.markdown(
-    '<div class="sidebar-section">Navegação</div>',
-    unsafe_allow_html=True
-)
 
 paginas_liberadas = PERMISSOES_TELAS.get(
     perfil_usuario,
@@ -1958,6 +1447,236 @@ if busca:
             )
         )
     ]
+
+
+
+
+# --------------------------------------------------
+# PÁGINA DE DIAGNÓSTICO
+# --------------------------------------------------
+
+if pagina == "🧪 Diagnóstico":
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">Diagnóstico Técnico</div>
+            <h1>🧪 Diagnóstico de Dados</h1>
+            <p>Compare o que está rodando no localhost e no Streamlit Cloud.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.info(
+        "Esta página ajuda a identificar se o online está lendo arquivos, pastas ou bases diferentes do localhost."
+    )
+
+    st.metric(
+        "Versão do App",
+        VERSAO_APP if "VERSAO_APP" in globals() else "sem versão"
+    )
+
+    st.write(
+        "**Diretório atual:**",
+        os.getcwd()
+    )
+
+    st.markdown("### Arquivos e pastas na raiz do projeto")
+
+    try:
+
+        itens_raiz = []
+
+        for item in sorted(Path(".").iterdir()):
+
+            itens_raiz.append(
+                {
+                    "Nome": item.name,
+                    "Tipo": "Pasta" if item.is_dir() else "Arquivo",
+                    "Tamanho KB": round(item.stat().st_size / 1024, 2) if item.is_file() else "",
+                    "Modificado": datetime.fromtimestamp(
+                        item.stat().st_mtime
+                    ).strftime("%d/%m/%Y %H:%M:%S")
+                }
+            )
+
+        st.dataframe(
+            pd.DataFrame(itens_raiz),
+            use_container_width=True,
+            height=320
+        )
+
+    except Exception as erro:
+
+        st.error(
+            f"Erro ao listar raiz do projeto: {erro}"
+        )
+
+    st.markdown("### Arquivos nas pastas de dados")
+
+    try:
+
+        pastas = [
+            "VENDA_TESTE",
+            "VENDA_FINAL_TESTE",
+            "ESTOQUE_TESTE",
+            "VENDA_TESTE_FINAL"
+        ]
+
+        registros = []
+
+        for pasta in pastas:
+
+            pasta_path = Path(pasta)
+
+            if not pasta_path.exists():
+
+                registros.append(
+                    {
+                        "Pasta": pasta,
+                        "Arquivo": "PASTA NÃO ENCONTRADA",
+                        "Tamanho KB": "",
+                        "Modificado": ""
+                    }
+                )
+
+            else:
+
+                arquivos = list(pasta_path.glob("*"))
+
+                if not arquivos:
+
+                    registros.append(
+                        {
+                            "Pasta": pasta,
+                            "Arquivo": "PASTA VAZIA",
+                            "Tamanho KB": "",
+                            "Modificado": ""
+                        }
+                    )
+
+                for arquivo in sorted(arquivos):
+
+                    if arquivo.is_file():
+
+                        registros.append(
+                            {
+                                "Pasta": pasta,
+                                "Arquivo": arquivo.name,
+                                "Tamanho KB": round(arquivo.stat().st_size / 1024, 2),
+                                "Modificado": datetime.fromtimestamp(
+                                    arquivo.stat().st_mtime
+                                ).strftime("%d/%m/%Y %H:%M:%S")
+                            }
+                        )
+
+        st.dataframe(
+            pd.DataFrame(registros),
+            use_container_width=True,
+            height=360
+        )
+
+    except Exception as erro:
+
+        st.error(
+            f"Erro ao listar pastas de dados: {erro}"
+        )
+
+    st.markdown("### Bases carregadas")
+
+    resumo_bases = pd.DataFrame(
+        [
+            {
+                "Base": "df / Analise_Pricing.xlsx",
+                "Linhas": len(df) if isinstance(df, pd.DataFrame) else 0,
+                "Colunas": len(df.columns) if isinstance(df, pd.DataFrame) else 0
+            },
+            {
+                "Base": "historico / VENDA_TESTE",
+                "Linhas": len(historico) if isinstance(historico, pd.DataFrame) else 0,
+                "Colunas": len(historico.columns) if isinstance(historico, pd.DataFrame) else 0
+            },
+            {
+                "Base": "compra",
+                "Linhas": len(compra) if isinstance(compra, pd.DataFrame) else 0,
+                "Colunas": len(compra.columns) if isinstance(compra, pd.DataFrame) else 0
+            },
+            {
+                "Base": "venda_rede / VENDA_FINAL_TESTE",
+                "Linhas": len(venda_rede) if isinstance(venda_rede, pd.DataFrame) else 0,
+                "Colunas": len(venda_rede.columns) if isinstance(venda_rede, pd.DataFrame) else 0
+            },
+            {
+                "Base": "estoque / ESTOQUE_TESTE",
+                "Linhas": len(estoque) if isinstance(estoque, pd.DataFrame) else 0,
+                "Colunas": len(estoque.columns) if isinstance(estoque, pd.DataFrame) else 0
+            },
+            {
+                "Base": "simulacao_global",
+                "Linhas": len(simulacao_global) if "simulacao_global" in globals() and isinstance(simulacao_global, pd.DataFrame) else 0,
+                "Colunas": len(simulacao_global.columns) if "simulacao_global" in globals() and isinstance(simulacao_global, pd.DataFrame) else 0
+            }
+        ]
+    )
+
+    st.dataframe(
+        resumo_bases,
+        use_container_width=True,
+        height=260
+    )
+
+    st.markdown("### Top 30 da simulação")
+
+    if (
+        "simulacao_global" in globals()
+        and isinstance(simulacao_global, pd.DataFrame)
+        and not simulacao_global.empty
+    ):
+
+        cols_amostra = [
+            c for c in [
+                "EAN",
+                "Produto_Simulador",
+                "Produto",
+                "Qtd_Vendida_Mes_Anterior",
+                "Preco_Atual",
+                "Preco_Sugerido_Mercado",
+                "Ganho_Unitario",
+                "Ganho_Potencial_Simulador"
+            ]
+            if c in simulacao_global.columns
+        ]
+
+        amostra = simulacao_global[cols_amostra].copy()
+
+        if "Ganho_Potencial_Simulador" in amostra.columns:
+
+            amostra["_ordem"] = pd.to_numeric(
+                amostra["Ganho_Potencial_Simulador"],
+                errors="coerce"
+            )
+
+            amostra = (
+                amostra
+                .sort_values("_ordem", ascending=False)
+                .drop(columns=["_ordem"])
+                .head(30)
+            )
+
+        st.dataframe(
+            amostra,
+            use_container_width=True,
+            height=420
+        )
+
+    else:
+
+        st.warning(
+            "simulacao_global está vazia ou não foi criada."
+        )
+
+    st.stop()
 
 
 
@@ -6809,74 +6528,11 @@ if not simulacao_global.empty:
         width="stretch"
     )
 
-    # --------------------------------------------------
-    # GRÁFICO TOP 20 CORRIGIDO
-    # Barras horizontais evitam que um produto com ganho muito alto
-    # esconda visualmente os demais.
-    # --------------------------------------------------
-
-    top_ganho_grafico = simulacao.copy()
-
-    top_ganho_grafico["Ganho_Potencial_Simulador"] = pd.to_numeric(
-        top_ganho_grafico["Ganho_Potencial_Simulador"],
-        errors="coerce"
-    ).fillna(0)
-
-    eixo_produto_grafico = (
-        "Produto"
-        if "Produto" in top_ganho_grafico.columns
-        else "EAN"
-    )
-
-    top_ganho_grafico = (
-        top_ganho_grafico
-        .sort_values(
-            "Ganho_Potencial_Simulador",
-            ascending=True
-        )
-        .tail(20)
-    )
-
-    top_ganho_grafico["Ganho_Label"] = (
-        top_ganho_grafico["Ganho_Potencial_Simulador"]
-        .apply(moeda_br)
-    )
-
     fig = px.bar(
-        top_ganho_grafico,
-        x="Ganho_Potencial_Simulador",
-        y=eixo_produto_grafico,
-        orientation="h",
-        text="Ganho_Label",
-        title="Top 20 Produtos com Maior Ganho Projetado",
-        labels={
-            "Ganho_Potencial_Simulador": "Ganho Projetado",
-            eixo_produto_grafico: "Produto"
-        }
-    )
-
-    fig.update_traces(
-        textposition="outside",
-        cliponaxis=False
-    )
-
-    fig.update_layout(
-        height=650,
-        margin=dict(
-            l=20,
-            r=180,
-            t=60,
-            b=40
-        ),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(
-            tickformat=",",
-            showgrid=True
-        ),
-        yaxis=dict(
-            automargin=True
-        )
+        simulacao.head(20),
+        x="Produto" if "Produto" in simulacao.columns else "EAN",
+        y="Ganho_Potencial_Simulador",
+        title="Top 20 Produtos com Maior Ganho Projetado"
     )
 
     st.plotly_chart(
@@ -6888,8 +6544,16 @@ if not simulacao_global.empty:
 else:
 
     st.warning(
-        "Ainda não foi possível montar a simulação. Verifique se a base possui EAN e Preço (R$)."
+        "As bases necessárias ainda não possuem dados compatíveis para simulação."
     )
+
+    if not venda_rede.empty:
+        st.write("Colunas encontradas em VENDA_FINAL_TESTE:")
+        st.write(venda_rede.columns.tolist())
+
+    if not historico.empty:
+        st.write("Colunas encontradas em VENDA_TESTE:")
+        st.write(historico.columns.tolist())
 
 
 # --------------------------------------------------
