@@ -138,7 +138,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "menu_ordenado_estavel_20260608"
+VERSAO_APP = "sugestao_pesquisa_marca_real_380_dia_20260608"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -2250,26 +2250,124 @@ if pagina == "🎯 Sugestão de Pesquisa":
 
         return pd.to_numeric(serie, errors="coerce")
 
-    def _sp_marca(texto):
+    MARCAS_CONHECIDAS_PESQUISA = [
+        "SEMPRE LIVRE", "LA ROCHE", "MOUNJARO", "DORFLEX", "NEOSALDINA",
+        "NOVALGINA", "DIPIRONA", "BUSCOPAN", "TANDRILAX", "TYLENOL",
+        "ADVIL", "ALIVIUM", "NISULID", "TORSILAX", "VICK", "BENEGRIP",
+        "CORISTINA", "SORINE", "NEOSORO", "RINOSORO", "SALONPAS",
+        "BEPANTOL", "CICATRICURE", "DERMAONE", "NIVEA", "DOVE",
+        "REXONA", "MONANGE", "GRANADO", "PHEBO", "JOHNSON",
+        "NEUTROGENA", "PAMPERS", "MAMYPOKO", "BABYSEC", "HUGGIES",
+        "PLENITUD", "TENA", "NINHO", "NAN", "APTAMIL", "MILNUTRI",
+        "NESTOGENO", "SUSTAGEN", "ENSURE", "NUTREN", "PEDIASURE",
+        "FORTINI", "FORXIGA", "XIGDUO", "JARDIANCE", "OZEMPIC",
+        "RYBELSUS", "GLIFAGE", "JANUVIA", "GALVUS", "DAPAGLIFLOZINA",
+        "ROSUVASTATINA", "ATORVASTATINA", "SINVASTATINA", "LOSARTANA",
+        "VALSARTANA", "BRASART", "SELOZOK", "CONCOR", "ARADOIS",
+        "DIOVAN", "OMEPRAZOL", "PANTOPRAZOL", "ESOMEPRAZOL", "NEXIUM",
+        "LOSEC", "PURAN", "EUTHYROX", "SYNTHROID", "LEVOID", "EXPEC",
+        "ABRILAR", "MUCOSOLVAN", "ACETILCISTEINA", "PROTOVIT", "REDOXON",
+        "CENTRUM", "LAVITAN", "DORIL", "SONRISAL", "ENGOV", "ENO",
+        "EPAREMA", "LUFTAL", "SIMETICONA", "PARACETAMOL", "IBUPRIL",
+        "IBUPROFENO", "AMOXICILINA", "AZITROMICINA", "CEFALEXINA",
+        "NIMESULIDA", "METFORMINA", "CIMEGRIPE", "MULTIGRIP",
+        "RESFENOL", "APRACUR", "INTIMUS", "CAREFREE", "OB", "CARMED",
+        "SUNDOWN", "CERAVE", "VICHY", "ISDIN", "EPISOL", "MUSTELA",
+        "MANTECORP", "MINANCORA", "HIPOGLOS", "DESITIN", "MASTER",
+        "SUPRACORP", "OPPELLA", "HYPERA", "ACHE", "EMS", "EUROFARMA",
+        "MEDLEY", "BIOLAB", "CIMED", "NATULAB", "GEOLAB", "TEUTO",
+        "PRATI", "DONADUZZI"
+    ]
+
+    PALAVRAS_INVALIDAS_MARCA = {
+        "KIT", "CR", "CREME", "SAB", "SABONETE", "LIQ", "LIQUIDO",
+        "LÍQUIDO", "LEITE", "FRALDA", "FRALDAS", "ROUPA", "INTIMA",
+        "ÍNTIMA", "DESODORANTE", "DESOD", "AER", "AEROSSOL", "SPRAY",
+        "CAP", "CAPS", "CAPSULA", "CAPSULAS", "CÁPSULA", "CÁPSULAS",
+        "CP", "COMP", "COMPRIMIDO", "COMPRIMIDOS", "GTS", "GOTAS",
+        "ML", "MG", "GR", "G", "POM", "POMADA", "SOL", "SOLUCAO",
+        "SOLUÇÃO", "XPE", "SUSP", "CX", "UN", "UND", "UNIDADE",
+        "UNIDADES", "C", "COM", "SEM", "REFIL", "PRO", "PLUS",
+        "MEGA", "GIGA", "JUNIOR", "ADULTO", "INFANTIL", "BABY",
+        "PANTS", "SHORTINHO", "DESC", "PROMO", "ORIGINAL", "TRAD",
+        "FPS", "COL", "GEL", "AZ", "OMEGA"
+    }
+
+    MAPA_CORRECAO_MARCA = {
+        "FRALDA": ["PAMPERS", "MAMYPOKO", "BABYSEC", "HUGGIES", "PLENITUD"],
+        "FRALDAS": ["PAMPERS", "MAMYPOKO", "BABYSEC", "HUGGIES", "PLENITUD"],
+        "LEITE": ["NINHO", "NAN", "APTAMIL", "NESTOGENO", "MILNUTRI"],
+        "DESODORANTE": ["DOVE", "REXONA", "NIVEA", "MONANGE"],
+        "DESOD": ["DOVE", "REXONA", "NIVEA", "MONANGE"],
+        "SAB": ["GRANADO", "PHEBO", "DOVE", "NIVEA", "JOHNSON"],
+        "SABONETE": ["GRANADO", "PHEBO", "DOVE", "NIVEA", "JOHNSON"],
+        "KIT": ["DERMAONE", "CICATRICURE", "BEPANTOL", "NIVEA"],
+        "CR": ["CICATRICURE", "BEPANTOL", "NIVEA", "NEUTROGENA"],
+        "ROUPA": ["PLENITUD", "TENA"]
+    }
+
+    def _sp_limpar_texto_marca(texto):
         texto = str(texto).strip().upper()
 
-        if not texto or texto in ["NAN", "NONE"]:
-            return "SEM MARCA"
-
         texto = (
-            texto.replace("(A) -", "")
-            .replace("(B) -", "")
-            .replace("(C) -", "")
+            texto.replace("(A) -", " ")
+            .replace("(B) -", " ")
+            .replace("(C) -", " ")
             .replace("-", " ")
             .replace("/", " ")
+            .replace(".", " ")
+            .replace(",", " ")
+            .replace("(", " ")
+            .replace(")", " ")
         )
 
-        partes = [p.strip() for p in texto.split() if p.strip()]
+        texto = re.sub(r"\s+", " ", texto).strip()
 
-        if not partes:
+        return texto
+
+    def _sp_marca(texto):
+        texto_original = _sp_limpar_texto_marca(texto)
+
+        if not texto_original or texto_original in ["NAN", "NONE"]:
             return "SEM MARCA"
 
-        return partes[0]
+        tokens = [p.strip() for p in texto_original.split() if p.strip()]
+
+        if not tokens:
+            return "SEM MARCA"
+
+        primeiro = tokens[0]
+
+        if primeiro in MAPA_CORRECAO_MARCA:
+            for marca in MAPA_CORRECAO_MARCA[primeiro]:
+                if marca in texto_original:
+                    return marca
+
+        marcas_ordenadas = sorted(MARCAS_CONHECIDAS_PESQUISA, key=len, reverse=True)
+
+        for marca in marcas_ordenadas:
+            padrao = r"(^|\s)" + re.escape(marca) + r"($|\s)"
+            if re.search(padrao, texto_original):
+                return marca
+
+        for token in tokens:
+            token_limpo = re.sub(r"[^A-Z0-9ÁÉÍÓÚÂÊÔÃÕÇ]", "", token)
+
+            if not token_limpo:
+                continue
+
+            if token_limpo in PALAVRAS_INVALIDAS_MARCA:
+                continue
+
+            if token_limpo.isdigit():
+                continue
+
+            if len(token_limpo) <= 2:
+                continue
+
+            return token_limpo
+
+        return "SEM MARCA"
 
     col_ean = _sp_coluna(
         base_pesquisa,
@@ -2330,6 +2428,8 @@ if pagina == "🎯 Sugestão de Pesquisa":
             .str.strip()
             .str.upper()
         )
+
+        base_pesquisa["Marca_Pesquisa"] = base_pesquisa["Marca_Pesquisa"].apply(_sp_marca)
     else:
         base_pesquisa["Marca_Pesquisa"] = ""
 
@@ -2372,7 +2472,13 @@ if pagina == "🎯 Sugestão de Pesquisa":
         base_pesquisa["Produto_Base_SIM"] = base_pesquisa[col_produto].astype(str)
 
         base_pesquisa["Marca_Pesquisa"] = np.where(
-            base_pesquisa["Marca_Pesquisa"].astype(str).str.strip().isin(["", "NAN", "NONE"]),
+            base_pesquisa["Marca_Pesquisa"].astype(str).str.strip().isin(["", "NAN", "NONE", "SEM MARCA"]),
+            base_pesquisa["Produto_Base_SIM"].apply(_sp_marca),
+            base_pesquisa["Marca_Pesquisa"]
+        )
+
+        base_pesquisa["Marca_Pesquisa"] = np.where(
+            base_pesquisa["Marca_Pesquisa"].astype(str).str.strip().isin(list(PALAVRAS_INVALIDAS_MARCA)),
             base_pesquisa["Produto_Base_SIM"].apply(_sp_marca),
             base_pesquisa["Marca_Pesquisa"]
         )
@@ -2454,6 +2560,10 @@ if pagina == "🎯 Sugestão de Pesquisa":
         .cumcount()
         + 1
     )
+
+    selecionado = selecionado[
+        selecionado["Ordem no Dia"] <= marcas_por_dia
+    ].copy()
 
     faturamento_coberto = float(selecionado["Faturamento_Mensal"].sum())
 
