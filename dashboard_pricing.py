@@ -142,7 +142,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "marca_gtin_dinamica_20260608"
+VERSAO_APP = "sugestao_pesquisa_380_por_dia_corrigida_20260608"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -2195,7 +2195,7 @@ if pagina == "🎯 Sugestão de Pesquisa":
         <div class="eirox-hero">
             <div class="eirox-section-title">Inteligência de Campo</div>
             <h1>🎯 Sugestão Inteligente de Pesquisa de Preço</h1>
-            <p>Planejamento operacional com 380 marcas por dia, baseado no faturamento da VENDA_FINAL_TESTE.</p>
+            <p>Planejamento operacional com até 380 pesquisas por dia, baseado no faturamento da VENDA_FINAL_TESTE.</p>
         </div>
         """,
         unsafe_allow_html=True
@@ -2775,35 +2775,43 @@ if pagina == "🎯 Sugestão de Pesquisa":
         "Domingo"
     ]
 
-    total_planejado = marcas_por_dia * len(dias_semana)
+    # Regra operacional:
+    # A agenda deve ter ATÉ 380 pesquisas por dia.
+    # Não é necessário ter 2.660 marcas únicas.
+    # Se existirem menos de 380 marcas únicas, usa todas as disponíveis em cada dia.
+    base_diaria = ranking.head(marcas_por_dia).copy()
 
-    selecionado = ranking.head(total_planejado).copy()
+    qtd_real_por_dia = len(base_diaria)
 
-    if len(selecionado) < total_planejado:
-        st.warning(
-            f"Foram encontradas {len(selecionado)} marcas únicas. "
-            f"Para 380 marcas por dia durante 7 dias, seriam necessárias {total_planejado} marcas únicas."
+    if qtd_real_por_dia < marcas_por_dia:
+        st.info(
+            f"Foram encontradas {qtd_real_por_dia} marcas únicas qualificadas. "
+            f"A agenda usará {qtd_real_por_dia} pesquisas por dia, respeitando o limite máximo de {marcas_por_dia}."
         )
 
-    selecionado["Posição Geral"] = range(1, len(selecionado) + 1)
+    agendas = []
 
-    selecionado["Dia da Semana"] = [
-        dias_semana[min(i // marcas_por_dia, len(dias_semana) - 1)]
-        for i in range(len(selecionado))
-    ]
+    for dia in dias_semana:
 
-    selecionado["Ordem no Dia"] = (
-        selecionado
-        .groupby("Dia da Semana")
-        .cumcount()
-        + 1
-    )
+        temp_dia = base_diaria.copy()
+        temp_dia["Dia da Semana"] = dia
+        temp_dia["Ordem no Dia"] = range(1, len(temp_dia) + 1)
 
+        agendas.append(temp_dia)
+
+    selecionado = pd.concat(
+        agendas,
+        ignore_index=True
+    ) if agendas else pd.DataFrame()
+
+    selecionado["Posição Geral"] = selecionado["Ordem no Dia"]
+
+    # Segurança operacional: nunca permitir mais de 380 pesquisas em um único dia.
     selecionado = selecionado[
         selecionado["Ordem no Dia"] <= marcas_por_dia
     ].copy()
 
-    faturamento_coberto = float(selecionado["Faturamento_Mensal"].sum())
+    faturamento_coberto = float(base_diaria["Faturamento_Mensal"].sum())
 
     participacao_coberta = (
         faturamento_coberto / faturamento_total * 100
@@ -2813,7 +2821,7 @@ if pagina == "🎯 Sugestão de Pesquisa":
 
     k1, k2, k3, k4 = st.columns(4)
 
-    k1.metric("Marcas por dia", marcas_por_dia)
+    k1.metric("Limite por dia", marcas_por_dia)
     k2.metric("Total semanal", f"{len(selecionado):,}".replace(",", "."))
     k3.metric("Faturamento coberto", moeda_br(faturamento_coberto))
     k4.metric("Participação mensal", percentual_br(participacao_coberta))
