@@ -138,7 +138,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "menu_ordenado_20260608"
+VERSAO_APP = "menu_ordenado_estavel_20260608"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -1542,52 +1542,52 @@ USUARIOS = {
 
 PERMISSOES_TELAS = {
     "Diretoria": [
-        "📊 Painel Geral",
+        "📊 Dashboard Geral",
         "🔎 Rede/Loja vs Concorrentes",
         "🛒 Negociação Compras",
         "🌎 Mapa Geográfico de Concorrência",
         "🚨 Central de Alertas",
         "📈 Simulador Inteligente",
-        "🏢 Painel Executivo",
+        "🏢 Dashboard Executivo",
         "🎯 Sugestão de Pesquisa",
         "🧪 Diagnóstico"
     ],
     "Pricing": [
-        "📊 Painel Geral",
+        "📊 Dashboard Geral",
         "🔎 Rede/Loja vs Concorrentes",
         "🛒 Negociação Compras",
         "🌎 Mapa Geográfico de Concorrência",
         "🚨 Central de Alertas",
         "📈 Simulador Inteligente",
-        "🏢 Painel Executivo",
+        "🏢 Dashboard Executivo",
         "🎯 Sugestão de Pesquisa",
         "🧪 Diagnóstico"
     ],
     "Comercial": [
-        "📊 Painel Geral",
+        "📊 Dashboard Geral",
         "🔎 Rede/Loja vs Concorrentes",
         "🛒 Negociação Compras",
         "🌎 Mapa Geográfico de Concorrência",
         "🚨 Central de Alertas",
         "📈 Simulador Inteligente",
-        "🏢 Painel Executivo",
+        "🏢 Dashboard Executivo",
         "🎯 Sugestão de Pesquisa",
         "🧪 Diagnóstico"
     ],
     "Regional": [
-        "📊 Painel Geral",
+        "📊 Dashboard Geral",
         "🔎 Rede/Loja vs Concorrentes",
         "🛒 Negociação Compras",
         "🌎 Mapa Geográfico de Concorrência",
         "🚨 Central de Alertas",
         "📈 Simulador Inteligente",
-        "🏢 Painel Executivo",
+        "🏢 Dashboard Executivo",
         "🎯 Sugestão de Pesquisa",
         "🧪 Diagnóstico"
     ],
     "Consulta": [
-        "📊 Painel Geral",
-        "🏢 Painel Executivo"
+        "📊 Dashboard Geral",
+        "🏢 Dashboard Executivo"
     ]
 }
 
@@ -2052,17 +2052,20 @@ st.sidebar.caption(
 paginas_liberadas = PERMISSOES_TELAS.get(
     perfil_usuario,
     [
-        "📊 Painel Geral",
-        "🏢 Painel Executivo"
+        "📊 Dashboard Geral",
+        "🏢 Dashboard Executivo"
     ]
 )
 
 pagina = st.sidebar.radio(
     "Escolha a visão",
     paginas_liberadas,
-    key="menu_principal",
+    key="menu_principal_v2",
     label_visibility="collapsed"
 )
+
+if pagina not in paginas_liberadas:
+    pagina = paginas_liberadas[0]
 
 st.sidebar.markdown("---")
 
@@ -3957,7 +3960,7 @@ if pagina == "📈 Simulador Inteligente":
 # DASHBOARD EXECUTIVO PREMIUM
 # --------------------------------------------------
 
-if pagina == "🏢 Painel Executivo":
+if pagina == "🏢 Dashboard Executivo":
 
     st.markdown(
         """
