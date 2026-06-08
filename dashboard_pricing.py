@@ -138,7 +138,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "simulador_qtd_venda_estoque_20260608"
+VERSAO_APP = "menu_ordenado_20260608"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -1542,48 +1542,52 @@ USUARIOS = {
 
 PERMISSOES_TELAS = {
     "Diretoria": [
-        "📊 Dashboard Geral",
+        "📊 Painel Geral",
         "🔎 Rede/Loja vs Concorrentes",
-        "🌎 Mapa Geográfico de Concorrência",
         "🛒 Negociação Compras",
+        "🌎 Mapa Geográfico de Concorrência",
         "🚨 Central de Alertas",
-        "🧪 Diagnóstico",
         "📈 Simulador Inteligente",
-        "🏢 Dashboard Executivo"
+        "🏢 Painel Executivo",
+        "🎯 Sugestão de Pesquisa",
+        "🧪 Diagnóstico"
     ],
     "Pricing": [
-        "📊 Dashboard Geral",
+        "📊 Painel Geral",
         "🔎 Rede/Loja vs Concorrentes",
-        "🌎 Mapa Geográfico de Concorrência",
         "🛒 Negociação Compras",
+        "🌎 Mapa Geográfico de Concorrência",
         "🚨 Central de Alertas",
-        "🧪 Diagnóstico",
         "📈 Simulador Inteligente",
-        "🏢 Dashboard Executivo"
+        "🏢 Painel Executivo",
+        "🎯 Sugestão de Pesquisa",
+        "🧪 Diagnóstico"
     ],
     "Comercial": [
-        "📊 Dashboard Geral",
+        "📊 Painel Geral",
         "🔎 Rede/Loja vs Concorrentes",
-        "🌎 Mapa Geográfico de Concorrência",
         "🛒 Negociação Compras",
+        "🌎 Mapa Geográfico de Concorrência",
         "🚨 Central de Alertas",
-        "🧪 Diagnóstico",
         "📈 Simulador Inteligente",
-        "🏢 Dashboard Executivo"
+        "🏢 Painel Executivo",
+        "🎯 Sugestão de Pesquisa",
+        "🧪 Diagnóstico"
     ],
     "Regional": [
-        "📊 Dashboard Geral",
+        "📊 Painel Geral",
         "🔎 Rede/Loja vs Concorrentes",
-        "🌎 Mapa Geográfico de Concorrência",
         "🛒 Negociação Compras",
+        "🌎 Mapa Geográfico de Concorrência",
         "🚨 Central de Alertas",
-        "🧪 Diagnóstico",
         "📈 Simulador Inteligente",
-        "🏢 Dashboard Executivo"
+        "🏢 Painel Executivo",
+        "🎯 Sugestão de Pesquisa",
+        "🧪 Diagnóstico"
     ],
     "Consulta": [
-        "📊 Dashboard Geral",
-        "🏢 Dashboard Executivo"
+        "📊 Painel Geral",
+        "🏢 Painel Executivo"
     ]
 }
 
@@ -2048,8 +2052,8 @@ st.sidebar.caption(
 paginas_liberadas = PERMISSOES_TELAS.get(
     perfil_usuario,
     [
-        "📊 Dashboard Geral",
-        "🏢 Dashboard Executivo"
+        "📊 Painel Geral",
+        "🏢 Painel Executivo"
     ]
 )
 
@@ -2170,6 +2174,411 @@ if busca:
 
 # Garante que todas as telas após os filtros recebam o ganho atualizado.
 df_filtrado = propagar_ganho_potencial(df_filtrado)
+
+
+
+# --------------------------------------------------
+# SUGESTÃO INTELIGENTE DE PESQUISA DE PREÇO
+# --------------------------------------------------
+
+if pagina == "🎯 Sugestão de Pesquisa":
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">Inteligência de Campo</div>
+            <h1>🎯 Sugestão Inteligente de Pesquisa de Preço</h1>
+            <p>Planejamento operacional com 380 marcas por dia, baseado no faturamento da VENDA_FINAL_TESTE.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    if not isinstance(venda_rede, pd.DataFrame) or venda_rede.empty:
+        st.warning("A base VENDA_FINAL_TESTE não está carregada.")
+        st.stop()
+
+    base_pesquisa = venda_rede.copy()
+    base_pesquisa.columns = base_pesquisa.columns.astype(str).str.strip()
+
+    def _sp_coluna(base, exatos, contem=None):
+        contem = contem or []
+
+        for alvo in exatos:
+            for col in base.columns:
+                if str(col).strip().lower() == str(alvo).strip().lower():
+                    return col
+
+        for termo in contem:
+            termo = str(termo).lower()
+            for col in base.columns:
+                if termo in str(col).lower():
+                    return col
+
+        return None
+
+    def _sp_numero(serie):
+        if isinstance(serie, pd.Series):
+            s = (
+                serie.astype(str)
+                .str.strip()
+                .str.replace("R$", "", regex=False)
+                .str.replace("%", "", regex=False)
+                .str.replace(" ", "", regex=False)
+            )
+
+            tem_virgula = s.str.contains(",", regex=False)
+
+            s_br = (
+                s[tem_virgula]
+                .str.replace(".", "", regex=False)
+                .str.replace(",", ".", regex=False)
+            )
+
+            s_us = (
+                s[~tem_virgula]
+                .str.replace(",", "", regex=False)
+            )
+
+            out = pd.Series(index=serie.index, dtype="float64")
+            out.loc[s_br.index] = pd.to_numeric(s_br, errors="coerce")
+            out.loc[s_us.index] = pd.to_numeric(s_us, errors="coerce")
+            return out
+
+        return pd.to_numeric(serie, errors="coerce")
+
+    def _sp_marca(texto):
+        texto = str(texto).strip().upper()
+
+        if not texto or texto in ["NAN", "NONE"]:
+            return "SEM MARCA"
+
+        texto = (
+            texto.replace("(A) -", "")
+            .replace("(B) -", "")
+            .replace("(C) -", "")
+            .replace("-", " ")
+            .replace("/", " ")
+        )
+
+        partes = [p.strip() for p in texto.split() if p.strip()]
+
+        if not partes:
+            return "SEM MARCA"
+
+        return partes[0]
+
+    col_ean = _sp_coluna(
+        base_pesquisa,
+        ["EAN", "EAN (GTIN)", "GTIN", "Cód. Barras/Etiq.", "Cod. Barras/Etiq.", "Código de Barras", "Codigo de Barras"],
+        ["ean", "gtin", "barras", "etiq"]
+    )
+
+    col_venda = _sp_coluna(
+        base_pesquisa,
+        ["Venda", "Valor Venda", "Faturamento", "Valor Total", "Total Venda", "Valor Líquido", "Valor Liquido"],
+        ["venda", "fatur", "liquido", "líquido"]
+    )
+
+    col_produto = _sp_coluna(
+        base_pesquisa,
+        ["Produto", "Descrição", "Descricao", "Embalagem", "Nome Produto", "Produto Descrição", "Produto Descricao"],
+        ["produto", "descr", "embalagem"]
+    )
+
+    col_marca = _sp_coluna(
+        base_pesquisa,
+        ["Marca", "Marca Produto", "Produto Marca"],
+        ["marca"]
+    )
+
+    col_itens = _sp_coluna(
+        base_pesquisa,
+        ["Itens", "Item", "Quantidade", "Qtd", "QTD", "Qtde", "Unidades"],
+        ["itens", "item", "qtd", "quant", "unid"]
+    )
+
+    if not col_venda:
+        st.error("Não encontrei a coluna de faturamento/venda na VENDA_FINAL_TESTE.")
+        st.write("Colunas encontradas:", base_pesquisa.columns.tolist())
+        st.stop()
+
+    base_pesquisa["Faturamento_SIM"] = _sp_numero(base_pesquisa[col_venda])
+
+    if col_itens:
+        base_pesquisa["Qtd_SIM"] = _sp_numero(base_pesquisa[col_itens])
+    else:
+        base_pesquisa["Qtd_SIM"] = 0
+
+    if col_ean:
+        base_pesquisa["EAN_SIM"] = (
+            base_pesquisa[col_ean]
+            .astype(str)
+            .str.replace(".0", "", regex=False)
+            .str.strip()
+        )
+    else:
+        base_pesquisa["EAN_SIM"] = ""
+
+    if col_marca:
+        base_pesquisa["Marca_Pesquisa"] = (
+            base_pesquisa[col_marca]
+            .astype(str)
+            .str.strip()
+            .str.upper()
+        )
+    else:
+        base_pesquisa["Marca_Pesquisa"] = ""
+
+    if col_ean and isinstance(df, pd.DataFrame) and "EAN" in df.columns:
+        cadastro = df.copy()
+        cadastro["EAN_SIM"] = (
+            cadastro["EAN"]
+            .astype(str)
+            .str.replace(".0", "", regex=False)
+            .str.strip()
+        )
+
+        col_marca_df = _sp_coluna(
+            cadastro,
+            ["Marca", "Marca Produto", "Produto Marca"],
+            ["marca"]
+        )
+
+        if col_marca_df:
+            marca_ref = (
+                cadastro[["EAN_SIM", col_marca_df]]
+                .dropna()
+                .drop_duplicates("EAN_SIM")
+                .rename(columns={col_marca_df: "Marca_Cadastro"})
+            )
+
+            base_pesquisa = base_pesquisa.merge(
+                marca_ref,
+                on="EAN_SIM",
+                how="left"
+            )
+
+            base_pesquisa["Marca_Pesquisa"] = np.where(
+                base_pesquisa["Marca_Pesquisa"].astype(str).str.strip().isin(["", "NAN", "NONE"]),
+                base_pesquisa["Marca_Cadastro"].astype(str).str.upper(),
+                base_pesquisa["Marca_Pesquisa"]
+            )
+
+    if col_produto:
+        base_pesquisa["Produto_Base_SIM"] = base_pesquisa[col_produto].astype(str)
+
+        base_pesquisa["Marca_Pesquisa"] = np.where(
+            base_pesquisa["Marca_Pesquisa"].astype(str).str.strip().isin(["", "NAN", "NONE"]),
+            base_pesquisa["Produto_Base_SIM"].apply(_sp_marca),
+            base_pesquisa["Marca_Pesquisa"]
+        )
+    else:
+        base_pesquisa["Produto_Base_SIM"] = ""
+
+    base_pesquisa["Marca_Pesquisa"] = (
+        base_pesquisa["Marca_Pesquisa"]
+        .astype(str)
+        .str.strip()
+        .str.upper()
+    )
+
+    base_pesquisa = base_pesquisa[
+        (base_pesquisa["Marca_Pesquisa"].astype(str).str.len() > 0)
+        & (~base_pesquisa["Marca_Pesquisa"].isin(["NAN", "NONE", "SEM MARCA"]))
+        & (base_pesquisa["Faturamento_SIM"] > 0)
+    ].copy()
+
+    if base_pesquisa.empty:
+        st.warning("Não foi possível montar marcas válidas pela VENDA_FINAL_TESTE.")
+        st.stop()
+
+    faturamento_total = float(base_pesquisa["Faturamento_SIM"].sum())
+
+    ranking = (
+        base_pesquisa
+        .groupby("Marca_Pesquisa", dropna=False)
+        .agg(
+            Faturamento_Mensal=("Faturamento_SIM", "sum"),
+            Qtd_Vendida=("Qtd_SIM", "sum"),
+            SKUs=("EAN_SIM", "nunique"),
+            Produtos_Exemplo=("Produto_Base_SIM", lambda x: " | ".join(pd.Series(x).dropna().astype(str).head(3).tolist()))
+        )
+        .reset_index()
+        .rename(columns={"Marca_Pesquisa": "Marca"})
+    )
+
+    ranking["Participacao_%"] = (
+        ranking["Faturamento_Mensal"] / faturamento_total * 100
+        if faturamento_total > 0
+        else 0
+    )
+
+    ranking = ranking.sort_values("Faturamento_Mensal", ascending=False).reset_index(drop=True)
+
+    marcas_por_dia = 380
+
+    dias_semana = [
+        "Segunda-feira",
+        "Terça-feira",
+        "Quarta-feira",
+        "Quinta-feira",
+        "Sexta-feira",
+        "Sábado",
+        "Domingo"
+    ]
+
+    total_planejado = marcas_por_dia * len(dias_semana)
+
+    selecionado = ranking.head(total_planejado).copy()
+
+    if len(selecionado) < total_planejado:
+        st.warning(
+            f"Foram encontradas {len(selecionado)} marcas únicas. "
+            f"Para 380 marcas por dia durante 7 dias, seriam necessárias {total_planejado} marcas únicas."
+        )
+
+    selecionado["Posição Geral"] = range(1, len(selecionado) + 1)
+
+    selecionado["Dia da Semana"] = [
+        dias_semana[min(i // marcas_por_dia, len(dias_semana) - 1)]
+        for i in range(len(selecionado))
+    ]
+
+    selecionado["Ordem no Dia"] = (
+        selecionado
+        .groupby("Dia da Semana")
+        .cumcount()
+        + 1
+    )
+
+    faturamento_coberto = float(selecionado["Faturamento_Mensal"].sum())
+
+    participacao_coberta = (
+        faturamento_coberto / faturamento_total * 100
+        if faturamento_total > 0
+        else 0
+    )
+
+    k1, k2, k3, k4 = st.columns(4)
+
+    k1.metric("Marcas por dia", marcas_por_dia)
+    k2.metric("Total semanal", f"{len(selecionado):,}".replace(",", "."))
+    k3.metric("Faturamento coberto", moeda_br(faturamento_coberto))
+    k4.metric("Participação mensal", percentual_br(participacao_coberta))
+
+    st.markdown("### 📅 Distribuição semanal")
+
+    resumo_dia = (
+        selecionado
+        .groupby("Dia da Semana")
+        .agg(
+            Qtd_Marcas=("Marca", "count"),
+            Faturamento_Coberto=("Faturamento_Mensal", "sum"),
+            Participacao_Mensal=("Participacao_%", "sum")
+        )
+        .reset_index()
+    )
+
+    resumo_dia["Dia da Semana"] = pd.Categorical(
+        resumo_dia["Dia da Semana"],
+        categories=dias_semana,
+        ordered=True
+    )
+
+    resumo_dia = resumo_dia.sort_values("Dia da Semana")
+
+    resumo_exibir = resumo_dia.copy()
+    resumo_exibir["Faturamento_Coberto"] = resumo_exibir["Faturamento_Coberto"].apply(moeda_br)
+    resumo_exibir["Participacao_Mensal"] = resumo_exibir["Participacao_Mensal"].apply(percentual_br)
+
+    st.dataframe(
+        resumo_exibir,
+        use_container_width=True,
+        height=280
+    )
+
+    fig = px.bar(
+        resumo_dia,
+        x="Dia da Semana",
+        y="Faturamento_Coberto",
+        text="Qtd_Marcas",
+        title="Faturamento coberto por dia de pesquisa"
+    )
+
+    fig.update_traces(textposition="outside")
+    fig.update_layout(
+        height=420,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)"
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("### 🔎 Lista operacional de marcas para pesquisar")
+
+    filtro_dia = st.selectbox(
+        "Filtrar dia da semana",
+        ["Todos"] + dias_semana,
+        index=0,
+        key="filtro_dia_sugestao_pesquisa"
+    )
+
+    tabela = selecionado.copy()
+
+    if filtro_dia != "Todos":
+        tabela = tabela[tabela["Dia da Semana"] == filtro_dia].copy()
+
+    tabela = tabela[
+        [
+            "Dia da Semana",
+            "Ordem no Dia",
+            "Posição Geral",
+            "Marca",
+            "Faturamento_Mensal",
+            "Participacao_%",
+            "Qtd_Vendida",
+            "SKUs",
+            "Produtos_Exemplo"
+        ]
+    ].copy()
+
+    tabela = tabela.rename(
+        columns={
+            "Faturamento_Mensal": "Faturamento Mensal",
+            "Participacao_%": "Participação no Faturamento",
+            "Qtd_Vendida": "Qtd Vendida",
+            "Produtos_Exemplo": "Produtos Exemplo"
+        }
+    )
+
+    tabela_exibir = tabela.copy()
+    tabela_exibir["Faturamento Mensal"] = tabela_exibir["Faturamento Mensal"].apply(moeda_br)
+    tabela_exibir["Participação no Faturamento"] = tabela_exibir["Participação no Faturamento"].apply(percentual_br)
+    tabela_exibir["Qtd Vendida"] = tabela_exibir["Qtd Vendida"].apply(numero_br)
+
+    st.dataframe(
+        tabela_exibir,
+        use_container_width=True,
+        height=560
+    )
+
+    csv_pesquisa = (
+        tabela_exibir
+        .to_csv(index=False, sep=";")
+        .encode("utf-8-sig")
+    )
+
+    st.download_button(
+        "📥 Exportar sugestão de pesquisa",
+        csv_pesquisa,
+        "sugestao_pesquisa_380_marcas_por_dia.csv",
+        "text/csv",
+        key="exportar_sugestao_pesquisa"
+    )
+
+    st.stop()
+
 
 
 # --------------------------------------------------
@@ -3548,7 +3957,7 @@ if pagina == "📈 Simulador Inteligente":
 # DASHBOARD EXECUTIVO PREMIUM
 # --------------------------------------------------
 
-if pagina == "🏢 Dashboard Executivo":
+if pagina == "🏢 Painel Executivo":
 
     st.markdown(
         """
