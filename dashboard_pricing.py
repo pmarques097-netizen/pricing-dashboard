@@ -138,7 +138,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "simulador_original_melhorado_20260608"
+VERSAO_APP = "simulador_qtd_venda_estoque_20260608"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -2835,6 +2835,97 @@ if pagina == "📈 Simulador Inteligente":
 
         return 0.0, "Custo não localizado"
 
+    def _qtd_vendida_mes_anterior_sim(ean, venda_final_preparada):
+        """
+        Quantidade vendida do mês anterior pela VENDA_FINAL_TESTE.
+        Soma a coluna Itens do produto/EAN.
+        """
+
+        ean = _normalizar_ean_sim(ean)
+
+        if not isinstance(venda_final_preparada, pd.DataFrame) or venda_final_preparada.empty:
+            return 1.0
+
+        vf = venda_final_preparada[
+            venda_final_preparada["EAN_SIM"] == ean
+        ].copy()
+
+        if vf.empty or "Itens_SIM" not in vf.columns:
+            return 1.0
+
+        qtd = vf["Itens_SIM"].dropna().sum()
+
+        if pd.notna(qtd) and qtd > 0:
+            return float(qtd)
+
+        return 1.0
+
+    def _qtd_estoque_produto_sim(ean, estoque_base):
+        """
+        Quantidade em estoque pela ESTOQUE_TESTE.
+        O valor vem preenchido, mas o usuário pode simular alterando o campo.
+        """
+
+        ean = _normalizar_ean_sim(ean)
+
+        if not isinstance(estoque_base, pd.DataFrame) or estoque_base.empty:
+            return 0.0
+
+        est = estoque_base.copy()
+        est.columns = est.columns.astype(str).str.strip()
+
+        col_ean = _buscar_coluna_flex(
+            est,
+            [
+                "EAN",
+                "EAN (GTIN)",
+                "GTIN",
+                "Cód. Barras/Etiq.",
+                "Cod. Barras/Etiq.",
+                "Código de Barras",
+                "Codigo de Barras"
+            ],
+            ["ean", "gtin", "barras", "etiq"]
+        )
+
+        col_qtd = _buscar_coluna_flex(
+            est,
+            [
+                "Estoque",
+                "Qtd Estoque",
+                "Qtde Estoque",
+                "Quantidade Estoque",
+                "Saldo",
+                "Saldo Estoque",
+                "Disponível",
+                "Disponivel",
+                "Quantidade",
+                "Qtd",
+                "Qtde"
+            ],
+            ["estoque", "saldo", "dispon", "qtd", "qtde", "quant"]
+        )
+
+        if not col_ean or not col_qtd:
+            return 0.0
+
+        est["EAN_SIM"] = est[col_ean].apply(_normalizar_ean_sim)
+        est["Qtd_Estoque_SIM"] = _num_serie_sim(est[col_qtd])
+
+        est = est[
+            est["EAN_SIM"] == ean
+        ].copy()
+
+        if est.empty:
+            return 0.0
+
+        qtd = est["Qtd_Estoque_SIM"].dropna().sum()
+
+        if pd.notna(qtd) and qtd > 0:
+            return float(qtd)
+
+        return 0.0
+
     def _concorrentes_sim(ean, hist_preparado):
         ean = _normalizar_ean_sim(ean)
 
@@ -3032,32 +3123,15 @@ if pagina == "📈 Simulador Inteligente":
                 venda_final_sim_preparada
             )
 
-            qtd_padrao = 1.0
+            qtd_padrao = _qtd_vendida_mes_anterior_sim(
+                ean_sim,
+                venda_final_sim_preparada
+            )
 
-            if (
-                "simulacao_global" in globals()
-                and not simulacao_global.empty
-                and ean_sim
-                and "EAN" in simulacao_global.columns
-            ):
-                sim_auto = simulacao_global.copy()
-                sim_auto["EAN"] = (
-                    sim_auto["EAN"]
-                    .astype(str)
-                    .str.replace(".0", "", regex=False)
-                    .str.strip()
-                )
-
-                sim_auto = sim_auto[sim_auto["EAN"] == ean_sim]
-
-                if not sim_auto.empty:
-                    linha_sim = sim_auto.iloc[0]
-
-                    qtd_padrao = _primeiro_valor_linha(
-                        linha_sim,
-                        ["Qtd_Vendida_Mes_Anterior"],
-                        qtd_padrao
-                    )
+            qtd_estoque_padrao = _qtd_estoque_produto_sim(
+                ean_sim,
+                estoque
+            )
 
             concorrentes_produto_sim = _concorrentes_sim(
                 ean_sim,
@@ -3086,7 +3160,6 @@ if pagina == "📈 Simulador Inteligente":
             info1.metric("EAN", ean_sim if ean_sim else "Não informado")
 
             info2.metric("Preço atual base", moeda_br(preco_atual_padrao))
-            info2.caption(origem_preco_atual)
             if legenda_preco_atual:
                 info2.caption(legenda_preco_atual)
 
@@ -3095,6 +3168,7 @@ if pagina == "📈 Simulador Inteligente":
                 info3.caption(legenda_menor_concorrente)
 
             info4.metric("Qtd mês base", numero_br(qtd_padrao))
+            info4.caption("Venda do mês anterior")
 
             st.markdown("### 🎛️ Parâmetros da simulação")
 
@@ -3174,6 +3248,17 @@ if pagina == "📈 Simulador Inteligente":
                     key=f"sim_cenario_{ean_sim}"
                 )
 
+            with c7:
+                qtd_estoque = st.number_input(
+                    "Qtd em estoque",
+                    min_value=0.0,
+                    value=float(qtd_estoque_padrao if qtd_estoque_padrao is not None else 0),
+                    step=1.0,
+                    format="%.0f",
+                    key=f"sim_qtd_estoque_{ean_sim}"
+                )
+                st.caption("Estoque atual do produto")
+
             if cenario != "Manual":
 
                 (
@@ -3197,7 +3282,7 @@ if pagina == "📈 Simulador Inteligente":
                 if menor_concorrente_calc and menor_concorrente_calc > 0:
                     menor_concorrente = float(menor_concorrente_calc)
 
-                with c7:
+                with c8:
                     st.metric("Preço sugerido", moeda_br(novo_preco))
                     if legenda_preco_sugerido_calc:
                         st.caption(f"Referência: {legenda_preco_sugerido_calc}")
@@ -3338,6 +3423,7 @@ if pagina == "📈 Simulador Inteligente":
                         "Novo Preço": moeda_br(novo_preco),
                         "Custo": moeda_br(custo),
                         "Qtd Vendida/Mês": numero_br(qtd_mes),
+                        "Qtd em Estoque": numero_br(qtd_estoque),
                         "Menor Concorrente": moeda_br(menor_concorrente),
                         "Margem Atual": percentual_br(margem_atual_calc),
                         "Margem Simulada": percentual_br(margem_nova_calc),
