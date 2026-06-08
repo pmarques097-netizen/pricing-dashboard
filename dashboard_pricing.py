@@ -1,5 +1,8 @@
 import streamlit as st
 import os
+import json
+import urllib.request
+import urllib.error
 import re
 import zipfile
 import pandas as pd
@@ -139,7 +142,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "marca_real_380_dia_corrigido_20260608"
+VERSAO_APP = "marca_gtin_dinamica_20260608"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -2326,6 +2329,143 @@ if pagina == "🎯 Sugestão de Pesquisa":
 
         return texto
 
+
+    def _sp_get_secret(nome, padrao=""):
+        try:
+            if hasattr(st, "secrets") and nome in st.secrets:
+                return str(st.secrets[nome]).strip()
+        except Exception:
+            pass
+
+        try:
+            return str(os.environ.get(nome, padrao)).strip()
+        except Exception:
+            return padrao
+
+    @st.cache_data(ttl=60 * 60 * 24 * 7, show_spinner=False)
+    def _sp_consultar_gtin_externo(ean):
+        """
+        Consulta externa opcional por GTIN/EAN.
+
+        Suporta Bluesoft Cosmos se existir COSMOS_TOKEN nos secrets do Streamlit.
+        Endpoint esperado:
+        https://api.cosmos.bluesoft.com.br/gtins/{ean}
+
+        Retorna marca/fabricante quando disponível.
+        Se não houver token ou der erro, retorna vazio sem quebrar o app.
+        """
+
+        ean = str(ean).replace(".0", "").strip()
+
+        if not ean or ean.lower() in ["nan", "none"]:
+            return {
+                "marca": "",
+                "fabricante": "",
+                "descricao": "",
+                "origem": ""
+            }
+
+        token_cosmos = _sp_get_secret("COSMOS_TOKEN", "")
+
+        if token_cosmos:
+            try:
+                url = f"https://api.cosmos.bluesoft.com.br/gtins/{ean}"
+
+                req = urllib.request.Request(
+                    url,
+                    headers={
+                        "X-Cosmos-Token": token_cosmos,
+                        "User-Agent": "EiroxPricing/1.0"
+                    },
+                    method="GET"
+                )
+
+                with urllib.request.urlopen(req, timeout=8) as resp:
+                    payload = json.loads(resp.read().decode("utf-8", errors="ignore"))
+
+                marca = ""
+
+                for caminho in [
+                    ("brand", "name"),
+                    ("brand",),
+                    ("brand_name",),
+                    ("marca",),
+                    ("Marca",)
+                ]:
+                    valor = payload
+                    try:
+                        for chave in caminho:
+                            valor = valor[chave]
+                        if valor:
+                            marca = str(valor).strip().upper()
+                            break
+                    except Exception:
+                        continue
+
+                fabricante = ""
+
+                for caminho in [
+                    ("manufacturer", "name"),
+                    ("manufacturer",),
+                    ("manufacturer_name",),
+                    ("fabricante",),
+                    ("company", "name"),
+                    ("Empresa",)
+                ]:
+                    valor = payload
+                    try:
+                        for chave in caminho:
+                            valor = valor[chave]
+                        if valor:
+                            fabricante = str(valor).strip().upper()
+                            break
+                    except Exception:
+                        continue
+
+                descricao = str(
+                    payload.get("description")
+                    or payload.get("descricao")
+                    or payload.get("name")
+                    or ""
+                ).strip().upper()
+
+                return {
+                    "marca": marca,
+                    "fabricante": fabricante,
+                    "descricao": descricao,
+                    "origem": "COSMOS"
+                }
+
+            except Exception:
+                return {
+                    "marca": "",
+                    "fabricante": "",
+                    "descricao": "",
+                    "origem": ""
+                }
+
+        return {
+            "marca": "",
+            "fabricante": "",
+            "descricao": "",
+            "origem": ""
+        }
+
+    def _sp_marca_valida(valor):
+        valor = str(valor).strip().upper()
+
+        if not valor or valor in ["NAN", "NONE", "SEM MARCA"]:
+            return False
+
+        if "PALAVRAS_INVALIDAS_MARCA" in locals() and valor in PALAVRAS_INVALIDAS_MARCA:
+            return False
+
+        if len(valor) <= 2:
+            return False
+
+        return True
+
+
     def _sp_marca(texto):
         texto_original = _sp_limpar_texto_marca(texto)
 
@@ -2390,8 +2530,18 @@ if pagina == "🎯 Sugestão de Pesquisa":
 
     col_marca = _sp_coluna(
         base_pesquisa,
-        ["Marca", "Marca Produto", "Produto Marca"],
-        ["marca"]
+        [
+            "Marca",
+            "Marca Produto",
+            "Produto Marca",
+            "Fabricante",
+            "Laboratório",
+            "Laboratorio",
+            "Indústria",
+            "Industria",
+            "Fornecedor"
+        ],
+        ["marca", "fabricante", "laborat", "industri", "fornecedor"]
     )
 
     col_itens = _sp_coluna(
@@ -2422,6 +2572,44 @@ if pagina == "🎯 Sugestão de Pesquisa":
     else:
         base_pesquisa["EAN_SIM"] = ""
 
+    # Consulta externa/local por código de barras.
+    # Para evitar lentidão, consulta apenas os EANs das maiores vendas, suficientes para cobrir a lista semanal.
+    base_gtin_rank = (
+        base_pesquisa
+        .groupby("EAN_SIM", dropna=False)
+        .agg(Faturamento_EAN=("Faturamento_SIM", "sum"))
+        .reset_index()
+        .sort_values("Faturamento_EAN", ascending=False)
+    )
+
+    eans_para_consulta = (
+        base_gtin_rank["EAN_SIM"]
+        .dropna()
+        .astype(str)
+        .str.strip()
+        .replace("", np.nan)
+        .dropna()
+        .head(4000)
+        .tolist()
+    )
+
+    mapa_gtin_externo = {}
+
+    for _ean_ext in eans_para_consulta:
+        mapa_gtin_externo[_ean_ext] = _sp_consultar_gtin_externo(_ean_ext)
+
+    base_pesquisa["Marca_Externa_GTIN"] = base_pesquisa["EAN_SIM"].map(
+        lambda x: mapa_gtin_externo.get(str(x), {}).get("marca", "")
+    )
+
+    base_pesquisa["Fabricante_Externo_GTIN"] = base_pesquisa["EAN_SIM"].map(
+        lambda x: mapa_gtin_externo.get(str(x), {}).get("fabricante", "")
+    )
+
+    base_pesquisa["Descricao_Externa_GTIN"] = base_pesquisa["EAN_SIM"].map(
+        lambda x: mapa_gtin_externo.get(str(x), {}).get("descricao", "")
+    )
+
     if col_marca:
         base_pesquisa["Marca_Pesquisa"] = (
             base_pesquisa[col_marca]
@@ -2434,6 +2622,29 @@ if pagina == "🎯 Sugestão de Pesquisa":
     else:
         base_pesquisa["Marca_Pesquisa"] = ""
 
+    # Prioridade 1: marca validada por GTIN/código de barras.
+    base_pesquisa["Marca_Pesquisa"] = np.where(
+        base_pesquisa["Marca_Externa_GTIN"].astype(str).str.strip().apply(_sp_marca_valida),
+        base_pesquisa["Marca_Externa_GTIN"].astype(str).str.upper(),
+        base_pesquisa["Marca_Pesquisa"]
+    )
+
+    # Prioridade 1B: fabricante externo, quando a marca externa vier vazia.
+    base_pesquisa["Marca_Pesquisa"] = np.where(
+        ~base_pesquisa["Marca_Pesquisa"].astype(str).str.strip().apply(_sp_marca_valida)
+        & base_pesquisa["Fabricante_Externo_GTIN"].astype(str).str.strip().apply(_sp_marca_valida),
+        base_pesquisa["Fabricante_Externo_GTIN"].astype(str).str.upper(),
+        base_pesquisa["Marca_Pesquisa"]
+    )
+
+    # Prioridade 1C: descrição externa do GTIN, quando disponível.
+    base_pesquisa["Marca_Pesquisa"] = np.where(
+        ~base_pesquisa["Marca_Pesquisa"].astype(str).str.strip().apply(_sp_marca_valida)
+        & base_pesquisa["Descricao_Externa_GTIN"].astype(str).str.strip().ne(""),
+        base_pesquisa["Descricao_Externa_GTIN"].apply(_sp_marca),
+        base_pesquisa["Marca_Pesquisa"]
+    )
+
     if col_ean and isinstance(df, pd.DataFrame) and "EAN" in df.columns:
         cadastro = df.copy()
         cadastro["EAN_SIM"] = (
@@ -2445,8 +2656,18 @@ if pagina == "🎯 Sugestão de Pesquisa":
 
         col_marca_df = _sp_coluna(
             cadastro,
-            ["Marca", "Marca Produto", "Produto Marca"],
-            ["marca"]
+            [
+                "Marca",
+                "Marca Produto",
+                "Produto Marca",
+                "Fabricante",
+                "Laboratório",
+                "Laboratorio",
+                "Indústria",
+                "Industria",
+                "Fornecedor"
+            ],
+            ["marca", "fabricante", "laborat", "industri", "fornecedor"]
         )
 
         if col_marca_df:
@@ -2464,8 +2685,9 @@ if pagina == "🎯 Sugestão de Pesquisa":
             )
 
             base_pesquisa["Marca_Pesquisa"] = np.where(
-                base_pesquisa["Marca_Pesquisa"].astype(str).str.strip().isin(["", "NAN", "NONE"]),
-                base_pesquisa["Marca_Cadastro"].astype(str).str.upper(),
+                ~base_pesquisa["Marca_Pesquisa"].astype(str).str.strip().apply(_sp_marca_valida)
+                & base_pesquisa["Marca_Cadastro"].astype(str).str.strip().apply(_sp_marca_valida),
+                base_pesquisa["Marca_Cadastro"].astype(str).str.upper().apply(_sp_marca),
                 base_pesquisa["Marca_Pesquisa"]
             )
 
@@ -2473,7 +2695,7 @@ if pagina == "🎯 Sugestão de Pesquisa":
         base_pesquisa["Produto_Base_SIM"] = base_pesquisa[col_produto].astype(str)
 
         base_pesquisa["Marca_Pesquisa"] = np.where(
-            base_pesquisa["Marca_Pesquisa"].astype(str).str.strip().isin(["", "NAN", "NONE", "SEM MARCA"]),
+            ~base_pesquisa["Marca_Pesquisa"].astype(str).str.strip().apply(_sp_marca_valida),
             base_pesquisa["Produto_Base_SIM"].apply(_sp_marca),
             base_pesquisa["Marca_Pesquisa"]
         )
@@ -2491,6 +2713,20 @@ if pagina == "🎯 Sugestão de Pesquisa":
         .astype(str)
         .str.strip()
         .str.upper()
+    )
+
+    base_pesquisa["Origem_Marca"] = np.select(
+        [
+            base_pesquisa["Marca_Externa_GTIN"].astype(str).str.strip().apply(_sp_marca_valida),
+            base_pesquisa["Fabricante_Externo_GTIN"].astype(str).str.strip().apply(_sp_marca_valida),
+            base_pesquisa["Descricao_Externa_GTIN"].astype(str).str.strip().ne(""),
+        ],
+        [
+            "GTIN externo",
+            "Fabricante GTIN",
+            "Descrição GTIN"
+        ],
+        default="Base interna/descrição"
     )
 
     base_pesquisa = base_pesquisa[
@@ -2512,7 +2748,8 @@ if pagina == "🎯 Sugestão de Pesquisa":
             Faturamento_Mensal=("Faturamento_SIM", "sum"),
             Qtd_Vendida=("Qtd_SIM", "sum"),
             SKUs=("EAN_SIM", "nunique"),
-            Produtos_Exemplo=("Produto_Base_SIM", lambda x: " | ".join(pd.Series(x).dropna().astype(str).head(3).tolist()))
+            Produtos_Exemplo=("Produto_Base_SIM", lambda x: " | ".join(pd.Series(x).dropna().astype(str).head(3).tolist())),
+            Origem_Marca=("Origem_Marca", lambda x: pd.Series(x).mode().iloc[0] if len(pd.Series(x).dropna()) else "Base interna/descrição")
         )
         .reset_index()
         .rename(columns={"Marca_Pesquisa": "Marca"})
@@ -2653,6 +2890,7 @@ if pagina == "🎯 Sugestão de Pesquisa":
             "Participacao_%",
             "Qtd_Vendida",
             "SKUs",
+            "Origem_Marca",
             "Produtos_Exemplo"
         ]
     ].copy()
@@ -2662,6 +2900,7 @@ if pagina == "🎯 Sugestão de Pesquisa":
             "Faturamento_Mensal": "Faturamento Mensal",
             "Participacao_%": "Participação no Faturamento",
             "Qtd_Vendida": "Qtd Vendida",
+            "Origem_Marca": "Origem da Marca",
             "Produtos_Exemplo": "Produtos Exemplo"
         }
     )
