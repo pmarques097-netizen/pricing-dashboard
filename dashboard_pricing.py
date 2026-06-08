@@ -138,7 +138,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "busca_recursiva_venda_final_20260607"
+VERSAO_APP = "simulador_inteligente_regras_20260608"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -1969,6 +1969,471 @@ if not historico.empty:
     else:
 
         historico["Descricao_Unica"] = "SEM DESCRICAO"
+
+
+
+
+# --------------------------------------------------
+# FUNÇÕES DO SIMULADOR INTELIGENTE
+# --------------------------------------------------
+
+def _sim_numero(valor):
+
+    try:
+
+        if isinstance(valor, pd.Series):
+
+            s = (
+                valor
+                .astype(str)
+                .str.strip()
+                .str.replace("R$", "", regex=False)
+                .str.replace("%", "", regex=False)
+                .str.replace(" ", "", regex=False)
+            )
+
+            tem_virgula = s.str.contains(",", regex=False)
+
+            s_br = (
+                s[tem_virgula]
+                .str.replace(".", "", regex=False)
+                .str.replace(",", ".", regex=False)
+            )
+
+            s_us = (
+                s[~tem_virgula]
+                .str.replace(",", "", regex=False)
+            )
+
+            out = pd.Series(index=valor.index, dtype="float64")
+            out.loc[s_br.index] = pd.to_numeric(s_br, errors="coerce")
+            out.loc[s_us.index] = pd.to_numeric(s_us, errors="coerce")
+
+            return out
+
+        txt = str(valor).strip().replace("R$", "").replace("%", "").replace(" ", "")
+
+        if "," in txt:
+            txt = txt.replace(".", "").replace(",", ".")
+        else:
+            txt = txt.replace(",", "")
+
+        return float(txt)
+
+    except Exception:
+
+        return np.nan
+
+
+def _sim_coluna(base, exatos, contem=None):
+
+    if not isinstance(base, pd.DataFrame) or base.empty:
+        return None
+
+    contem = contem or []
+
+    for alvo in exatos:
+
+        for col in base.columns:
+
+            if str(col).strip().lower() == str(alvo).strip().lower():
+                return col
+
+    for termo in contem:
+
+        termo = str(termo).lower()
+
+        for col in base.columns:
+
+            if termo in str(col).lower():
+                return col
+
+    return None
+
+
+def _sim_normalizar_ean(valor):
+
+    return (
+        str(valor)
+        .replace(".0", "")
+        .strip()
+    )
+
+
+def _sim_classificar_loja(farmacia="", rede="", nome_fantasia=""):
+
+    texto = (
+        str(farmacia)
+        + " "
+        + str(rede)
+        + " "
+        + str(nome_fantasia)
+    ).upper()
+
+    if "ZANOL" in texto or "THOMAZ" in texto or "TRIANGULO" in texto or "TRIÂNGULO" in texto:
+        return "REDE"
+
+    return "CONCORRENTE"
+
+
+def _sim_preparar_historico(historico_base):
+
+    if not isinstance(historico_base, pd.DataFrame) or historico_base.empty:
+        return pd.DataFrame()
+
+    base = historico_base.copy()
+    base.columns = base.columns.astype(str).str.strip()
+
+    col_ean = _sim_coluna(
+        base,
+        ["EAN", "EAN (GTIN)", "GTIN", "Código de Barras", "Codigo de Barras"],
+        ["ean", "gtin", "barras"]
+    )
+
+    col_preco = _sim_coluna(
+        base,
+        ["Preço (R$)", "Preco (R$)", "Preço", "Preco", "Valor"],
+        ["preço", "preco", "valor"]
+    )
+
+    col_data = _sim_coluna(
+        base,
+        ["Data Emissão", "Data Emissao", "Data", "Dt Emissão", "Dt Emissao"],
+        ["data", "emissão", "emissao"]
+    )
+
+    if not col_ean or not col_preco:
+        return pd.DataFrame()
+
+    base["EAN_SIM"] = base[col_ean].apply(_sim_normalizar_ean)
+    base["Preco_SIM"] = _sim_numero(base[col_preco])
+
+    if col_data:
+        base["Data_SIM"] = pd.to_datetime(
+            base[col_data],
+            errors="coerce",
+            dayfirst=True
+        )
+    else:
+        base["Data_SIM"] = pd.NaT
+
+    if "Farmácia" not in base.columns:
+        base["Farmácia"] = ""
+
+    if "Rede" not in base.columns:
+        base["Rede"] = ""
+
+    if "Nome Fantasia" not in base.columns:
+        base["Nome Fantasia"] = ""
+
+    base["Tipo_Loja_SIM"] = base.apply(
+        lambda row: _sim_classificar_loja(
+            row.get("Farmácia", ""),
+            row.get("Rede", ""),
+            row.get("Nome Fantasia", "")
+        ),
+        axis=1
+    )
+
+    base = base[
+        (base["EAN_SIM"].astype(str).str.len() > 0)
+        & (base["Preco_SIM"] > 0)
+        & (base["Preco_SIM"] <= 5000)
+    ].copy()
+
+    return base
+
+
+def _sim_preparar_venda_final(venda_final_base):
+
+    if not isinstance(venda_final_base, pd.DataFrame) or venda_final_base.empty:
+        return pd.DataFrame()
+
+    base = venda_final_base.copy()
+    base.columns = base.columns.astype(str).str.strip()
+
+    col_ean = _sim_coluna(
+        base,
+        [
+            "EAN",
+            "EAN (GTIN)",
+            "GTIN",
+            "Cód. Barras/Etiq.",
+            "Cod. Barras/Etiq.",
+            "Código de Barras",
+            "Codigo de Barras"
+        ],
+        ["ean", "gtin", "barras", "etiq"]
+    )
+
+    col_itens = _sim_coluna(
+        base,
+        ["Itens", "Item", "Quantidade", "Qtd", "QTD", "Qtde", "Unidades"],
+        ["itens", "item", "qtd", "quant", "unid"]
+    )
+
+    col_venda = _sim_coluna(
+        base,
+        ["Venda", "Valor Venda", "Faturamento", "Valor Total", "Total Venda"],
+        ["venda", "fatur"]
+    )
+
+    col_custo = _sim_coluna(
+        base,
+        ["Custo", "Custo Médio", "Custo Medio", "Valor Custo", "Custo Total"],
+        ["custo"]
+    )
+
+    if not col_ean:
+        return pd.DataFrame()
+
+    base["EAN_SIM"] = base[col_ean].apply(_sim_normalizar_ean)
+
+    if col_itens:
+        base["Itens_SIM"] = _sim_numero(base[col_itens])
+    else:
+        base["Itens_SIM"] = np.nan
+
+    if col_venda:
+        base["Venda_SIM"] = _sim_numero(base[col_venda])
+    else:
+        base["Venda_SIM"] = np.nan
+
+    if col_custo:
+        base["Custo_SIM"] = _sim_numero(base[col_custo])
+    else:
+        base["Custo_SIM"] = np.nan
+
+    base = base[
+        base["EAN_SIM"].astype(str).str.len() > 0
+    ].copy()
+
+    return base
+
+
+def _sim_preparar_estoque(estoque_base):
+
+    if not isinstance(estoque_base, pd.DataFrame) or estoque_base.empty:
+        return pd.DataFrame()
+
+    base = estoque_base.copy()
+    base.columns = base.columns.astype(str).str.strip()
+
+    col_ean = _sim_coluna(
+        base,
+        [
+            "EAN",
+            "EAN (GTIN)",
+            "GTIN",
+            "Cód. Barras/Etiq.",
+            "Cod. Barras/Etiq.",
+            "Código de Barras",
+            "Codigo de Barras"
+        ],
+        ["ean", "gtin", "barras", "etiq"]
+    )
+
+    col_custo = _sim_coluna(
+        base,
+        [
+            "Custo",
+            "Custo Médio",
+            "Custo Medio",
+            "Preço Custo",
+            "Preco Custo",
+            "Valor Custo",
+            "CMV"
+        ],
+        ["custo", "cmv"]
+    )
+
+    if not col_ean or not col_custo:
+        return pd.DataFrame()
+
+    base["EAN_SIM"] = base[col_ean].apply(_sim_normalizar_ean)
+    base["Custo_Estoque_SIM"] = _sim_numero(base[col_custo])
+
+    base = base[
+        (base["EAN_SIM"].astype(str).str.len() > 0)
+        & (base["Custo_Estoque_SIM"] > 0)
+        & (base["Custo_Estoque_SIM"] <= 5000)
+    ].copy()
+
+    return base
+
+
+def _sim_preco_atual_rede(ean, hist_preparado, venda_final_preparada):
+
+    ean = _sim_normalizar_ean(ean)
+
+    # 1. Primeira regra: preço da rede em VENDA_TESTE, usando a data mais recente.
+    if isinstance(hist_preparado, pd.DataFrame) and not hist_preparado.empty:
+
+        rede = hist_preparado[
+            (hist_preparado["EAN_SIM"] == ean)
+            & (hist_preparado["Tipo_Loja_SIM"] == "REDE")
+        ].copy()
+
+        if not rede.empty:
+
+            if "Data_SIM" in rede.columns and rede["Data_SIM"].notna().any():
+
+                rede = rede.sort_values(
+                    "Data_SIM",
+                    ascending=False
+                )
+
+            preco = float(rede.iloc[0]["Preco_SIM"])
+
+            origem = "VENDA_TESTE - preço da rede na data mais recente"
+
+            detalhe = {
+                "farmacia": rede.iloc[0].get("Farmácia", ""),
+                "rede": rede.iloc[0].get("Rede", ""),
+                "data": rede.iloc[0].get("Data_SIM", pd.NaT)
+            }
+
+            return preco, origem, detalhe
+
+    # 2. Segunda regra: preço médio da VENDA_FINAL_TESTE.
+    if isinstance(venda_final_preparada, pd.DataFrame) and not venda_final_preparada.empty:
+
+        vf = venda_final_preparada[
+            venda_final_preparada["EAN_SIM"] == ean
+        ].copy()
+
+        if not vf.empty and vf["Itens_SIM"].sum() > 0 and vf["Venda_SIM"].sum() > 0:
+
+            preco = float(
+                vf["Venda_SIM"].sum()
+                / vf["Itens_SIM"].sum()
+            )
+
+            return preco, "VENDA_FINAL_TESTE - preço médio Venda / Itens", {}
+
+    return np.nan, "Preço atual não localizado", {}
+
+
+def _sim_custo_produto(ean, estoque_preparado, venda_final_preparada):
+
+    ean = _sim_normalizar_ean(ean)
+
+    # 1. Primeira regra: custo da ESTOQUE_TESTE.
+    if isinstance(estoque_preparado, pd.DataFrame) and not estoque_preparado.empty:
+
+        est = estoque_preparado[
+            estoque_preparado["EAN_SIM"] == ean
+        ].copy()
+
+        if not est.empty:
+
+            custo = float(
+                est["Custo_Estoque_SIM"]
+                .dropna()
+                .mean()
+            )
+
+            if pd.notna(custo) and custo > 0:
+                return custo, "ESTOQUE_TESTE"
+
+    # 2. Segunda regra: custo médio da VENDA_FINAL_TESTE.
+    if isinstance(venda_final_preparada, pd.DataFrame) and not venda_final_preparada.empty:
+
+        vf = venda_final_preparada[
+            venda_final_preparada["EAN_SIM"] == ean
+        ].copy()
+
+        if not vf.empty:
+
+            if vf["Itens_SIM"].sum() > 0 and vf["Custo_SIM"].sum() > 0:
+
+                custo = float(
+                    vf["Custo_SIM"].sum()
+                    / vf["Itens_SIM"].sum()
+                )
+
+                if pd.notna(custo) and custo > 0:
+                    return custo, "VENDA_FINAL_TESTE - Custo / Itens"
+
+            custo_medio = float(
+                vf["Custo_SIM"]
+                .dropna()
+                .mean()
+            )
+
+            if pd.notna(custo_medio) and custo_medio > 0:
+                return custo_medio, "VENDA_FINAL_TESTE - custo médio"
+
+    return np.nan, "Custo não localizado"
+
+
+def _sim_concorrentes_produto(ean, hist_preparado):
+
+    ean = _sim_normalizar_ean(ean)
+
+    if not isinstance(hist_preparado, pd.DataFrame) or hist_preparado.empty:
+        return pd.DataFrame()
+
+    conc = hist_preparado[
+        (hist_preparado["EAN_SIM"] == ean)
+        & (hist_preparado["Tipo_Loja_SIM"] == "CONCORRENTE")
+    ].copy()
+
+    if conc.empty:
+        return pd.DataFrame()
+
+    conc = conc.sort_values(
+        ["Preco_SIM", "Data_SIM"],
+        ascending=[
+            True,
+            False
+        ]
+    )
+
+    return conc
+
+
+def _sim_escolher_preco_simulado(concorrentes, custo, cenario):
+
+    if not isinstance(concorrentes, pd.DataFrame) or concorrentes.empty:
+        return np.nan, None, "Nenhum concorrente encontrado"
+
+    concorrentes = concorrentes.copy()
+    concorrentes["Margem_RS_SIM"] = concorrentes["Preco_SIM"] - custo
+
+    menor = concorrentes.iloc[0]
+
+    cenario = str(cenario).upper()
+
+    if cenario == "COMPETITIVO":
+
+        elegiveis = concorrentes[
+            concorrentes["Margem_RS_SIM"] >= 0
+        ].copy()
+
+        if not elegiveis.empty:
+            ref = elegiveis.iloc[0]
+            return float(ref["Preco_SIM"]), ref, "Menor preço concorrente com margem não negativa"
+
+        return float(menor["Preco_SIM"]), menor, "Todos os concorrentes geram margem negativa; exibindo menor preço como alerta"
+
+    if cenario == "AGRESSIVO":
+
+        return float(menor["Preco_SIM"]), menor, "Menor preço absoluto da concorrência"
+
+    if cenario == "CONSERVADOR":
+
+        elegiveis = concorrentes[
+            concorrentes["Margem_RS_SIM"] >= 0
+        ].copy()
+
+        if not elegiveis.empty:
+            ref = elegiveis.iloc[0]
+            return float(ref["Preco_SIM"]), ref, "Menor preço concorrente preservando margem"
+
+        return max(float(custo), float(menor["Preco_SIM"])), menor, "Preço ajustado para não ficar abaixo do custo"
+
+    return float(menor["Preco_SIM"]), menor, "Referência padrão"
 
 
 # --------------------------------------------------
@@ -7508,165 +7973,426 @@ if (
 
 
 # --------------------------------------------------
-# SIMULADOR DE GANHO COM REAJUSTE
+# SIMULADOR INTELIGENTE DE PRICING
 # --------------------------------------------------
 
 st.subheader(
-    "💵 Simulador de Ganho com Ajuste de Preço"
+    "💵 Simulador Inteligente"
 )
 
-if not simulacao_global.empty:
+st.caption(
+    "O simulador usa VENDA_TESTE, VENDA_FINAL_TESTE e ESTOQUE_TESTE para sugerir o preço competitivo com margem preservada."
+)
 
-    simulacao = simulacao_global.copy()
+hist_sim = _sim_preparar_historico(
+    historico
+)
 
-    if "Produto_Simulador" in simulacao.columns:
-        simulacao = simulacao.rename(
-            columns={
-                "Produto_Simulador": "Produto"
-            }
-        )
+venda_final_sim = _sim_preparar_venda_final(
+    venda_rede
+)
 
-    simulacao = simulacao.sort_values(
-        "Ganho_Potencial_Simulador",
-        ascending=False
-    )
+estoque_sim = _sim_preparar_estoque(
+    estoque
+)
 
-    k1, k2, k3, k4 = st.columns(4)
+base_produtos_sim = df_filtrado.copy()
 
-    k1.metric(
-        "Produtos com Oportunidade",
-        len(simulacao)
-    )
+if "EAN" in base_produtos_sim.columns:
 
-    k2.metric(
-        "Venda Preço Antigo",
-        moeda_br(simulacao["Venda_Preco_Antigo"].sum())
-    )
-
-    k3.metric(
-        "Venda com Preço Sugerido",
-        moeda_br(simulacao["Venda_Projetada_Preco_Sugerido"].sum())
-    )
-
-    k4.metric(
-        "Ganho Total",
-        moeda_br(simulacao["Ganho_Potencial_Simulador"].sum())
-    )
-
-    colunas_exibir = [
-        "EAN"
-    ]
-
-    if "Produto" in simulacao.columns:
-        colunas_exibir.append("Produto")
-
-    colunas_exibir += [
-        "Qtd_Vendida_Mes_Anterior",
-        "Venda_Preco_Antigo",
-        "Preco_Atual",
-        "Preco_Sugerido_Mercado",
-        "Venda_Projetada_Preco_Sugerido",
-        "Ganho_Unitario",
-        "Ganho_Potencial_Simulador"
-    ]
-
-    simulacao_exibir = simulacao[colunas_exibir].copy()
-
-    for coluna in [
-        "Venda_Preco_Antigo",
-        "Preco_Atual",
-        "Preco_Sugerido_Mercado",
-        "Venda_Projetada_Preco_Sugerido",
-        "Ganho_Unitario",
-        "Ganho_Potencial_Simulador"
-    ]:
-
-        if coluna in simulacao_exibir.columns:
-            simulacao_exibir[coluna] = simulacao_exibir[coluna].apply(moeda_br)
-
-    if "Qtd_Vendida_Mes_Anterior" in simulacao_exibir.columns:
-        simulacao_exibir["Qtd_Vendida_Mes_Anterior"] = (
-            simulacao_exibir["Qtd_Vendida_Mes_Anterior"]
-            .apply(numero_br)
-        )
-
-    st.dataframe(
-        simulacao_exibir,
-        width="stretch"
-    )
-
-    # Gráfico oficial do Dashboard: usa apenas Analise_Pricing.xlsx
-    base_ganho_oficial = preparar_ganho_oficial_dashboard(
-        df_filtrado
-    )
-
-    eixo_produto_grafico = (
-        "Produto"
-        if "Produto" in base_ganho_oficial.columns
-        else "EAN"
-    )
-
-    top_ganho_grafico = (
-        base_ganho_oficial
-        .sort_values(
-            "Ganho_Potencial",
-            ascending=True
-        )
-        .tail(20)
-        .copy()
-    )
-
-    top_ganho_grafico["Ganho_Label"] = (
-        top_ganho_grafico["Ganho_Potencial"]
-        .apply(moeda_br)
-    )
-
-    fig = px.bar(
-        top_ganho_grafico,
-        x="Ganho_Potencial",
-        y=eixo_produto_grafico,
-        orientation="h",
-        text="Ganho_Label",
-        title="Top 20 Produtos com Maior Ganho Projetado",
-        labels={
-            "Ganho_Potencial": "Ganho Projetado",
-            eixo_produto_grafico: "Produto"
-        }
-    )
-
-    fig.update_traces(
-        textposition="outside",
-        cliponaxis=False
-    )
-
-    fig.update_layout(
-        height=650,
-        margin=dict(
-            l=20,
-            r=180,
-            t=60,
-            b=40
-        ),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(
-            tickformat=",",
-            showgrid=True
-        ),
-        yaxis=dict(
-            automargin=True
-        )
-    )
-
-    st.plotly_chart(
-        fig,
-        width="stretch",
-        key="dashboard_ganho_oficial"
+    base_produtos_sim["EAN_SIM"] = (
+        base_produtos_sim["EAN"]
+        .apply(_sim_normalizar_ean)
     )
 
 else:
 
-    pass
+    base_produtos_sim["EAN_SIM"] = ""
+
+base_produtos_sim = base_produtos_sim[
+    base_produtos_sim["EAN_SIM"].astype(str).str.len() > 0
+].copy()
+
+if base_produtos_sim.empty:
+
+    st.warning(
+        "Não há produto filtrado com EAN válido para simulação."
+    )
+
+else:
+
+    if "Ganho_Potencial" in base_produtos_sim.columns:
+
+        base_produtos_sim["Ganho_Potencial"] = pd.to_numeric(
+            base_produtos_sim["Ganho_Potencial"],
+            errors="coerce"
+        ).fillna(0)
+
+        base_produtos_sim = base_produtos_sim.sort_values(
+            "Ganho_Potencial",
+            ascending=False
+        )
+
+    opcoes_produto_sim = []
+
+    for _, row in base_produtos_sim.drop_duplicates("EAN_SIM").iterrows():
+
+        nome_produto = (
+            row.get("Produto", "")
+            if "Produto" in base_produtos_sim.columns
+            else row.get("Descricao_Unica", "")
+        )
+
+        label = f"{row['EAN_SIM']} - {nome_produto}"
+
+        opcoes_produto_sim.append(
+            label
+        )
+
+    produto_escolhido_label = st.selectbox(
+        "Produto para simular",
+        opcoes_produto_sim,
+        index=0,
+        key="simulador_produto_inteligente"
+    )
+
+    ean_simulado = produto_escolhido_label.split(" - ")[0].strip()
+
+    produto_ref = base_produtos_sim[
+        base_produtos_sim["EAN_SIM"] == ean_simulado
+    ].iloc[0]
+
+    nome_produto_simulado = (
+        produto_ref.get("Produto", "")
+        if "Produto" in base_produtos_sim.columns
+        else produto_ref.get("Descricao_Unica", "")
+    )
+
+    cenarios = [
+        "Competitivo",
+        "Conservador",
+        "Agressivo"
+    ]
+
+    cenario = st.selectbox(
+        "Cenário",
+        cenarios,
+        index=0,
+        key="simulador_cenario_inteligente"
+    )
+
+    preco_atual, origem_preco_atual, detalhe_preco_atual = _sim_preco_atual_rede(
+        ean_simulado,
+        hist_sim,
+        venda_final_sim
+    )
+
+    custo_produto, origem_custo = _sim_custo_produto(
+        ean_simulado,
+        estoque_sim,
+        venda_final_sim
+    )
+
+    concorrentes_produto = _sim_concorrentes_produto(
+        ean_simulado,
+        hist_sim
+    )
+
+    menor_concorrente = (
+        concorrentes_produto.iloc[0]
+        if not concorrentes_produto.empty
+        else None
+    )
+
+    preco_menor_concorrente = (
+        float(menor_concorrente["Preco_SIM"])
+        if menor_concorrente is not None
+        else np.nan
+    )
+
+    novo_preco_simulado, concorrente_referencia, regra_preco_simulado = _sim_escolher_preco_simulado(
+        concorrentes_produto,
+        custo_produto,
+        cenario
+    )
+
+    margem_atual_rs = (
+        preco_atual - custo_produto
+        if pd.notna(preco_atual) and pd.notna(custo_produto)
+        else np.nan
+    )
+
+    margem_nova_rs = (
+        novo_preco_simulado - custo_produto
+        if pd.notna(novo_preco_simulado) and pd.notna(custo_produto)
+        else np.nan
+    )
+
+    margem_nova_pct = (
+        margem_nova_rs / novo_preco_simulado * 100
+        if pd.notna(margem_nova_rs)
+        and pd.notna(novo_preco_simulado)
+        and novo_preco_simulado > 0
+        else np.nan
+    )
+
+    diferenca_vs_atual = (
+        novo_preco_simulado - preco_atual
+        if pd.notna(novo_preco_simulado) and pd.notna(preco_atual)
+        else np.nan
+    )
+
+    concorrente_menor_label = ""
+
+    if menor_concorrente is not None:
+
+        concorrente_menor_label = (
+            f"{menor_concorrente.get('Farmácia', '')}"
+            f" | Rede: {menor_concorrente.get('Rede', '')}"
+        )
+
+    concorrente_ref_label = ""
+
+    if concorrente_referencia is not None:
+
+        concorrente_ref_label = (
+            f"{concorrente_referencia.get('Farmácia', '')}"
+            f" | Rede: {concorrente_referencia.get('Rede', '')}"
+        )
+
+    # --------------------------------------------------
+    # CAMPOS PRINCIPAIS
+    # --------------------------------------------------
+
+    st.markdown(
+        f"### Produto filtrado: {nome_produto_simulado}"
+    )
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    c1.metric(
+        "Preço atual",
+        moeda_br(preco_atual)
+    )
+
+    c1.caption(
+        origem_preco_atual
+    )
+
+    if detalhe_preco_atual:
+
+        data_preco = detalhe_preco_atual.get("data", "")
+
+        if pd.notna(data_preco):
+
+            try:
+                data_preco = data_preco.strftime("%d/%m/%Y")
+            except Exception:
+                data_preco = str(data_preco)
+
+        c1.caption(
+            f"{detalhe_preco_atual.get('farmacia', '')} | {detalhe_preco_atual.get('rede', '')} | {data_preco}"
+        )
+
+    c2.metric(
+        "Novo preço simulado",
+        moeda_br(novo_preco_simulado),
+        delta=moeda_br(diferenca_vs_atual)
+    )
+
+    c2.caption(
+        regra_preco_simulado
+    )
+
+    if concorrente_ref_label:
+        c2.caption(
+            f"Referência: {concorrente_ref_label}"
+        )
+
+    c3.metric(
+        "Custo",
+        moeda_br(custo_produto)
+    )
+
+    c3.caption(
+        origem_custo
+    )
+
+    c4.metric(
+        "Menor preço concorrente",
+        moeda_br(preco_menor_concorrente)
+    )
+
+    if concorrente_menor_label:
+        c4.caption(
+            f"Concorrente: {concorrente_menor_label}"
+        )
+
+    # --------------------------------------------------
+    # RESUMO DECISÓRIO
+    # --------------------------------------------------
+
+    st.markdown(
+        "### 🧠 Resumo decisório"
+    )
+
+    if pd.isna(custo_produto):
+
+        st.error(
+            "Produto sem custo localizado. Enviar para saneamento de cadastro ou negociação de compras."
+        )
+
+    elif pd.notna(novo_preco_simulado) and novo_preco_simulado < custo_produto:
+
+        st.error(
+            "Mesmo seguindo a concorrência, o preço ficaria abaixo do custo. Produto deve ser enviado para negociação de compras."
+        )
+
+    elif pd.notna(margem_nova_rs) and margem_nova_rs >= 0:
+
+        st.success(
+            f"O preço sugerido mantém margem positiva de {moeda_br(margem_nova_rs)} por unidade."
+        )
+
+    else:
+
+        st.warning(
+            "Não foi possível concluir a decisão por falta de dados suficientes."
+        )
+
+    r1, r2, r3, r4 = st.columns(4)
+
+    r1.metric(
+        "Margem atual R$",
+        moeda_br(margem_atual_rs)
+    )
+
+    r2.metric(
+        "Margem simulada R$",
+        moeda_br(margem_nova_rs)
+    )
+
+    r3.metric(
+        "Margem simulada %",
+        percentual_br(margem_nova_pct)
+    )
+
+    r4.metric(
+        "Diferença vs preço atual",
+        moeda_br(diferenca_vs_atual)
+    )
+
+    # --------------------------------------------------
+    # TABELA DE AUDITORIA DO CÁLCULO
+    # --------------------------------------------------
+
+    st.markdown(
+        "### 🔎 Pesquisas utilizadas no cálculo"
+    )
+
+    if concorrentes_produto.empty and hist_sim[
+        hist_sim["EAN_SIM"] == ean_simulado
+    ].empty:
+
+        st.warning(
+            "Não há pesquisas de preço para este produto na VENDA_TESTE."
+        )
+
+    else:
+
+        auditoria = hist_sim[
+            hist_sim["EAN_SIM"] == ean_simulado
+        ].copy()
+
+        auditoria["Margem_vs_Custo"] = (
+            auditoria["Preco_SIM"]
+            - custo_produto
+        )
+
+        auditoria["Usado_Como_Referencia"] = ""
+
+        if menor_concorrente is not None:
+
+            menor_idx = menor_concorrente.name
+
+            if menor_idx in auditoria.index:
+                auditoria.loc[menor_idx, "Usado_Como_Referencia"] = "Menor preço concorrente"
+
+        if concorrente_referencia is not None:
+
+            ref_idx = concorrente_referencia.name
+
+            if ref_idx in auditoria.index:
+                auditoria.loc[ref_idx, "Usado_Como_Referencia"] = "Novo preço simulado"
+
+        cols_auditoria = [
+            c for c in [
+                "Data_SIM",
+                "EAN_SIM",
+                "Produto",
+                "Farmácia",
+                "Nome Fantasia",
+                "Rede",
+                "Tipo_Loja_SIM",
+                "Preco_SIM",
+                "Margem_vs_Custo",
+                "Usado_Como_Referencia"
+            ]
+            if c in auditoria.columns
+        ]
+
+        auditoria_exibir = auditoria[
+            cols_auditoria
+        ].copy()
+
+        auditoria_exibir = auditoria_exibir.rename(
+            columns={
+                "Data_SIM": "Data Pesquisa",
+                "EAN_SIM": "EAN",
+                "Tipo_Loja_SIM": "Tipo Loja",
+                "Preco_SIM": "Preço Pesquisa",
+                "Margem_vs_Custo": "Margem vs Custo",
+                "Usado_Como_Referencia": "Referência no Cálculo"
+            }
+        )
+
+        if "Data Pesquisa" in auditoria_exibir.columns:
+            auditoria_exibir["Data Pesquisa"] = pd.to_datetime(
+                auditoria_exibir["Data Pesquisa"],
+                errors="coerce"
+            ).dt.strftime("%d/%m/%Y")
+
+        for col_moeda in [
+            "Preço Pesquisa",
+            "Margem vs Custo"
+        ]:
+
+            if col_moeda in auditoria_exibir.columns:
+                auditoria_exibir[col_moeda] = auditoria_exibir[col_moeda].apply(moeda_br)
+
+        st.dataframe(
+            auditoria_exibir,
+            use_container_width=True,
+            height=430
+        )
+
+        csv_auditoria = (
+            auditoria_exibir
+            .to_csv(
+                index=False,
+                sep=";"
+            )
+            .encode("utf-8-sig")
+        )
+
+        st.download_button(
+            "📥 Exportar pesquisas do produto",
+            csv_auditoria,
+            f"pesquisas_simulador_{ean_simulado}.csv",
+            "text/csv",
+            key="exportar_pesquisas_simulador_inteligente"
+        )
+
 
 
 # --------------------------------------------------
