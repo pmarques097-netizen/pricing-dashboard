@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import re
 import zipfile
 import pandas as pd
 import numpy as np
@@ -138,7 +139,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "sugestao_pesquisa_marca_real_380_dia_20260608"
+VERSAO_APP = "marca_real_380_dia_corrigido_20260608"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
