@@ -12,6 +12,7 @@ import urllib.request
 import urllib.parse
 from pathlib import Path
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 pio.templates.default = "plotly_dark"
 
@@ -144,7 +145,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.33.3"
+VERSAO_APP = "v1.33.4"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -1557,6 +1558,20 @@ def enviar_alerta_telegram(mensagem):
         return False
 
 
+
+def horario_brasil_formatado():
+    """
+    Retorna horário do Brasil para alertas, corrigindo UTC do Streamlit Cloud.
+    """
+
+    try:
+        return datetime.now(
+            ZoneInfo("America/Sao_Paulo")
+        ).strftime("%d/%m/%Y %H:%M:%S")
+    except Exception:
+        return horario_brasil_formatado()
+
+
 def registrar_alerta_login(usuario, nome, perfil):
 
     """
@@ -1578,7 +1593,7 @@ def registrar_alerta_login(usuario, nome, perfil):
             f"👤 <b>Usuário:</b> {usuario}\n"
             f"🙋 <b>Nome:</b> {nome}\n"
             f"🔐 <b>Perfil:</b> {perfil}\n"
-            f"🕒 <b>Horário:</b> {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n"
+            f"🕒 <b>Horário:</b> {horario_brasil_formatado()}\n"
             f"🌐 <b>Ambiente:</b> {ambiente}\n"
             f"🏷️ <b>Versão:</b> {VERSAO_APP}"
         )
