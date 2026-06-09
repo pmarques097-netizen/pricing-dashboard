@@ -8,6 +8,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
 import hashlib
+import urllib.request
+import urllib.parse
 from pathlib import Path
 from datetime import datetime
 
@@ -142,7 +144,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.33.2"
+VERSAO_APP = "v1.33.3"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -1489,6 +1491,108 @@ div[role="radiogroup"] label {
     unsafe_allow_html=True
 )
 
+
+# --------------------------------------------------
+# ALERTA TELEGRAM DE ACESSO
+# --------------------------------------------------
+
+def obter_config_telegram(nome):
+
+    """
+    Busca configuração primeiro no Streamlit Secrets e depois em variável de ambiente.
+    Não deixa token sensível fixo no código.
+    """
+
+    try:
+        if hasattr(st, "secrets") and nome in st.secrets:
+            return str(st.secrets[nome]).strip()
+    except Exception:
+        pass
+
+    try:
+        return str(os.environ.get(nome, "")).strip()
+    except Exception:
+        return ""
+
+
+def enviar_alerta_telegram(mensagem):
+
+    """
+    Envia alerta de acesso para Telegram.
+    Para ativar no Streamlit Cloud, configurar em Secrets:
+
+    TELEGRAM_BOT_TOKEN = "seu_token"
+    TELEGRAM_CHAT_ID = "seu_chat_id"
+    """
+
+    token = obter_config_telegram("TELEGRAM_BOT_TOKEN")
+    chat_id = obter_config_telegram("TELEGRAM_CHAT_ID")
+
+    if not token or not chat_id:
+        return False
+
+    try:
+
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+
+        payload = urllib.parse.urlencode(
+            {
+                "chat_id": chat_id,
+                "text": mensagem,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": "true"
+            }
+        ).encode("utf-8")
+
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            method="POST"
+        )
+
+        with urllib.request.urlopen(req, timeout=5) as resposta:
+            return resposta.status == 200
+
+    except Exception:
+        return False
+
+
+def registrar_alerta_login(usuario, nome, perfil):
+
+    """
+    Envia alerta uma única vez por sessão autenticada.
+    Evita disparos repetidos a cada rerun do Streamlit.
+    """
+
+    try:
+
+        chave_sessao = f"alerta_login_enviado_{usuario}"
+
+        if st.session_state.get(chave_sessao, False):
+            return
+
+        ambiente = "Streamlit Cloud" if "/mount/src" in str(Path.cwd()) else "Localhost"
+
+        mensagem = (
+            "🚀 <b>Novo acesso no Eirox Pricing</b>\n\n"
+            f"👤 <b>Usuário:</b> {usuario}\n"
+            f"🙋 <b>Nome:</b> {nome}\n"
+            f"🔐 <b>Perfil:</b> {perfil}\n"
+            f"🕒 <b>Horário:</b> {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n"
+            f"🌐 <b>Ambiente:</b> {ambiente}\n"
+            f"🏷️ <b>Versão:</b> {VERSAO_APP}"
+        )
+
+        enviado = enviar_alerta_telegram(mensagem)
+
+        if enviado:
+            st.session_state[chave_sessao] = True
+
+    except Exception:
+        pass
+
+
+
 # --------------------------------------------------
 # LOGIN E CONTROLE DE ACESSO
 # --------------------------------------------------
@@ -1652,6 +1756,12 @@ def tela_login():
             st.session_state["usuario"] = usuario_key
             st.session_state["nome_usuario"] = USUARIOS[usuario_key]["nome"]
             st.session_state["perfil_usuario"] = USUARIOS[usuario_key]["perfil"]
+
+            registrar_alerta_login(
+                usuario_key,
+                USUARIOS[usuario_key]["nome"],
+                USUARIOS[usuario_key]["perfil"]
+            )
 
             st.rerun()
 
