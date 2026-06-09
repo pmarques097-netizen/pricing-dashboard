@@ -145,7 +145,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.33.5"
+VERSAO_APP = "v1.33.6"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -1900,6 +1900,81 @@ def enviar_resumo_navegacao_telegram():
 
 
 
+
+def enviar_resumo_periodico_navegacao():
+    """
+    Envia resumo automático durante o uso.
+    Isso cobre casos em que o usuário fecha o navegador sem clicar em Sair.
+
+    Regra:
+    - Envia no máximo uma vez a cada 5 minutos.
+    - Envia também quando houver pelo menos 3 trocas de tela desde o último envio.
+    """
+
+    try:
+        if not st.session_state.get("logado", False):
+            return
+
+        agora_txt = horario_brasil_formatado()
+
+        ultima_envio_txt = st.session_state.get("auditoria_ultimo_resumo_auto")
+        trocas_atuais = int(st.session_state.get("auditoria_contador_paginas", 0))
+        trocas_ultimo_envio = int(st.session_state.get("auditoria_trocas_ultimo_resumo", 0))
+
+        deve_enviar = False
+
+        if not ultima_envio_txt:
+            # Não envia imediatamente no login para evitar duplicar o alerta de entrada.
+            st.session_state["auditoria_ultimo_resumo_auto"] = agora_txt
+            st.session_state["auditoria_trocas_ultimo_resumo"] = trocas_atuais
+            return
+
+        try:
+            ultima_envio = datetime.strptime(
+                ultima_envio_txt,
+                "%d/%m/%Y %H:%M:%S"
+            )
+
+            agora = datetime.strptime(
+                agora_txt,
+                "%d/%m/%Y %H:%M:%S"
+            )
+
+            minutos_passados = (
+                agora - ultima_envio
+            ).total_seconds() / 60
+
+            if minutos_passados >= 5:
+                deve_enviar = True
+
+        except Exception:
+            pass
+
+        if trocas_atuais - trocas_ultimo_envio >= 3:
+            deve_enviar = True
+
+        if not deve_enviar:
+            return
+
+        mensagem = montar_resumo_navegacao()
+
+        if mensagem:
+            mensagem = mensagem.replace(
+                "📊 <b>Resumo de navegação Eirox</b>",
+                "📡 <b>Resumo automático de navegação Eirox</b>"
+            )
+
+            enviado = enviar_alerta_telegram(mensagem)
+
+            if enviado:
+                st.session_state["auditoria_ultimo_resumo_auto"] = agora_txt
+                st.session_state["auditoria_trocas_ultimo_resumo"] = trocas_atuais
+
+    except Exception:
+        pass
+
+
+
 def autenticar_usuario(usuario, senha):
 
     usuario = str(usuario).strip().lower()
@@ -2393,6 +2468,7 @@ if pagina not in paginas_liberadas:
     pagina = paginas_liberadas[0]
 
 registrar_pagina_acessada(pagina)
+enviar_resumo_periodico_navegacao()
 
 st.sidebar.markdown("---")
 
