@@ -145,7 +145,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.33.4"
+VERSAO_APP = "v1.33.5"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -1714,6 +1714,192 @@ PERMISSOES_TELAS = {
 }
 
 
+
+def iniciar_auditoria_sessao(usuario, nome, perfil):
+    """
+    Inicializa controle de navegação do usuário na sessão atual.
+    """
+
+    try:
+        agora = horario_brasil_formatado()
+
+        if not st.session_state.get("auditoria_sessao_iniciada", False):
+
+            st.session_state["auditoria_sessao_iniciada"] = True
+            st.session_state["auditoria_usuario"] = usuario
+            st.session_state["auditoria_nome"] = nome
+            st.session_state["auditoria_perfil"] = perfil
+            st.session_state["auditoria_entrada"] = agora
+            st.session_state["auditoria_ultima_acao"] = agora
+            st.session_state["auditoria_paginas"] = []
+            st.session_state["auditoria_paginas_unicas"] = []
+            st.session_state["auditoria_contador_paginas"] = 0
+
+    except Exception:
+        pass
+
+
+def registrar_pagina_acessada(pagina):
+    """
+    Registra cada navegação entre telas.
+    """
+
+    try:
+        if not st.session_state.get("logado", False):
+            return
+
+        agora = horario_brasil_formatado()
+
+        if "auditoria_paginas" not in st.session_state:
+            st.session_state["auditoria_paginas"] = []
+
+        if "auditoria_paginas_unicas" not in st.session_state:
+            st.session_state["auditoria_paginas_unicas"] = []
+
+        pagina_limpa = str(pagina).strip()
+
+        if not pagina_limpa:
+            return
+
+        ultima_pagina = st.session_state["auditoria_paginas"][-1]["pagina"] if st.session_state["auditoria_paginas"] else None
+
+        if pagina_limpa != ultima_pagina:
+
+            st.session_state["auditoria_paginas"].append(
+                {
+                    "pagina": pagina_limpa,
+                    "horario": agora
+                }
+            )
+
+            if pagina_limpa not in st.session_state["auditoria_paginas_unicas"]:
+                st.session_state["auditoria_paginas_unicas"].append(pagina_limpa)
+
+            st.session_state["auditoria_contador_paginas"] = len(
+                st.session_state["auditoria_paginas"]
+            )
+
+        st.session_state["auditoria_ultima_acao"] = agora
+        st.session_state["auditoria_ultima_pagina"] = pagina_limpa
+
+    except Exception:
+        pass
+
+
+def calcular_tempo_sessao():
+    """
+    Calcula tempo aproximado entre entrada e última ação.
+    """
+
+    try:
+        entrada_txt = st.session_state.get("auditoria_entrada")
+        ultima_txt = st.session_state.get("auditoria_ultima_acao")
+
+        if not entrada_txt or not ultima_txt:
+            return "Não disponível"
+
+        entrada = datetime.strptime(
+            entrada_txt,
+            "%d/%m/%Y %H:%M:%S"
+        )
+
+        ultima = datetime.strptime(
+            ultima_txt,
+            "%d/%m/%Y %H:%M:%S"
+        )
+
+        total_segundos = int(
+            max(
+                0,
+                (ultima - entrada).total_seconds()
+            )
+        )
+
+        horas = total_segundos // 3600
+        minutos = (total_segundos % 3600) // 60
+        segundos = total_segundos % 60
+
+        if horas > 0:
+            return f"{horas}h {minutos}min {segundos}s"
+
+        if minutos > 0:
+            return f"{minutos}min {segundos}s"
+
+        return f"{segundos}s"
+
+    except Exception:
+        return "Não disponível"
+
+
+def montar_resumo_navegacao():
+    """
+    Monta mensagem de resumo da sessão para Telegram.
+    """
+
+    try:
+        usuario = st.session_state.get("auditoria_usuario", st.session_state.get("usuario", ""))
+        nome = st.session_state.get("auditoria_nome", st.session_state.get("nome_usuario", ""))
+        perfil = st.session_state.get("auditoria_perfil", st.session_state.get("perfil_usuario", ""))
+        entrada = st.session_state.get("auditoria_entrada", "")
+        ultima = st.session_state.get("auditoria_ultima_acao", "")
+        ultima_pagina = st.session_state.get("auditoria_ultima_pagina", "")
+        paginas_unicas = st.session_state.get("auditoria_paginas_unicas", [])
+        paginas = st.session_state.get("auditoria_paginas", [])
+
+        ambiente = "Streamlit Cloud" if "/mount/src" in str(Path.cwd()) else "Localhost"
+
+        lista_paginas = ""
+
+        for i, pag in enumerate(paginas_unicas, start=1):
+            lista_paginas += f"{i}. {pag}\n"
+
+        if not lista_paginas:
+            lista_paginas = "Nenhuma página registrada\n"
+
+        mensagem = (
+            "📊 <b>Resumo de navegação Eirox</b>\n\n"
+            f"👤 <b>Usuário:</b> {usuario}\n"
+            f"🙋 <b>Nome:</b> {nome}\n"
+            f"🔐 <b>Perfil:</b> {perfil}\n\n"
+            f"🕒 <b>Entrada:</b> {entrada}\n"
+            f"🕘 <b>Última ação:</b> {ultima}\n"
+            f"⏱️ <b>Tempo no sistema:</b> {calcular_tempo_sessao()}\n\n"
+            f"🧭 <b>Telas navegadas:</b> {len(paginas_unicas)}\n"
+            f"🔁 <b>Trocas de tela:</b> {len(paginas)}\n\n"
+            f"📍 <b>Última página:</b> {ultima_pagina}\n\n"
+            f"📄 <b>Páginas acessadas:</b>\n{lista_paginas}\n"
+            f"🌐 <b>Ambiente:</b> {ambiente}\n"
+            f"🏷️ <b>Versão:</b> {VERSAO_APP}"
+        )
+
+        return mensagem
+
+    except Exception:
+        return ""
+
+
+def enviar_resumo_navegacao_telegram():
+    """
+    Envia o resumo da sessão, evitando duplicidade.
+    """
+
+    try:
+        if st.session_state.get("resumo_navegacao_enviado", False):
+            return
+
+        mensagem = montar_resumo_navegacao()
+
+        if mensagem:
+            enviado = enviar_alerta_telegram(mensagem)
+
+            if enviado:
+                st.session_state["resumo_navegacao_enviado"] = True
+
+    except Exception:
+        pass
+
+
+
 def autenticar_usuario(usuario, senha):
 
     usuario = str(usuario).strip().lower()
@@ -1778,6 +1964,12 @@ def tela_login():
                 USUARIOS[usuario_key]["perfil"]
             )
 
+            iniciar_auditoria_sessao(
+                usuario_key,
+                USUARIOS[usuario_key]["nome"],
+                USUARIOS[usuario_key]["perfil"]
+            )
+
             st.rerun()
 
         else:
@@ -1800,10 +1992,13 @@ def exigir_login():
 
 def logout():
 
+    enviar_resumo_navegacao_telegram()
+
     st.session_state["logado"] = False
     st.session_state["usuario"] = None
     st.session_state["nome_usuario"] = None
     st.session_state["perfil_usuario"] = None
+    st.session_state["auditoria_sessao_iniciada"] = False
     st.rerun()
 
 
@@ -2196,6 +2391,8 @@ pagina = st.sidebar.radio(
 
 if pagina not in paginas_liberadas:
     pagina = paginas_liberadas[0]
+
+registrar_pagina_acessada(pagina)
 
 st.sidebar.markdown("---")
 
