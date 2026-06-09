@@ -30,7 +30,10 @@ st.markdown(
         div[data-testid="stDataFrame"] > div {
             width: 100% !important;
         }
-    </style>
+    
+}
+
+</style>
     """,
     unsafe_allow_html=True
 )
@@ -139,7 +142,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "recuperacao_estavel_marca_produto_20260608"
+VERSAO_APP = "v1.33.2"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -1151,12 +1154,11 @@ def criar_simulacao_por_historico(historico_base):
 # CONFIG
 # --------------------------------------------------
 
+
 st.set_page_config(
     page_title="Eirox Pricing Enterprise",
     layout="wide"
 )
-
-
 
 st.markdown(
     """
@@ -2065,6 +2067,8 @@ pagina = st.sidebar.radio(
     label_visibility="collapsed"
 )
 
+
+
 if pagina not in paginas_liberadas:
     pagina = paginas_liberadas[0]
 
@@ -2181,6 +2185,10 @@ df_filtrado = propagar_ganho_potencial(df_filtrado)
 
 
 
+
+# Mantém a barra visual durante a renderização da tela.
+# Ela desaparece suavemente via CSS, evitando tela parada sem feedback.
+
 # --------------------------------------------------
 # SUGESTÃO INTELIGENTE DE PESQUISA DE PREÇO
 # --------------------------------------------------
@@ -2253,10 +2261,8 @@ if pagina == "🎯 Sugestão de Pesquisa":
 
     def _sp_marca(texto):
         """
-        Extrai a marca do produto pela descrição.
-        Ex.:
-        DAPAGLIFLOZINA 10MG 30 COMPRIMIDOS (EMS) -> DAPAGLIFLOZINA
-        FRALDA HIPOPO CONFORT BAG SHORTINHO M 72 UNIDADES -> HIPOPO
+        Extrai a marca produto pela descrição.
+        Não usa API externa e não altera outras telas.
         """
 
         texto = str(texto).strip().upper()
@@ -2264,6 +2270,7 @@ if pagina == "🎯 Sugestão de Pesquisa":
         if not texto or texto in ["NAN", "NONE"]:
             return "SEM MARCA"
 
+        # Remove fabricante/laboratório entre parênteses. Ex.: (EMS)
         texto = re.sub(r"\([^)]*\)", " ", texto)
 
         texto = (
@@ -2286,36 +2293,74 @@ if pagina == "🎯 Sugestão de Pesquisa":
 
         tokens = [t for t in tokens if t]
 
-        invalidos = {
-            "KIT", "CR", "CREME", "SAB", "SABONETE", "LIQ", "LIQUIDO",
-            "LÍQUIDO", "LEITE", "FRALDA", "FRALDAS", "ROUPA", "INTIMA",
-            "ÍNTIMA", "DESODORANTE", "DESOD", "AER", "AEROSSOL", "SPRAY",
-            "CAP", "CAPS", "CAPSULA", "CAPSULAS", "CÁPSULA", "CÁPSULAS",
-            "CP", "COMP", "COMPRIMIDO", "COMPRIMIDOS", "GTS", "GOTAS",
-            "ML", "MG", "MCG", "GR", "G", "POM", "POMADA", "SOL",
-            "SOLUCAO", "SOLUÇÃO", "XPE", "SUSP", "CX", "UN", "UND",
-            "UNIDADE", "UNIDADES", "COM", "SEM", "REFIL", "PRO",
-            "PLUS", "MEGA", "GIGA", "JUNIOR", "ADULTO", "INFANTIL",
-            "BABY", "PANTS", "SHORTINHO", "DESC", "PROMO", "ORIGINAL",
-            "TRAD", "FPS", "COL", "GEL", "AZ", "OMEGA",
-            "EMS", "EUROFARMA", "CIMED", "MEDLEY", "ACHE", "ACHÉ",
-            "BIOLAB", "PRATI", "DONADUZZI", "NATULAB", "TEUTO",
-            "GEOLAB", "HYPERA", "OPPELLA", "SANOFI", "BAYER",
-            "GSK", "PFIZER", "SANDOZ"
-        }
-
         if not tokens:
             return "SEM MARCA"
 
-        # Para fralda, pegar o termo imediatamente depois de FRALDA/FRALDAS.
+        invalidos = {
+            "KIT", "CR", "CREME", "SAB", "SABONETE", "LIQ", "LIQUIDO", "LÍQUIDO",
+            "LEITE", "FRALDA", "FRALDAS", "ROUPA", "INTIMA", "ÍNTIMA",
+            "DESODORANTE", "DESOD", "AER", "AEROSSOL", "SPRAY",
+            "CAP", "CAPS", "CAPSULA", "CAPSULAS", "CÁPSULA", "CÁPSULAS",
+            "CP", "COMP", "COMPRIMIDO", "COMPRIMIDOS", "GTS", "GOTAS",
+            "ML", "MG", "MCG", "GR", "G", "POM", "POMADA", "SOL", "SOLUCAO",
+            "SOLUÇÃO", "XPE", "SUSP", "CX", "UN", "UND", "UNIDADE", "UNIDADES",
+            "COM", "SEM", "REFIL", "PRO", "PLUS", "MEGA", "GIGA", "JUNIOR",
+            "ADULTO", "INFANTIL", "BABY", "PANTS", "SHORTINHO", "DESC", "PROMO",
+            "ORIGINAL", "TRAD", "FPS", "COL", "GEL", "AZ", "OMEGA", "BAG",
+            "CONFORT", "CONFORTO", "MAX", "TOTAL", "CARE",
+            "EMS", "EUROFARMA", "CIMED", "MEDLEY", "ACHE", "ACHÉ", "BIOLAB",
+            "PRATI", "DONADUZZI", "NATULAB", "TEUTO", "GEOLAB", "HYPERA",
+            "OPPELLA", "SANOFI", "BAYER", "GSK", "PFIZER", "SANDOZ", "MERCK",
+            "NOVARTIS", "ASTRAZENECA", "LIBBS", "GERMED", "LEGRAND"
+        }
+
+        marcas_conhecidas = [
+            "DORFLEX", "NEOSALDINA", "NOVALGINA", "BUSCOPAN", "TANDRILAX",
+            "TYLENOL", "ADVIL", "ALIVIUM", "VICK", "BENEGRIP", "CORISTINA",
+            "SORINE", "NEOSORO", "RINOSORO", "SALONPAS", "BEPANTOL",
+            "CICATRICURE", "DERMAONE", "NIVEA", "DOVE", "REXONA", "MONANGE",
+            "GRANADO", "PHEBO", "JOHNSON", "NEUTROGENA", "PAMPERS",
+            "MAMYPOKO", "BABYSEC", "HUGGIES", "PLENITUD", "TENA", "HIPOPO",
+            "NINHO", "NAN", "APTAMIL", "MILNUTRI", "NESTOGENO", "SUSTAGEN",
+            "ENSURE", "NUTREN", "PEDIASURE", "FORXIGA", "XIGDUO", "JARDIANCE",
+            "OZEMPIC", "MOUNJARO", "RYBELSUS", "GLIFAGE", "JANUVIA", "GALVUS",
+            "BRASART", "SELOZOK", "CONCOR", "ARADOIS", "DIOVAN", "NEXIUM",
+            "LOSEC", "PURAN", "EUTHYROX", "LEVOID", "EXPEC", "ABRILAR",
+            "MUCOSOLVAN", "PROTOVIT", "REDOXON", "CENTRUM", "LAVITAN", "DORIL",
+            "SONRISAL", "ENGOV", "ENO", "EPAREMA", "LUFTAL", "CIMEGRIPE",
+            "MULTIGRIP", "RESFENOL", "APRACUR", "INTIMUS", "CAREFREE", "CARMED",
+            "SUNDOWN", "CERAVE", "VICHY", "ISDIN", "EPISOL", "MUSTELA",
+            "MINANCORA", "HIPOGLOS", "DAPAGLIFLOZINA"
+        ]
+
+        texto_busca = " ".join(tokens)
+
+        for marca in sorted(marcas_conhecidas, key=len, reverse=True):
+            if re.search(r"(^|\s)" + re.escape(marca) + r"($|\s)", texto_busca):
+                return marca
+
+        # Fraldas: marca geralmente vem logo depois de FRALDA/FRALDAS.
         for termo in ["FRALDA", "FRALDAS"]:
             if termo in tokens:
                 idx = tokens.index(termo)
+
                 if idx + 1 < len(tokens):
                     candidato = tokens[idx + 1]
+
                     if candidato not in invalidos and not candidato.isdigit() and len(candidato) > 2:
                         return candidato
 
+        # Leites: marca geralmente vem depois de LEITE.
+        if "LEITE" in tokens:
+            idx = tokens.index("LEITE")
+
+            if idx + 1 < len(tokens):
+                candidato = tokens[idx + 1]
+
+                if candidato not in invalidos and not candidato.isdigit() and len(candidato) > 2:
+                    return candidato
+
+        # Regra geral: primeira palavra útil da descrição.
         for token in tokens:
             if token in invalidos:
                 continue
@@ -2323,7 +2368,7 @@ if pagina == "🎯 Sugestão de Pesquisa":
             if token.isdigit():
                 continue
 
-            if re.match(r"^\d+(MG|ML|MCG|G)$", token):
+            if re.match(r"^\d+(MG|ML|MCG|G|UN|UND)$", token):
                 continue
 
             if len(token) <= 2:
@@ -4389,6 +4434,14 @@ if pagina == "🌎 Mapa Geográfico de Concorrência":
         )
 
     fig_mapa.update_layout(
+    legend=dict(
+        orientation="h",
+        yanchor="top",
+        y=1.02,
+        xanchor="left",
+        x=0.0,
+        bgcolor="rgba(0,0,0,0)"
+    ),
         mapbox=dict(
             style="carto-darkmatter",
             center=dict(lat=centro_lat, lon=centro_lon),
@@ -4396,8 +4449,7 @@ if pagina == "🌎 Mapa Geográfico de Concorrência":
         ),
         height=680,
         margin=dict(l=0, r=0, t=20, b=0),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-        paper_bgcolor="rgba(0,0,0,0)"
+paper_bgcolor="rgba(0,0,0,0)"
     )
 
     st.plotly_chart(fig_mapa, use_container_width=True, key="mapa_geografico_concorrencia")
