@@ -3,6 +3,7 @@ import streamlit.components.v1 as components
 import os
 import re
 import zipfile
+import shutil
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -149,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.35.3-beta-saude-sistema"
+VERSAO_APP = "v1.35.4-beta-backup-automatico"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -1855,6 +1856,481 @@ def exportar_auditoria_excel(logs_detalhe, ranking_usuarios, ranking_telas, aces
 
 
 
+
+# --------------------------------------------------
+# BACKUP CENTER - HOMOLOGAÇÃO v1.35.4
+# --------------------------------------------------
+
+BACKUP_DIR = Path("backups_eirox")
+
+
+def _backup_agora_tag():
+    try:
+        return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%Y%m%d_%H%M%S")
+    except Exception:
+        return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
+def _backup_agora_br():
+    try:
+        return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S")
+    except Exception:
+        return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+def _backup_tamanho_formatado(bytes_valor):
+    try:
+        bytes_valor = float(bytes_valor)
+
+        if bytes_valor >= 1024 ** 3:
+            return f"{bytes_valor / (1024 ** 3):.2f} GB".replace(".", ",")
+
+        if bytes_valor >= 1024 ** 2:
+            return f"{bytes_valor / (1024 ** 2):.2f} MB".replace(".", ",")
+
+        if bytes_valor >= 1024:
+            return f"{bytes_valor / 1024:.2f} KB".replace(".", ",")
+
+        return f"{int(bytes_valor)} B"
+
+    except Exception:
+        return "0 B"
+
+
+def _backup_arquivos_alvo():
+    """
+    Define os arquivos e pastas críticos para backup.
+    """
+
+    alvos = [
+        "dashboard_pricing.py",
+        "pricing_utils.py",
+        "style.css",
+        "logo eirox.png",
+        "Analise_Pricing.xlsx",
+        "VENDA_TESTE",
+        "VENDA_FINAL_TESTE",
+        "COMPRA_TESTE",
+        "ESTOQUE_TESTE",
+        "logs",
+        "USUARIOS_EIROX.csv",
+        ".streamlit"
+    ]
+
+    return alvos
+
+
+def _backup_status_alvos():
+    """
+    Lista status dos itens que serão considerados no backup.
+    """
+
+    linhas = []
+
+    for alvo in _backup_arquivos_alvo():
+        p = Path(alvo)
+
+        existe = p.exists()
+
+        tipo = "Pasta" if existe and p.is_dir() else "Arquivo"
+
+        tamanho = 0
+        qtd_arquivos = 0
+        atualizado = ""
+
+        try:
+            if existe and p.is_file():
+                tamanho = p.stat().st_size
+                qtd_arquivos = 1
+                atualizado = _health_formatar_data(p.stat().st_mtime) if "_health_formatar_data" in globals() else ""
+
+            elif existe and p.is_dir():
+                for arq in p.rglob("*"):
+                    if arq.is_file():
+                        qtd_arquivos += 1
+                        tamanho += arq.stat().st_size
+                        if not atualizado:
+                            atualizado = _health_formatar_data(arq.stat().st_mtime) if "_health_formatar_data" in globals() else ""
+                        else:
+                            atual = arq.stat().st_mtime
+                            try:
+                                atual_dt = datetime.fromtimestamp(atual)
+                                atual_txt = atual_dt.strftime("%d/%m/%Y %H:%M:%S")
+                                if pd.to_datetime(atual_txt, dayfirst=True) > pd.to_datetime(atualizado, dayfirst=True):
+                                    atualizado = atual_txt
+                            except Exception:
+                                pass
+
+        except Exception:
+            pass
+
+        linhas.append(
+            {
+                "Item": alvo,
+                "Status": "🟢 Encontrado" if existe else "🟡 Não encontrado",
+                "Tipo": tipo if existe else "-",
+                "Arquivos": qtd_arquivos,
+                "Tamanho": _backup_tamanho_formatado(tamanho),
+                "Última Atualização": atualizado
+            }
+        )
+
+    return pd.DataFrame(linhas)
+
+
+def gerar_backup_eirox(nome_manual=""):
+    """
+    Gera ZIP completo com os itens críticos do projeto.
+    """
+
+    try:
+        BACKUP_DIR.mkdir(exist_ok=True)
+
+        tag = _backup_agora_tag()
+
+        nome_base = str(nome_manual).strip()
+
+        if not nome_base:
+            nome_base = f"BACKUP_EIROX_PRICING_{VERSAO_APP}_{tag}"
+
+        nome_base = (
+            nome_base
+            .replace("/", "_")
+            .replace("\\", "_")
+            .replace(":", "_")
+            .replace(" ", "_")
+        )
+
+        zip_path = BACKUP_DIR / f"{nome_base}.zip"
+
+        itens_incluidos = []
+        itens_ignorados = []
+
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+
+            readme = (
+                "EIROX PRICING ENTERPRISE - BACKUP OFICIAL\n\n"
+                f"Versão: {VERSAO_APP}\n"
+                f"Data/Hora: {_backup_agora_br()}\n"
+                f"Gerado por: {st.session_state.get('usuario', '')}\n\n"
+                "Conteúdo:\n"
+                "- Código principal\n"
+                "- Bases operacionais\n"
+                "- Logs\n"
+                "- Usuários\n"
+                "- Configurações locais disponíveis\n\n"
+                "Observação: secrets do Streamlit Cloud não são exportados automaticamente por segurança.\n"
+            )
+
+            z.writestr("README_BACKUP.txt", readme)
+
+            for alvo in _backup_arquivos_alvo():
+                p = Path(alvo)
+
+                if not p.exists():
+                    itens_ignorados.append(alvo)
+                    continue
+
+                if p.is_file():
+                    z.write(p, arcname=str(p))
+                    itens_incluidos.append(str(p))
+
+                elif p.is_dir():
+                    for arq in p.rglob("*"):
+                        if not arq.is_file():
+                            continue
+
+                        if ".git" in arq.parts or "__pycache__" in arq.parts:
+                            continue
+
+                        z.write(arq, arcname=str(arq))
+                        itens_incluidos.append(str(arq))
+
+        tamanho = zip_path.stat().st_size if zip_path.exists() else 0
+
+        try:
+            registrar_log_usuario(
+                "Backup",
+                str(zip_path.name),
+                f"Backup gerado com {len(itens_incluidos)} itens. Ignorados: {len(itens_ignorados)}"
+            )
+        except Exception:
+            pass
+
+        try:
+            enviar_alerta_telegram(
+                "📦 <b>Backup gerado no Eirox Pricing</b>\n\n"
+                f"📄 <b>Arquivo:</b> {zip_path.name}\n"
+                f"📦 <b>Tamanho:</b> {_backup_tamanho_formatado(tamanho)}\n"
+                f"✅ <b>Itens incluídos:</b> {len(itens_incluidos)}\n"
+                f"⚠️ <b>Itens não encontrados:</b> {len(itens_ignorados)}\n"
+                f"🕒 <b>Horário:</b> {_backup_agora_br()}\n"
+                f"👤 <b>Usuário:</b> {st.session_state.get('usuario', '')}\n"
+                f"🏷️ <b>Versão:</b> {VERSAO_APP}"
+            )
+        except Exception:
+            pass
+
+        return {
+            "ok": True,
+            "arquivo": str(zip_path),
+            "nome": zip_path.name,
+            "tamanho": tamanho,
+            "itens_incluidos": len(itens_incluidos),
+            "itens_ignorados": itens_ignorados
+        }
+
+    except Exception as erro:
+        return {
+            "ok": False,
+            "erro": str(erro),
+            "arquivo": "",
+            "nome": "",
+            "tamanho": 0,
+            "itens_incluidos": 0,
+            "itens_ignorados": []
+        }
+
+
+def listar_backups_eirox():
+    """
+    Lista backups já gerados.
+    """
+
+    try:
+        BACKUP_DIR.mkdir(exist_ok=True)
+
+        linhas = []
+
+        for arq in sorted(BACKUP_DIR.glob("*.zip"), key=lambda x: x.stat().st_mtime, reverse=True):
+            linhas.append(
+                {
+                    "Arquivo": arq.name,
+                    "Caminho": str(arq),
+                    "Tamanho": _backup_tamanho_formatado(arq.stat().st_size),
+                    "Bytes": arq.stat().st_size,
+                    "Criado em": _health_formatar_data(arq.stat().st_mtime) if "_health_formatar_data" in globals() else "",
+                }
+            )
+
+        return pd.DataFrame(linhas)
+
+    except Exception:
+        return pd.DataFrame()
+
+
+def _backup_ultimo():
+    try:
+        backups = listar_backups_eirox()
+
+        if backups.empty:
+            return None
+
+        return backups.iloc[0].to_dict()
+
+    except Exception:
+        return None
+
+
+def _backup_espaco_total():
+    try:
+        total = 0
+
+        if not BACKUP_DIR.exists():
+            return 0
+
+        for arq in BACKUP_DIR.glob("*.zip"):
+            total += arq.stat().st_size
+
+        return total
+
+    except Exception:
+        return 0
+
+
+def limpar_backups_antigos(manter=10):
+    """
+    Mantém apenas os últimos N backups.
+    """
+
+    try:
+        BACKUP_DIR.mkdir(exist_ok=True)
+
+        backups = sorted(
+            BACKUP_DIR.glob("*.zip"),
+            key=lambda x: x.stat().st_mtime,
+            reverse=True
+        )
+
+        removidos = 0
+
+        for arq in backups[int(manter):]:
+            try:
+                arq.unlink()
+                removidos += 1
+            except Exception:
+                pass
+
+        return removidos
+
+    except Exception:
+        return 0
+
+
+
+
+# --------------------------------------------------
+# BACKUP CENTER
+# --------------------------------------------------
+
+if pagina == "📦 Backup Center":
+
+    if not usuario_pode_ver_auditoria():
+        st.error("Acesso não autorizado.")
+        st.stop()
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">Proteção e Recuperação</div>
+            <h1>📦 Backup Center</h1>
+            <p>Geração, controle, histórico e download de backups oficiais do Eirox Pricing Enterprise.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    ultimo_backup = _backup_ultimo()
+    backups_df = listar_backups_eirox()
+    espaco_total = _backup_espaco_total()
+
+    qtd_backups = len(backups_df)
+    ultimo_nome = ultimo_backup.get("Arquivo", "-") if ultimo_backup else "-"
+    ultimo_data = ultimo_backup.get("Criado em", "-") if ultimo_backup else "-"
+    status_backup = "🟢 Protegido" if qtd_backups > 0 else "🟡 Sem backup"
+
+    st.markdown("### 🧭 Painel Executivo de Backup")
+
+    b1, b2, b3, b4, b5 = st.columns(5)
+
+    b1.metric("Status", status_backup)
+    b2.metric("Backups disponíveis", qtd_backups)
+    b3.metric("Espaço utilizado", _backup_tamanho_formatado(espaco_total))
+    b4.metric("Último backup", ultimo_data)
+    b5.metric("Versão", VERSAO_APP)
+
+    st.markdown("### 📋 Itens protegidos")
+
+    status_alvos = _backup_status_alvos()
+
+    st.dataframe(
+        status_alvos,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.markdown("### 📦 Gerar backup")
+
+    nome_manual = st.text_input(
+        "Nome do backup",
+        value=f"BACKUP_EIROX_PRICING_{VERSAO_APP}_{_backup_agora_tag()}",
+        help="Você pode manter o nome automático ou alterar."
+    )
+
+    col_gerar, col_limpar = st.columns(2)
+
+    if col_gerar.button(
+        "📦 Gerar Backup Completo",
+        use_container_width=True
+    ):
+
+        with st.spinner("Gerando backup completo do Eirox..."):
+            resultado = gerar_backup_eirox(nome_manual)
+
+        if resultado.get("ok"):
+            st.success(
+                f"Backup gerado com sucesso: {resultado.get('nome')} "
+                f"({_backup_tamanho_formatado(resultado.get('tamanho', 0))})"
+            )
+            st.rerun()
+        else:
+            st.error(
+                f"Falha ao gerar backup: {resultado.get('erro')}"
+            )
+
+    if col_limpar.button(
+        "🧹 Manter apenas últimos 10 backups",
+        use_container_width=True
+    ):
+
+        removidos = limpar_backups_antigos(10)
+
+        st.success(
+            f"Limpeza concluída. Backups removidos: {removidos}"
+        )
+
+        st.rerun()
+
+    st.markdown("### 🗂️ Histórico de backups")
+
+    backups_df = listar_backups_eirox()
+
+    if backups_df.empty:
+        st.info("Nenhum backup gerado ainda.")
+    else:
+        st.dataframe(
+            backups_df[
+                [
+                    "Arquivo",
+                    "Tamanho",
+                    "Criado em"
+                ]
+            ],
+            use_container_width=True,
+            hide_index=True
+        )
+
+        st.markdown("### ⬇️ Download de backup")
+
+        backup_opcoes = backups_df["Arquivo"].tolist()
+
+        backup_sel = st.selectbox(
+            "Selecione o backup",
+            backup_opcoes
+        )
+
+        linha_backup = backups_df[
+            backups_df["Arquivo"] == backup_sel
+        ]
+
+        if not linha_backup.empty:
+            caminho_backup = Path(
+                linha_backup.iloc[0]["Caminho"]
+            )
+
+            if caminho_backup.exists():
+                with open(caminho_backup, "rb") as f:
+                    dados_backup = f.read()
+
+                st.download_button(
+                    "⬇️ Baixar backup selecionado",
+                    data=dados_backup,
+                    file_name=caminho_backup.name,
+                    mime="application/zip",
+                    use_container_width=True
+                )
+
+    st.markdown("### ⚠️ Observações de segurança")
+
+    st.info(
+        "Os Secrets do Streamlit Cloud não são exportados automaticamente por segurança. "
+        "Mantenha uma cópia segura separada das chaves TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID."
+    )
+
+    st.stop()
+
+
+
 # --------------------------------------------------
 # SAÚDE DO SISTEMA - HOMOLOGAÇÃO v1.35.3
 # --------------------------------------------------
@@ -3368,6 +3844,9 @@ if usuario_pode_gerenciar_usuarios() and "👥 Controle de Usuários" not in pag
 
 if usuario_pode_ver_auditoria() and "🟢 Saúde do Sistema" not in paginas_liberadas:
     paginas_liberadas = paginas_liberadas + ["🟢 Saúde do Sistema"]
+
+if usuario_pode_ver_auditoria() and "📦 Backup Center" not in paginas_liberadas:
+    paginas_liberadas = paginas_liberadas + ["📦 Backup Center"]
 
 if usuario_pode_ver_auditoria() and "🔐 Central de Auditoria" not in paginas_liberadas:
     paginas_liberadas = paginas_liberadas + ["🔐 Central de Auditoria"]
