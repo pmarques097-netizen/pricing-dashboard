@@ -147,7 +147,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.34.0"
+VERSAO_APP = "v1.35.1-beta-fast"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -1778,12 +1778,6 @@ def salvar_log_acesso(evento, tela="", detalhe=""):
     try:
         LOG_DIR.mkdir(exist_ok=True)
 
-        geo = {}
-        try:
-            geo = obter_localizacao_query_params()
-        except Exception:
-            geo = {}
-
         ambiente = "Streamlit Cloud" if "/mount/src" in str(Path.cwd()) else "Localhost"
 
         linha = {
@@ -1794,10 +1788,10 @@ def salvar_log_acesso(evento, tela="", detalhe=""):
             "Evento": str(evento),
             "Tela": str(tela),
             "Detalhe": str(detalhe),
-            "Latitude": geo.get("lat", "") if isinstance(geo, dict) else "",
-            "Longitude": geo.get("lon", "") if isinstance(geo, dict) else "",
-            "Precisao_Metros": geo.get("acc", "") if isinstance(geo, dict) else "",
-            "Status_Localizacao": geo.get("status", "") if isinstance(geo, dict) else "",
+            "Latitude": st.session_state.get("geo_lat", ""),
+            "Longitude": st.session_state.get("geo_lon", ""),
+            "Precisao_Metros": st.session_state.get("geo_acc", ""),
+            "Status_Localizacao": st.session_state.get("geo_status", ""),
             "Ambiente": ambiente,
             "Versao": VERSAO_APP
         }
@@ -1886,6 +1880,427 @@ USUARIOS = {
         "perfil": "Consulta"
     }
 }
+
+
+
+
+# --------------------------------------------------
+# GESTÃO DINÂMICA DE USUÁRIOS - HOMOLOGAÇÃO v1.35
+# --------------------------------------------------
+
+USUARIOS_ARQUIVO = Path("USUARIOS_EIROX.csv")
+USUARIOS_LOG_ARQUIVO = Path("logs") / "log_usuarios.csv"
+
+
+def _agora_brasil_txt():
+    try:
+        return horario_brasil_formatado()
+    except Exception:
+        return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+def registrar_log_usuario(acao, usuario_alvo="", detalhe=""):
+    """
+    Registra alterações feitas no cadastro de usuários.
+    """
+
+    try:
+        Path("logs").mkdir(exist_ok=True)
+
+        linha = {
+            "Data_Hora": _agora_brasil_txt(),
+            "Administrador": st.session_state.get("usuario", ""),
+            "Usuario_Alvo": str(usuario_alvo),
+            "Acao": str(acao),
+            "Detalhe": str(detalhe),
+            "Versao": VERSAO_APP
+        }
+
+        existe = USUARIOS_LOG_ARQUIVO.exists()
+
+        with open(USUARIOS_LOG_ARQUIVO, "a", newline="", encoding="utf-8-sig") as f:
+            writer = csv.DictWriter(f, fieldnames=list(linha.keys()), delimiter=";")
+
+            if not existe:
+                writer.writeheader()
+
+            writer.writerow(linha)
+
+    except Exception:
+        pass
+
+
+def _usuarios_padrao_dataframe():
+    """
+    Migra os usuários fixos do código para a base USUARIOS_EIROX.csv.
+    """
+
+    linhas = []
+
+    for usuario, dados in USUARIOS.items():
+        linhas.append(
+            {
+                "Usuario": str(usuario).strip().lower(),
+                "Nome": str(dados.get("nome", "")),
+                "Perfil": str(dados.get("perfil", "Consulta")),
+                "Senha_Hash": str(dados.get("senha_hash", "")),
+                "Ativo": "Sim",
+                "Expira_Em": "",
+                "Forcar_Reset": "Não",
+                "Criado_Em": _agora_brasil_txt(),
+                "Atualizado_Em": _agora_brasil_txt()
+            }
+        )
+
+    return pd.DataFrame(linhas)
+
+
+def inicializar_arquivo_usuarios():
+    """
+    Cria o arquivo de usuários dinâmico caso ainda não exista.
+    """
+
+    try:
+        if not USUARIOS_ARQUIVO.exists():
+            base = _usuarios_padrao_dataframe()
+            base.to_csv(
+                USUARIOS_ARQUIVO,
+                index=False,
+                sep=";",
+                encoding="utf-8-sig"
+            )
+
+        return True
+
+    except Exception:
+        return False
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_usuarios_sistema():
+    """
+    Carrega usuários dinâmicos.
+    """
+
+    try:
+        inicializar_arquivo_usuarios()
+
+        base = pd.read_csv(
+            USUARIOS_ARQUIVO,
+            sep=";",
+            encoding="utf-8-sig",
+            dtype=str
+        ).fillna("")
+
+        base.columns = base.columns.astype(str).str.strip()
+
+        obrigatorias = [
+            "Usuario",
+            "Nome",
+            "Perfil",
+            "Senha_Hash",
+            "Ativo",
+            "Expira_Em",
+            "Forcar_Reset",
+            "Criado_Em",
+            "Atualizado_Em"
+        ]
+
+        for col in obrigatorias:
+            if col not in base.columns:
+                base[col] = ""
+
+        base["Usuario"] = base["Usuario"].astype(str).str.strip().str.lower()
+        base["Ativo"] = base["Ativo"].replace("", "Sim")
+        base["Forcar_Reset"] = base["Forcar_Reset"].replace("", "Não")
+
+        return base[obrigatorias].copy()
+
+    except Exception:
+        return _usuarios_padrao_dataframe()
+
+
+def salvar_usuarios_sistema(base):
+    """
+    Salva a base dinâmica de usuários.
+    """
+
+    try:
+        base = base.copy()
+        base["Usuario"] = base["Usuario"].astype(str).str.strip().str.lower()
+
+        base.to_csv(
+            USUARIOS_ARQUIVO,
+            index=False,
+            sep=";",
+            encoding="utf-8-sig"
+        )
+
+        try:
+            carregar_usuarios_sistema.clear()
+        except Exception:
+            pass
+
+        return True
+
+    except Exception:
+        return False
+
+
+def usuario_expirado(expira_em):
+    """
+    Verifica se o usuário está expirado.
+    Formato: dd/mm/aaaa.
+    """
+
+    try:
+        expira_em = str(expira_em).strip()
+
+        if not expira_em:
+            return False
+
+        data_exp = pd.to_datetime(
+            expira_em,
+            dayfirst=True,
+            errors="coerce"
+        )
+
+        if pd.isna(data_exp):
+            return False
+
+        hoje = pd.Timestamp.now().normalize()
+
+        return data_exp.normalize() < hoje
+
+    except Exception:
+        return False
+
+
+def obter_dados_usuario(usuario):
+    """
+    Busca usuário na base dinâmica.
+    """
+
+    try:
+        usuario = str(usuario).strip().lower()
+        base = carregar_usuarios_sistema()
+        linha = base[base["Usuario"] == usuario]
+
+        if linha.empty:
+            return None
+
+        return linha.iloc[0].to_dict()
+
+    except Exception:
+        return None
+
+
+def usuario_pode_gerenciar_usuarios():
+    """
+    Gestão de usuários exclusiva inicialmente para paulomarques.
+    """
+
+    try:
+        return str(st.session_state.get("usuario", "")).strip().lower() == "paulomarques"
+    except Exception:
+        return False
+
+
+def criar_ou_atualizar_usuario(usuario, nome, perfil, senha=None, ativo="Sim", expira_em="", forcar_reset="Não"):
+    """
+    Cria ou atualiza usuário na base dinâmica.
+    """
+
+    try:
+        usuario = str(usuario).strip().lower()
+        nome = str(nome).strip()
+        perfil = str(perfil).strip()
+        ativo = str(ativo).strip()
+        expira_em = str(expira_em).strip()
+        forcar_reset = str(forcar_reset).strip()
+
+        if not usuario or not nome or not perfil:
+            return False, "Usuário, nome e perfil são obrigatórios."
+
+        base = carregar_usuarios_sistema()
+        existe = base["Usuario"].eq(usuario).any()
+        agora = _agora_brasil_txt()
+
+        if existe:
+            idx = base.index[base["Usuario"] == usuario][0]
+
+            base.loc[idx, "Nome"] = nome
+            base.loc[idx, "Perfil"] = perfil
+            base.loc[idx, "Ativo"] = ativo
+            base.loc[idx, "Expira_Em"] = expira_em
+            base.loc[idx, "Forcar_Reset"] = forcar_reset
+            base.loc[idx, "Atualizado_Em"] = agora
+
+            if senha:
+                base.loc[idx, "Senha_Hash"] = hashlib.sha256(str(senha).encode()).hexdigest()
+                detalhe = "Usuário atualizado com reset de senha."
+            else:
+                detalhe = "Usuário atualizado."
+
+            salvar_usuarios_sistema(base)
+            registrar_log_usuario("Atualização", usuario, detalhe)
+
+            try:
+                enviar_alerta_telegram(
+                    "👥 <b>Usuário atualizado no Eirox</b>\n\n"
+                    f"👤 <b>Usuário:</b> {usuario}\n"
+                    f"🔐 <b>Perfil:</b> {perfil}\n"
+                    f"✅ <b>Ativo:</b> {ativo}\n"
+                    f"🕒 <b>Horário:</b> {_agora_brasil_txt()}\n"
+                    f"🙋 <b>Administrador:</b> {st.session_state.get('usuario', '')}"
+                )
+            except Exception:
+                pass
+
+            return True, detalhe
+
+        if not senha:
+            return False, "Senha obrigatória para novo usuário."
+
+        nova_linha = {
+            "Usuario": usuario,
+            "Nome": nome,
+            "Perfil": perfil,
+            "Senha_Hash": hashlib.sha256(str(senha).encode()).hexdigest(),
+            "Ativo": ativo,
+            "Expira_Em": expira_em,
+            "Forcar_Reset": forcar_reset,
+            "Criado_Em": agora,
+            "Atualizado_Em": agora
+        }
+
+        base = pd.concat(
+            [
+                base,
+                pd.DataFrame([nova_linha])
+            ],
+            ignore_index=True
+        )
+
+        salvar_usuarios_sistema(base)
+        registrar_log_usuario("Criação", usuario, "Usuário criado.")
+
+        try:
+            enviar_alerta_telegram(
+                "👥 <b>Novo usuário criado no Eirox</b>\n\n"
+                f"👤 <b>Usuário:</b> {usuario}\n"
+                f"🙋 <b>Nome:</b> {nome}\n"
+                f"🔐 <b>Perfil:</b> {perfil}\n"
+                f"✅ <b>Ativo:</b> {ativo}\n"
+                f"🕒 <b>Horário:</b> {_agora_brasil_txt()}\n"
+                f"🧑‍💼 <b>Administrador:</b> {st.session_state.get('usuario', '')}"
+            )
+        except Exception:
+            pass
+
+        return True, "Usuário criado com sucesso."
+
+    except Exception as erro:
+        return False, f"Erro ao salvar usuário: {erro}"
+
+
+def bloquear_desbloquear_usuario(usuario, ativo):
+    """
+    Bloqueia ou desbloqueia usuário.
+    """
+
+    try:
+        usuario = str(usuario).strip().lower()
+        base = carregar_usuarios_sistema()
+
+        if usuario not in base["Usuario"].tolist():
+            return False, "Usuário não encontrado."
+
+        idx = base.index[base["Usuario"] == usuario][0]
+        base.loc[idx, "Ativo"] = "Sim" if ativo else "Não"
+        base.loc[idx, "Atualizado_Em"] = _agora_brasil_txt()
+
+        salvar_usuarios_sistema(base)
+
+        acao = "Desbloqueio" if ativo else "Bloqueio"
+        registrar_log_usuario(acao, usuario, f"Ativo={base.loc[idx, 'Ativo']}")
+
+        try:
+            enviar_alerta_telegram(
+                f"{'🔓' if ativo else '🔒'} <b>{acao} de usuário no Eirox</b>\n\n"
+                f"👤 <b>Usuário:</b> {usuario}\n"
+                f"✅ <b>Ativo:</b> {base.loc[idx, 'Ativo']}\n"
+                f"🕒 <b>Horário:</b> {_agora_brasil_txt()}\n"
+                f"🧑‍💼 <b>Administrador:</b> {st.session_state.get('usuario', '')}"
+            )
+        except Exception:
+            pass
+
+        return True, f"Usuário {'desbloqueado' if ativo else 'bloqueado'} com sucesso."
+
+    except Exception as erro:
+        return False, f"Erro ao alterar status: {erro}"
+
+
+def resetar_senha_usuario(usuario, nova_senha, forcar_reset="Não"):
+    """
+    Reseta senha do usuário.
+    """
+
+    try:
+        usuario = str(usuario).strip().lower()
+
+        if not nova_senha:
+            return False, "Informe a nova senha."
+
+        base = carregar_usuarios_sistema()
+
+        if usuario not in base["Usuario"].tolist():
+            return False, "Usuário não encontrado."
+
+        idx = base.index[base["Usuario"] == usuario][0]
+        base.loc[idx, "Senha_Hash"] = hashlib.sha256(str(nova_senha).encode()).hexdigest()
+        base.loc[idx, "Forcar_Reset"] = forcar_reset
+        base.loc[idx, "Atualizado_Em"] = _agora_brasil_txt()
+
+        salvar_usuarios_sistema(base)
+        registrar_log_usuario("Reset de senha", usuario, f"Forcar_Reset={forcar_reset}")
+
+        try:
+            enviar_alerta_telegram(
+                "🔑 <b>Reset de senha no Eirox</b>\n\n"
+                f"👤 <b>Usuário:</b> {usuario}\n"
+                f"🔁 <b>Forçar reset:</b> {forcar_reset}\n"
+                f"🕒 <b>Horário:</b> {_agora_brasil_txt()}\n"
+                f"🧑‍💼 <b>Administrador:</b> {st.session_state.get('usuario', '')}"
+            )
+        except Exception:
+            pass
+
+        return True, "Senha redefinida com sucesso."
+
+    except Exception as erro:
+        return False, f"Erro ao redefinir senha: {erro}"
+
+
+def carregar_log_usuarios():
+    """
+    Carrega log de alterações de usuários.
+    """
+
+    try:
+        if not USUARIOS_LOG_ARQUIVO.exists():
+            return pd.DataFrame()
+
+        return pd.read_csv(
+            USUARIOS_LOG_ARQUIVO,
+            sep=";",
+            encoding="utf-8-sig"
+        )
+
+    except Exception:
+        return pd.DataFrame()
+
 
 
 PERMISSOES_TELAS = {
@@ -2206,14 +2621,30 @@ def autenticar_usuario(usuario, senha):
 
     usuario = str(usuario).strip().lower()
 
-    if usuario not in USUARIOS:
+    dados_usuario = obter_dados_usuario(usuario)
+
+    if not dados_usuario:
+        return False
+
+    if str(dados_usuario.get("Ativo", "Sim")).strip().lower() != "sim":
+        st.session_state["login_bloqueado_motivo"] = "Usuário bloqueado."
+        return False
+
+    if usuario_expirado(dados_usuario.get("Expira_Em", "")):
+        st.session_state["login_bloqueado_motivo"] = "Acesso expirado."
         return False
 
     senha_hash = hashlib.sha256(
         str(senha).encode()
     ).hexdigest()
 
-    return senha_hash == USUARIOS[usuario]["senha_hash"]
+    ok = senha_hash == str(dados_usuario.get("Senha_Hash", ""))
+
+    if ok and str(dados_usuario.get("Forcar_Reset", "Não")).strip().lower() == "sim":
+        st.session_state["login_bloqueado_motivo"] = "Senha temporária. Solicite alteração ao administrador."
+        return False
+
+    return ok
 
 
 def tela_login():
@@ -2255,10 +2686,12 @@ def tela_login():
 
             usuario_key = str(usuario).strip().lower()
 
+            dados_login = obter_dados_usuario(usuario_key)
+
             st.session_state["logado"] = True
             st.session_state["usuario"] = usuario_key
-            st.session_state["nome_usuario"] = USUARIOS[usuario_key]["nome"]
-            st.session_state["perfil_usuario"] = USUARIOS[usuario_key]["perfil"]
+            st.session_state["nome_usuario"] = dados_login.get("Nome", usuario_key) if dados_login else usuario_key
+            st.session_state["perfil_usuario"] = dados_login.get("Perfil", "Consulta") if dados_login else "Consulta"
 
             salvar_log_acesso(
                 "Login",
@@ -2268,23 +2701,28 @@ def tela_login():
 
             registrar_alerta_login(
                 usuario_key,
-                USUARIOS[usuario_key]["nome"],
-                USUARIOS[usuario_key]["perfil"]
+                st.session_state["nome_usuario"],
+                st.session_state["perfil_usuario"]
             )
 
             iniciar_auditoria_sessao(
                 usuario_key,
-                USUARIOS[usuario_key]["nome"],
-                USUARIOS[usuario_key]["perfil"]
+                st.session_state["nome_usuario"],
+                st.session_state["perfil_usuario"]
             )
 
             st.rerun()
 
         else:
 
-            st.error(
-                "Usuário ou senha inválidos."
-            )
+            motivo = st.session_state.pop("login_bloqueado_motivo", "")
+
+            if motivo:
+                st.error(motivo)
+            else:
+                st.error(
+                    "Usuário ou senha inválidos."
+                )
 
 
 def exigir_login():
@@ -2312,7 +2750,11 @@ def logout():
 
 exigir_login()
 
-solicitar_localizacao_navegador()
+
+if not st.session_state.get("geo_solicitada_sessao", False):
+    solicitar_localizacao_navegador()
+    st.session_state["geo_solicitada_sessao"] = True
+
 
 perfil_usuario = st.session_state.get(
     "perfil_usuario",
@@ -2690,6 +3132,9 @@ paginas_liberadas = PERMISSOES_TELAS.get(
     ]
 )
 
+if usuario_pode_gerenciar_usuarios() and "👥 Controle de Usuários" not in paginas_liberadas:
+    paginas_liberadas = paginas_liberadas + ["👥 Controle de Usuários"]
+
 if usuario_pode_ver_auditoria() and "🔐 Central de Auditoria" not in paginas_liberadas:
     paginas_liberadas = paginas_liberadas + ["🔐 Central de Auditoria"]
 
@@ -2710,8 +3155,8 @@ registrar_pagina_acessada(pagina)
 if st.session_state.get("ultima_pagina_logada") != pagina:
     salvar_log_acesso("Navegação", pagina, "Troca de tela")
     st.session_state["ultima_pagina_logada"] = pagina
-enviar_alerta_localizacao_capturada()
-enviar_resumo_periodico_navegacao()
+# enviar_alerta_localizacao_capturada()  # desativado para melhorar velocidade entre telas
+# enviar_resumo_periodico_navegacao()  # desativado para melhorar velocidade entre telas
 
 st.sidebar.markdown("---")
 
@@ -2829,6 +3274,290 @@ df_filtrado = propagar_ganho_potencial(df_filtrado)
 
 # Mantém a barra visual durante a renderização da tela.
 # Ela desaparece suavemente via CSS, evitando tela parada sem feedback.
+
+
+
+# --------------------------------------------------
+# CONTROLE DE USUÁRIOS
+# --------------------------------------------------
+
+if pagina == "👥 Controle de Usuários":
+
+    if not usuario_pode_gerenciar_usuarios():
+        st.error("Acesso não autorizado.")
+        st.stop()
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">Governança e Segurança</div>
+            <h1>👥 Controle de Usuários</h1>
+            <p>Cadastro, bloqueio, reset de senha, expiração de acesso e log de alterações.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    base_usuarios = carregar_usuarios_sistema()
+
+    k1, k2, k3, k4 = st.columns(4)
+
+    total_usuarios = len(base_usuarios)
+    ativos = int((base_usuarios["Ativo"].astype(str).str.lower() == "sim").sum())
+    bloqueados = total_usuarios - ativos
+    expirados = int(base_usuarios["Expira_Em"].apply(usuario_expirado).sum())
+
+    k1.metric("Usuários", total_usuarios)
+    k2.metric("Ativos", ativos)
+    k3.metric("Bloqueados", bloqueados)
+    k4.metric("Expirados", expirados)
+
+    aba1, aba2, aba3, aba4 = st.tabs(
+        [
+            "➕ Cadastro / Edição",
+            "🔒 Bloqueio",
+            "🔑 Reset de Senha",
+            "📋 Logs"
+        ]
+    )
+
+    with aba1:
+
+        st.markdown("### ➕ Criar ou editar usuário")
+
+        usuarios_existentes = ["Novo usuário"] + sorted(
+            base_usuarios["Usuario"]
+            .dropna()
+            .astype(str)
+            .unique()
+            .tolist()
+        )
+
+        usuario_sel = st.selectbox(
+            "Selecionar usuário",
+            usuarios_existentes,
+            key="controle_usuario_sel"
+        )
+
+        if usuario_sel != "Novo usuário":
+            dados = (
+                base_usuarios[
+                    base_usuarios["Usuario"] == usuario_sel
+                ]
+                .iloc[0]
+                .to_dict()
+            )
+        else:
+            dados = {}
+
+        with st.form("form_usuario_cadastro"):
+
+            usuario_form = st.text_input(
+                "Usuário",
+                value=dados.get("Usuario", "") if dados else ""
+            )
+
+            nome_form = st.text_input(
+                "Nome",
+                value=dados.get("Nome", "") if dados else ""
+            )
+
+            perfis = [
+                "Diretoria",
+                "Pricing",
+                "Comercial",
+                "Regional",
+                "Consulta"
+            ]
+
+            perfil_atual = dados.get("Perfil", "Consulta") if dados else "Consulta"
+
+            perfil_form = st.selectbox(
+                "Perfil",
+                perfis,
+                index=perfis.index(perfil_atual) if perfil_atual in perfis else 4
+            )
+
+            ativo_form = st.selectbox(
+                "Ativo",
+                ["Sim", "Não"],
+                index=0 if dados.get("Ativo", "Sim") == "Sim" else 1
+            )
+
+            expira_form = st.text_input(
+                "Expira em",
+                value=dados.get("Expira_Em", "") if dados else "",
+                placeholder="dd/mm/aaaa ou deixe vazio"
+            )
+
+            reset_form = st.selectbox(
+                "Forçar reset de senha",
+                ["Não", "Sim"],
+                index=0 if dados.get("Forcar_Reset", "Não") == "Não" else 1
+            )
+
+            senha_form = st.text_input(
+                "Senha",
+                type="password",
+                help="Obrigatória para novo usuário. Para editar, preencha apenas se quiser alterar a senha."
+            )
+
+            salvar = st.form_submit_button(
+                "💾 Salvar usuário",
+                use_container_width=True
+            )
+
+        if salvar:
+
+            ok, msg = criar_ou_atualizar_usuario(
+                usuario_form,
+                nome_form,
+                perfil_form,
+                senha=senha_form if senha_form else None,
+                ativo=ativo_form,
+                expira_em=expira_form,
+                forcar_reset=reset_form
+            )
+
+            if ok:
+                st.success(msg)
+                st.rerun()
+            else:
+                st.error(msg)
+
+        st.markdown("### 👥 Usuários cadastrados")
+
+        usuarios_view = base_usuarios.copy()
+
+        if "Senha_Hash" in usuarios_view.columns:
+            usuarios_view["Senha_Hash"] = "********"
+
+        st.dataframe(
+            usuarios_view,
+            use_container_width=True,
+            hide_index=True
+        )
+
+    with aba2:
+
+        st.markdown("### 🔒 Bloquear ou desbloquear usuário")
+
+        usuario_status = st.selectbox(
+            "Usuário",
+            sorted(
+                base_usuarios["Usuario"]
+                .dropna()
+                .astype(str)
+                .unique()
+                .tolist()
+            ),
+            key="usuario_bloqueio"
+        )
+
+        colb1, colb2 = st.columns(2)
+
+        if colb1.button("🔒 Bloquear", use_container_width=True):
+            ok, msg = bloquear_desbloquear_usuario(
+                usuario_status,
+                False
+            )
+
+            if ok:
+                st.success(msg)
+                st.rerun()
+            else:
+                st.error(msg)
+
+        if colb2.button("🔓 Desbloquear", use_container_width=True):
+            ok, msg = bloquear_desbloquear_usuario(
+                usuario_status,
+                True
+            )
+
+            if ok:
+                st.success(msg)
+                st.rerun()
+            else:
+                st.error(msg)
+
+    with aba3:
+
+        st.markdown("### 🔑 Reset de senha")
+
+        usuario_reset = st.selectbox(
+            "Usuário",
+            sorted(
+                base_usuarios["Usuario"]
+                .dropna()
+                .astype(str)
+                .unique()
+                .tolist()
+            ),
+            key="usuario_reset_senha"
+        )
+
+        with st.form("form_reset_senha"):
+
+            nova_senha = st.text_input(
+                "Nova senha",
+                type="password"
+            )
+
+            forcar_reset = st.selectbox(
+                "Forçar reset no próximo acesso",
+                ["Não", "Sim"],
+                index=0
+            )
+
+            resetar = st.form_submit_button(
+                "🔑 Resetar senha",
+                use_container_width=True
+            )
+
+        if resetar:
+            ok, msg = resetar_senha_usuario(
+                usuario_reset,
+                nova_senha,
+                forcar_reset=forcar_reset
+            )
+
+            if ok:
+                st.success(msg)
+                st.rerun()
+            else:
+                st.error(msg)
+
+    with aba4:
+
+        st.markdown("### 📋 Log de alterações")
+
+        logs_usuarios = carregar_log_usuarios()
+
+        if logs_usuarios.empty:
+            st.info("Ainda não existem logs de alterações de usuários.")
+        else:
+            st.dataframe(
+                logs_usuarios,
+                use_container_width=True,
+                hide_index=True
+            )
+
+            csv_logs = logs_usuarios.to_csv(
+                index=False,
+                sep=";",
+                encoding="utf-8-sig"
+            )
+
+            st.download_button(
+                "📥 Exportar logs de usuários",
+                data=csv_logs,
+                file_name="logs_usuarios_eirox.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+
+    st.stop()
+
 
 
 # --------------------------------------------------
