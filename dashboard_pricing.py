@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 import plotly.io as pio
 import hashlib
 import csv
+import io
 import urllib.request
 import urllib.parse
 from pathlib import Path
@@ -147,7 +148,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.35.1-beta-fast"
+VERSAO_APP = "v1.35.2-beta-auditoria-avancada"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -1825,6 +1826,30 @@ def carregar_logs_acesso():
         return logs
     except Exception:
         return pd.DataFrame()
+
+
+
+def exportar_auditoria_excel(logs_detalhe, ranking_usuarios, ranking_telas, acessos_dia):
+    """
+    Gera arquivo Excel da Central de Auditoria Avançada.
+    """
+
+    try:
+        output = io.BytesIO()
+
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            logs_detalhe.to_excel(writer, index=False, sheet_name="Historico")
+            ranking_usuarios.to_excel(writer, index=False, sheet_name="Ranking_Usuarios")
+            ranking_telas.to_excel(writer, index=False, sheet_name="Ranking_Telas")
+            acessos_dia.to_excel(writer, index=False, sheet_name="Acessos_por_Dia")
+
+        output.seek(0)
+
+        return output.getvalue()
+
+    except Exception:
+        return b""
+
 
 
 
@@ -3561,7 +3586,7 @@ if pagina == "👥 Controle de Usuários":
 
 
 # --------------------------------------------------
-# CENTRAL DE AUDITORIA
+# CENTRAL DE AUDITORIA AVANÇADA
 # --------------------------------------------------
 
 if pagina == "🔐 Central de Auditoria":
@@ -3569,6 +3594,388 @@ if pagina == "🔐 Central de Auditoria":
     if not usuario_pode_ver_auditoria():
         st.error("Acesso não autorizado.")
         st.stop()
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">Auditoria Enterprise</div>
+            <h1>🔐 Central de Auditoria Avançada</h1>
+            <p>Histórico de acessos, tempo de uso, telas mais acessadas, usuários ativos e exportação executiva.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    logs = carregar_logs_acesso()
+
+    if logs.empty:
+        st.info("Ainda não existem logs registrados.")
+        st.stop()
+
+    logs_view = logs.copy()
+
+    if "Data_Hora_dt" not in logs_view.columns and "Data_Hora" in logs_view.columns:
+        logs_view["Data_Hora_dt"] = pd.to_datetime(
+            logs_view["Data_Hora"],
+            format="%d/%m/%Y %H:%M:%S",
+            errors="coerce"
+        )
+
+    if "Data_Hora_dt" in logs_view.columns:
+        logs_view["Data"] = logs_view["Data_Hora_dt"].dt.strftime("%d/%m/%Y")
+        logs_view["Hora"] = logs_view["Data_Hora_dt"].dt.strftime("%H:%M:%S")
+    else:
+        logs_view["Data"] = ""
+        logs_view["Hora"] = ""
+
+    st.markdown("### 🔎 Filtros")
+
+    f1, f2, f3, f4 = st.columns(4)
+
+    usuarios = sorted(logs_view["Usuario"].dropna().astype(str).unique()) if "Usuario" in logs_view.columns else []
+    eventos = sorted(logs_view["Evento"].dropna().astype(str).unique()) if "Evento" in logs_view.columns else []
+    telas = sorted(logs_view["Tela"].dropna().astype(str).unique()) if "Tela" in logs_view.columns else []
+    datas = sorted(logs_view["Data"].dropna().astype(str).unique()) if "Data" in logs_view.columns else []
+
+    filtro_usuario = f1.multiselect("Usuário", usuarios)
+    filtro_evento = f2.multiselect("Evento", eventos)
+    filtro_tela = f3.multiselect("Tela", telas)
+    filtro_data = f4.multiselect("Data", datas)
+
+    if filtro_usuario and "Usuario" in logs_view.columns:
+        logs_view = logs_view[logs_view["Usuario"].astype(str).isin(filtro_usuario)]
+
+    if filtro_evento and "Evento" in logs_view.columns:
+        logs_view = logs_view[logs_view["Evento"].astype(str).isin(filtro_evento)]
+
+    if filtro_tela and "Tela" in logs_view.columns:
+        logs_view = logs_view[logs_view["Tela"].astype(str).isin(filtro_tela)]
+
+    if filtro_data and "Data" in logs_view.columns:
+        logs_view = logs_view[logs_view["Data"].astype(str).isin(filtro_data)]
+
+    # KPIs avançados
+    hoje_txt = datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y")
+
+    eventos_total = len(logs_view)
+
+    usuarios_unicos = (
+        logs_view["Usuario"].nunique()
+        if "Usuario" in logs_view.columns
+        else 0
+    )
+
+    usuarios_ativos_hoje = (
+        logs_view.loc[
+            logs_view["Data"].astype(str) == hoje_txt,
+            "Usuario"
+        ].nunique()
+        if "Data" in logs_view.columns and "Usuario" in logs_view.columns
+        else 0
+    )
+
+    ultima_acao = "-"
+
+    if "Data_Hora_dt" in logs_view.columns and logs_view["Data_Hora_dt"].notna().any():
+        ultima_acao = (
+            logs_view
+            .sort_values("Data_Hora_dt", ascending=False)
+            ["Data_Hora"]
+            .iloc[0]
+        )
+
+    tela_mais_acessada = "-"
+
+    if "Tela" in logs_view.columns and not logs_view.empty:
+        telas_validas = logs_view[
+            logs_view["Tela"].astype(str).str.strip().ne("")
+        ]
+
+        if not telas_validas.empty:
+            tela_mais_acessada = telas_validas["Tela"].value_counts().idxmax()
+
+    tempo_medio_uso = "Não disponível"
+
+    try:
+        if "Evento" in logs_view.columns and "Data_Hora_dt" in logs_view.columns and "Usuario" in logs_view.columns:
+            base_tempo = logs_view.dropna(subset=["Data_Hora_dt"]).copy()
+
+            sessoes = []
+
+            for usuario, grupo in base_tempo.groupby("Usuario"):
+                grupo = grupo.sort_values("Data_Hora_dt")
+
+                logins = grupo[grupo["Evento"].astype(str).eq("Login")]
+
+                for _, login_row in logins.iterrows():
+                    inicio = login_row["Data_Hora_dt"]
+                    posteriores = grupo[grupo["Data_Hora_dt"] >= inicio]
+                    fim = posteriores["Data_Hora_dt"].max()
+
+                    if pd.notna(inicio) and pd.notna(fim):
+                        minutos = max(0, (fim - inicio).total_seconds() / 60)
+                        if minutos <= 480:
+                            sessoes.append(minutos)
+
+            if sessoes:
+                media = sum(sessoes) / len(sessoes)
+                horas = int(media // 60)
+                minutos = int(media % 60)
+
+                if horas > 0:
+                    tempo_medio_uso = f"{horas}h {minutos}min"
+                else:
+                    tempo_medio_uso = f"{minutos}min"
+
+    except Exception:
+        tempo_medio_uso = "Não disponível"
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+
+    c1.metric("Usuários ativos hoje", usuarios_ativos_hoje)
+    c2.metric("Tempo médio de uso", tempo_medio_uso)
+    c3.metric("Tela mais acessada", tela_mais_acessada)
+    c4.metric("Último acesso", ultima_acao)
+    c5.metric("Eventos filtrados", f"{eventos_total:,}".replace(",", "."))
+
+    st.markdown("### 📈 Gráficos de uso")
+
+    # Acessos por dia
+    if "Data" in logs_view.columns and not logs_view.empty:
+        acessos_dia = (
+            logs_view
+            .groupby("Data", dropna=False)
+            .size()
+            .reset_index(name="Acessos")
+        )
+
+        try:
+            acessos_dia["_dt"] = pd.to_datetime(
+                acessos_dia["Data"],
+                format="%d/%m/%Y",
+                errors="coerce"
+            )
+
+            acessos_dia = (
+                acessos_dia
+                .sort_values("_dt")
+                .drop(columns=["_dt"])
+            )
+        except Exception:
+            pass
+
+        fig_dia = px.line(
+            acessos_dia,
+            x="Data",
+            y="Acessos",
+            markers=True,
+            title="Acessos por dia"
+        )
+
+        fig_dia.update_layout(
+            height=360,
+            margin=dict(l=10, r=10, t=60, b=10)
+        )
+
+        st.plotly_chart(
+            fig_dia,
+            use_container_width=True
+        )
+
+    else:
+        acessos_dia = pd.DataFrame(columns=["Data", "Acessos"])
+
+    g1, g2 = st.columns(2)
+
+    # Acessos por usuário
+    if "Usuario" in logs_view.columns and not logs_view.empty:
+        acessos_usuario = (
+            logs_view
+            .groupby("Usuario", dropna=False)
+            .size()
+            .reset_index(name="Acessos")
+            .sort_values("Acessos", ascending=False)
+            .head(15)
+        )
+
+        fig_usuario = px.bar(
+            acessos_usuario,
+            x="Acessos",
+            y="Usuario",
+            orientation="h",
+            title="Acessos por usuário"
+        )
+
+        fig_usuario.update_layout(
+            height=420,
+            margin=dict(l=10, r=10, t=60, b=10),
+            yaxis=dict(autorange="reversed")
+        )
+
+        g1.plotly_chart(
+            fig_usuario,
+            use_container_width=True
+        )
+
+    else:
+        acessos_usuario = pd.DataFrame(columns=["Usuario", "Acessos"])
+
+    # Acessos por tela
+    if "Tela" in logs_view.columns and not logs_view.empty:
+        acessos_tela = (
+            logs_view[
+                logs_view["Tela"]
+                .astype(str)
+                .str.strip()
+                .ne("")
+            ]
+            .groupby("Tela", dropna=False)
+            .size()
+            .reset_index(name="Acessos")
+            .sort_values("Acessos", ascending=False)
+            .head(15)
+        )
+
+        fig_tela = px.bar(
+            acessos_tela,
+            x="Acessos",
+            y="Tela",
+            orientation="h",
+            title="Acessos por tela"
+        )
+
+        fig_tela.update_layout(
+            height=420,
+            margin=dict(l=10, r=10, t=60, b=10),
+            yaxis=dict(autorange="reversed")
+        )
+
+        g2.plotly_chart(
+            fig_tela,
+            use_container_width=True
+        )
+
+    else:
+        acessos_tela = pd.DataFrame(columns=["Tela", "Acessos"])
+
+    st.markdown("### 📊 Rankings executivos")
+
+    r1, r2 = st.columns(2)
+
+    if all(c in logs_view.columns for c in ["Usuario", "Nome", "Perfil"]):
+        ranking_usuarios = (
+            logs_view
+            .groupby(["Usuario", "Nome", "Perfil"], dropna=False)
+            .agg(
+                Eventos=("Evento", "count"),
+                Ultimo_Acesso=("Data_Hora", "max")
+            )
+            .reset_index()
+            .sort_values("Eventos", ascending=False)
+        )
+
+        r1.dataframe(
+            ranking_usuarios,
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        ranking_usuarios = pd.DataFrame()
+
+    if "Tela" in logs_view.columns:
+        ranking_telas = (
+            logs_view[
+                logs_view["Tela"]
+                .astype(str)
+                .str.strip()
+                .ne("")
+            ]
+            .groupby("Tela", dropna=False)
+            .agg(Acessos=("Evento", "count"))
+            .reset_index()
+            .sort_values("Acessos", ascending=False)
+        )
+
+        r2.dataframe(
+            ranking_telas,
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        ranking_telas = pd.DataFrame()
+
+    st.markdown("### 📋 Histórico detalhado")
+
+    logs_detalhe = logs_view.copy()
+
+    if "Data_Hora_dt" in logs_detalhe.columns:
+        logs_detalhe = logs_detalhe.sort_values(
+            "Data_Hora_dt",
+            ascending=False
+        )
+
+    colunas_exibir = [
+        "Data_Hora",
+        "Usuario",
+        "Nome",
+        "Perfil",
+        "Evento",
+        "Tela",
+        "Detalhe",
+        "Latitude",
+        "Longitude",
+        "Precisao_Metros",
+        "Status_Localizacao",
+        "Ambiente",
+        "Versao"
+    ]
+
+    colunas_exibir = [
+        c for c in colunas_exibir
+        if c in logs_detalhe.columns
+    ]
+
+    st.dataframe(
+        logs_detalhe[colunas_exibir],
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.markdown("### 📤 Exportação")
+
+    csv_export = logs_detalhe[colunas_exibir].to_csv(
+        index=False,
+        sep=";",
+        encoding="utf-8-sig"
+    )
+
+    col_exp1, col_exp2 = st.columns(2)
+
+    col_exp1.download_button(
+        "📥 Exportar Auditoria CSV",
+        data=csv_export,
+        file_name="auditoria_eirox_pricing.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+
+    xlsx_export = exportar_auditoria_excel(
+        logs_detalhe[colunas_exibir],
+        ranking_usuarios,
+        ranking_telas,
+        acessos_dia
+    )
+
+    col_exp2.download_button(
+        "📊 Exportar Auditoria.xlsx",
+        data=xlsx_export,
+        file_name="auditoria_eirox_pricing.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+        disabled=not bool(xlsx_export)
+    )
+
+    st.stop()
 
     st.markdown(
         """
