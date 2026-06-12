@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import os
 import re
 import zipfile
@@ -145,7 +146,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.33.6"
+VERSAO_APP = "v1.33.7"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -1572,6 +1573,153 @@ def horario_brasil_formatado():
         return horario_brasil_formatado()
 
 
+
+def obter_localizacao_query_params():
+    try:
+        params = st.query_params
+
+        lat = params.get("geo_lat", "")
+        lon = params.get("geo_lon", "")
+        acc = params.get("geo_acc", "")
+        status = params.get("geo_status", "")
+
+        if isinstance(lat, list):
+            lat = lat[0] if lat else ""
+        if isinstance(lon, list):
+            lon = lon[0] if lon else ""
+        if isinstance(acc, list):
+            acc = acc[0] if acc else ""
+        if isinstance(status, list):
+            status = status[0] if status else ""
+
+        lat = str(lat).strip()
+        lon = str(lon).strip()
+        acc = str(acc).strip()
+        status = str(status).strip()
+
+        if lat and lon:
+            st.session_state["geo_lat"] = lat
+            st.session_state["geo_lon"] = lon
+            st.session_state["geo_acc"] = acc
+            st.session_state["geo_status"] = "autorizada"
+        elif status:
+            st.session_state["geo_status"] = status
+
+        return {
+            "lat": st.session_state.get("geo_lat", ""),
+            "lon": st.session_state.get("geo_lon", ""),
+            "acc": st.session_state.get("geo_acc", ""),
+            "status": st.session_state.get("geo_status", "pendente")
+        }
+
+    except Exception:
+        return {"lat": "", "lon": "", "acc": "", "status": "indisponivel"}
+
+
+def texto_localizacao_telegram():
+    try:
+        geo = obter_localizacao_query_params()
+        lat = geo.get("lat", "")
+        lon = geo.get("lon", "")
+        acc = geo.get("acc", "")
+        status = geo.get("status", "pendente")
+
+        if lat and lon:
+            mapa = f"https://www.google.com/maps?q={lat},{lon}"
+            if acc:
+                return f"📍 <b>Localização:</b> {lat}, {lon}\n🎯 <b>Precisão:</b> {acc} metros\n🗺️ <b>Mapa:</b> {mapa}\n"
+            return f"📍 <b>Localização:</b> {lat}, {lon}\n🗺️ <b>Mapa:</b> {mapa}\n"
+
+        if status == "negada":
+            return "📍 <b>Localização:</b> permissão negada pelo usuário\n"
+
+        return "📍 <b>Localização:</b> aguardando permissão do navegador\n"
+
+    except Exception:
+        return "📍 <b>Localização:</b> indisponível\n"
+
+
+def solicitar_localizacao_navegador():
+    try:
+        components.html(
+            """
+            <script>
+            (function() {
+                const params = new URLSearchParams(window.parent.location.search);
+
+                if (params.get("geo_lat") && params.get("geo_lon")) {
+                    return;
+                }
+
+                if (!navigator.geolocation) {
+                    params.set("geo_status", "indisponivel");
+                    window.parent.history.replaceState(null, "", "?" + params.toString());
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        params.set("geo_lat", position.coords.latitude.toFixed(6));
+                        params.set("geo_lon", position.coords.longitude.toFixed(6));
+                        params.set("geo_acc", Math.round(position.coords.accuracy));
+                        params.set("geo_status", "autorizada");
+                        window.parent.history.replaceState(null, "", "?" + params.toString());
+                    },
+                    function(error) {
+                        params.set("geo_status", "negada");
+                        window.parent.history.replaceState(null, "", "?" + params.toString());
+                    },
+                    { enableHighAccuracy: true, timeout: 7000, maximumAge: 300000 }
+                );
+            })();
+            </script>
+            """,
+            height=0,
+            width=0
+        )
+
+        obter_localizacao_query_params()
+
+    except Exception:
+        pass
+
+
+def enviar_alerta_localizacao_capturada():
+    try:
+        if not st.session_state.get("logado", False):
+            return
+
+        geo = obter_localizacao_query_params()
+
+        if not geo.get("lat") or not geo.get("lon"):
+            return
+
+        if st.session_state.get("alerta_localizacao_enviado", False):
+            return
+
+        usuario = st.session_state.get("usuario", "")
+        nome = st.session_state.get("nome_usuario", "")
+        perfil = st.session_state.get("perfil_usuario", "")
+        ambiente = "Streamlit Cloud" if "/mount/src" in str(Path.cwd()) else "Localhost"
+
+        mensagem = (
+            "📍 <b>Localização capturada no Eirox Pricing</b>\n\n"
+            f"👤 <b>Usuário:</b> {usuario}\n"
+            f"🙋 <b>Nome:</b> {nome}\n"
+            f"🔐 <b>Perfil:</b> {perfil}\n"
+            f"🕒 <b>Horário:</b> {horario_brasil_formatado()}\n"
+            f"{texto_localizacao_telegram()}"
+            f"🌐 <b>Ambiente:</b> {ambiente}\n"
+            f"🏷️ <b>Versão:</b> {VERSAO_APP}"
+        )
+
+        if enviar_alerta_telegram(mensagem):
+            st.session_state["alerta_localizacao_enviado"] = True
+
+    except Exception:
+        pass
+
+
 def registrar_alerta_login(usuario, nome, perfil):
 
     """
@@ -1594,6 +1742,7 @@ def registrar_alerta_login(usuario, nome, perfil):
             f"🙋 <b>Nome:</b> {nome}\n"
             f"🔐 <b>Perfil:</b> {perfil}\n"
             f"🕒 <b>Horário:</b> {horario_brasil_formatado()}\n"
+            f"{texto_localizacao_telegram()}"
             f"🌐 <b>Ambiente:</b> {ambiente}\n"
             f"🏷️ <b>Versão:</b> {VERSAO_APP}"
         )
@@ -1868,6 +2017,7 @@ def montar_resumo_navegacao():
             f"🔁 <b>Trocas de tela:</b> {len(paginas)}\n\n"
             f"📍 <b>Última página:</b> {ultima_pagina}\n\n"
             f"📄 <b>Páginas acessadas:</b>\n{lista_paginas}\n"
+            f"{texto_localizacao_telegram()}"
             f"🌐 <b>Ambiente:</b> {ambiente}\n"
             f"🏷️ <b>Versão:</b> {VERSAO_APP}"
         )
@@ -2078,6 +2228,8 @@ def logout():
 
 
 exigir_login()
+
+solicitar_localizacao_navegador()
 
 perfil_usuario = st.session_state.get(
     "perfil_usuario",
@@ -2468,6 +2620,7 @@ if pagina not in paginas_liberadas:
     pagina = paginas_liberadas[0]
 
 registrar_pagina_acessada(pagina)
+enviar_alerta_localizacao_capturada()
 enviar_resumo_periodico_navegacao()
 
 st.sidebar.markdown("---")
