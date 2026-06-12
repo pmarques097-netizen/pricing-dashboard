@@ -9,6 +9,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
 import hashlib
+import time
 import csv
 import io
 import urllib.request
@@ -148,7 +149,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.35.2-beta-auditoria-avancada"
+VERSAO_APP = "v1.35.3-beta-saude-sistema"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -1853,6 +1854,211 @@ def exportar_auditoria_excel(logs_detalhe, ranking_usuarios, ranking_telas, aces
 
 
 
+
+# --------------------------------------------------
+# SAÚDE DO SISTEMA - HOMOLOGAÇÃO v1.35.3
+# --------------------------------------------------
+
+def _health_numero_br(valor):
+    try:
+        return f"{int(valor):,}".replace(",", ".")
+    except Exception:
+        return "0"
+
+
+def _health_formatar_data(timestamp):
+    try:
+        return datetime.fromtimestamp(timestamp).strftime("%d/%m/%Y %H:%M:%S")
+    except Exception:
+        return ""
+
+
+def _health_status_base(qtd_arquivos, ultima_atualizacao):
+    try:
+        if qtd_arquivos <= 0:
+            return "🔴 Não encontrada"
+
+        if ultima_atualizacao:
+            dt = datetime.strptime(ultima_atualizacao, "%d/%m/%Y %H:%M:%S")
+            dias = (datetime.now() - dt).days
+            if dias >= 7:
+                return "🟡 Desatualizada"
+
+        return "🟢 OK"
+    except Exception:
+        return "🟢 OK" if qtd_arquivos > 0 else "🔴 Não encontrada"
+
+
+def _health_ler_amostra_arquivo(arquivo):
+    try:
+        if arquivo.suffix.lower() == ".csv":
+            try:
+                return pd.read_csv(arquivo, sep=";", encoding="utf-8-sig")
+            except Exception:
+                return pd.read_csv(arquivo, encoding="utf-8-sig")
+        return pd.read_excel(arquivo)
+    except Exception:
+        return pd.DataFrame()
+
+
+def _health_analisar_pasta(nome_base, caminhos):
+    inicio = time.time()
+    arquivos = []
+
+    for caminho in caminhos:
+        p = Path(caminho)
+        if p.exists() and p.is_dir():
+            for ext in ["*.xlsx", "*.xls", "*.xlsm", "*.csv"]:
+                arquivos.extend(list(p.glob(ext)))
+        elif p.exists() and p.is_file():
+            arquivos.append(p)
+
+    arquivos = sorted(set(arquivos), key=lambda x: str(x))
+
+    total_registros = 0
+    erros = []
+    ultima_ts = None
+
+    for arquivo in arquivos:
+        try:
+            ultima_ts_arq = arquivo.stat().st_mtime
+            if ultima_ts is None or ultima_ts_arq > ultima_ts:
+                ultima_ts = ultima_ts_arq
+
+            temp = _health_ler_amostra_arquivo(arquivo)
+            if isinstance(temp, pd.DataFrame) and not temp.empty:
+                total_registros += len(temp)
+        except Exception as erro:
+            erros.append(f"{arquivo.name}: {erro}")
+
+    ultima_atualizacao = _health_formatar_data(ultima_ts) if ultima_ts else ""
+    tempo = round(time.time() - inicio, 2)
+
+    return {
+        "Base": nome_base,
+        "Status": _health_status_base(len(arquivos), ultima_atualizacao),
+        "Arquivos": len(arquivos),
+        "Registros": total_registros,
+        "Última Atualização": ultima_atualizacao,
+        "Tempo Leitura (s)": tempo,
+        "Caminhos": ", ".join([str(a) for a in arquivos[:5]]),
+        "Erros": " | ".join(erros[:5])
+    }
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def gerar_saude_bases():
+    bases = [
+        ("VENDA_TESTE", ["VENDA_TESTE", "VENDA_TESTE.zip"]),
+        ("VENDA_FINAL_TESTE", ["VENDA_FINAL_TESTE", "VENDA_TESTE_FINAL", "VENDA_FINAL", "VENDA_REDE", "VENDA_FINAL_TESTE.zip", "VENDA_TESTE_FINAL.zip", "VENDA_FINAL.zip"]),
+        ("COMPRA_TESTE", ["COMPRA_TESTE", "COMPRA", "COMPRAS_TESTE", "COMPRA_TESTE.zip", "COMPRA.zip"]),
+        ("ESTOQUE_TESTE", ["ESTOQUE_TESTE", "ESTOQUE", "ESTOQUE_TESTE.zip", "ESTOQUE.zip"]),
+        ("Analise_Pricing.xlsx", ["Analise_Pricing.xlsx"])
+    ]
+    return pd.DataFrame([_health_analisar_pasta(nome, caminhos) for nome, caminhos in bases])
+
+
+def diagnostico_integridade_basico():
+    checks = []
+    try:
+        bases_memoria = {
+            "Analise_Pricing": df if "df" in globals() else pd.DataFrame(),
+            "VENDA_TESTE": historico if "historico" in globals() else pd.DataFrame(),
+            "VENDA_FINAL_TESTE": venda_rede if "venda_rede" in globals() else pd.DataFrame(),
+            "COMPRA_TESTE": compra if "compra" in globals() else pd.DataFrame(),
+            "ESTOQUE_TESTE": estoque if "estoque" in globals() else pd.DataFrame()
+        }
+
+        for nome, base in bases_memoria.items():
+            if not isinstance(base, pd.DataFrame) or base.empty:
+                checks.append({"Base": nome, "Verificação": "Base carregada", "Status": "🔴 Erro", "Ocorrências": 0, "Detalhe": "Base vazia ou não carregada."})
+                continue
+
+            checks.append({"Base": nome, "Verificação": "Base carregada", "Status": "🟢 OK", "Ocorrências": len(base), "Detalhe": "Base disponível em memória."})
+
+            colunas = base.columns.astype(str).tolist()
+
+            col_ean = None
+            for c in colunas:
+                if str(c).strip().lower() in ["ean", "ean (gtin)", "gtin", "cód. barras/etiq.", "cod. barras/etiq.", "codigo de barras", "código de barras"]:
+                    col_ean = c
+                    break
+
+            col_produto = None
+            for c in colunas:
+                if "produto" in str(c).lower() or "descr" in str(c).lower():
+                    col_produto = c
+                    break
+
+            col_preco = None
+            for c in colunas:
+                if "preço" in str(c).lower() or "preco" in str(c).lower() or "valor" in str(c).lower():
+                    col_preco = c
+                    break
+
+            if col_ean:
+                serie_ean = base[col_ean].astype(str).str.strip()
+                vazios = int(serie_ean.isin(["", "nan", "None"]).sum())
+                checks.append({"Base": nome, "Verificação": "EAN vazio", "Status": "🟢 OK" if vazios == 0 else "🟡 Atenção", "Ocorrências": vazios, "Detalhe": f"Coluna analisada: {col_ean}"})
+
+                duplicados = int(serie_ean.duplicated().sum())
+                checks.append({"Base": nome, "Verificação": "EAN duplicado", "Status": "🟢 OK" if duplicados == 0 else "🟡 Atenção", "Ocorrências": duplicados, "Detalhe": f"Coluna analisada: {col_ean}"})
+
+            if col_produto:
+                vazios_prod = int(base[col_produto].astype(str).str.strip().isin(["", "nan", "None"]).sum())
+                checks.append({"Base": nome, "Verificação": "Produto/descrição vazio", "Status": "🟢 OK" if vazios_prod == 0 else "🟡 Atenção", "Ocorrências": vazios_prod, "Detalhe": f"Coluna analisada: {col_produto}"})
+
+            if col_preco:
+                if "converter_numero_brasil" in globals():
+                    serie = converter_numero_brasil(base[col_preco])
+                else:
+                    serie = pd.to_numeric(base[col_preco], errors="coerce")
+                zerados = int((serie.fillna(0) <= 0).sum())
+                checks.append({"Base": nome, "Verificação": "Preço/valor zerado ou inválido", "Status": "🟢 OK" if zerados == 0 else "🟡 Atenção", "Ocorrências": zerados, "Detalhe": f"Coluna analisada: {col_preco}"})
+
+    except Exception as erro:
+        checks.append({"Base": "Sistema", "Verificação": "Diagnóstico", "Status": "🔴 Erro", "Ocorrências": 1, "Detalhe": str(erro)})
+
+    return pd.DataFrame(checks)
+
+
+def health_status_telegram():
+    try:
+        token = obter_config_telegram("TELEGRAM_BOT_TOKEN") if "obter_config_telegram" in globals() else ""
+        chat = obter_config_telegram("TELEGRAM_CHAT_ID") if "obter_config_telegram" in globals() else ""
+        return "🟢 Configurado" if token and chat else "🟡 Não configurado"
+    except Exception:
+        return "🔴 Erro"
+
+
+def health_status_usuarios():
+    try:
+        if "carregar_usuarios_sistema" in globals():
+            base = carregar_usuarios_sistema()
+            total = len(base)
+            ativos = int((base["Ativo"].astype(str).str.lower() == "sim").sum()) if not base.empty and "Ativo" in base.columns else 0
+            return total, ativos, total - ativos
+        return 0, 0, 0
+    except Exception:
+        return 0, 0, 0
+
+
+def health_ultimo_login():
+    try:
+        logs = carregar_logs_acesso() if "carregar_logs_acesso" in globals() else pd.DataFrame()
+        if logs.empty or "Evento" not in logs.columns:
+            return "-"
+        logins = logs[logs["Evento"].astype(str).eq("Login")].copy()
+        if logins.empty:
+            return "-"
+        if "Data_Hora_dt" not in logins.columns:
+            logins["Data_Hora_dt"] = pd.to_datetime(logins["Data_Hora"], format="%d/%m/%Y %H:%M:%S", errors="coerce")
+        return logins.sort_values("Data_Hora_dt", ascending=False)["Data_Hora"].iloc[0]
+    except Exception:
+        return "-"
+
+
+
 # --------------------------------------------------
 # LOGIN E CONTROLE DE ACESSO
 # --------------------------------------------------
@@ -3160,6 +3366,9 @@ paginas_liberadas = PERMISSOES_TELAS.get(
 if usuario_pode_gerenciar_usuarios() and "👥 Controle de Usuários" not in paginas_liberadas:
     paginas_liberadas = paginas_liberadas + ["👥 Controle de Usuários"]
 
+if usuario_pode_ver_auditoria() and "🟢 Saúde do Sistema" not in paginas_liberadas:
+    paginas_liberadas = paginas_liberadas + ["🟢 Saúde do Sistema"]
+
 if usuario_pode_ver_auditoria() and "🔐 Central de Auditoria" not in paginas_liberadas:
     paginas_liberadas = paginas_liberadas + ["🔐 Central de Auditoria"]
 
@@ -3580,6 +3789,142 @@ if pagina == "👥 Controle de Usuários":
                 mime="text/csv",
                 use_container_width=True
             )
+
+    st.stop()
+
+
+
+
+# --------------------------------------------------
+# SAÚDE DO SISTEMA
+# --------------------------------------------------
+
+if pagina == "🟢 Saúde do Sistema":
+
+    if not usuario_pode_ver_auditoria():
+        st.error("Acesso não autorizado.")
+        st.stop()
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">Eirox Health Center</div>
+            <h1>🟢 Saúde do Sistema</h1>
+            <p>Monitoramento das bases, performance, integridade, usuários, auditoria e integrações.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    inicio_health = time.time()
+    saude_bases = gerar_saude_bases()
+
+    bases_monitoradas = len(saude_bases)
+    arquivos_total = int(saude_bases["Arquivos"].sum()) if "Arquivos" in saude_bases.columns else 0
+    registros_total = int(saude_bases["Registros"].sum()) if "Registros" in saude_bases.columns else 0
+
+    ultima_atualizacao = "-"
+    try:
+        temp_datas = pd.to_datetime(saude_bases["Última Atualização"], format="%d/%m/%Y %H:%M:%S", errors="coerce")
+        if temp_datas.notna().any():
+            ultima_atualizacao = temp_datas.max().strftime("%d/%m/%Y %H:%M:%S")
+    except Exception:
+        pass
+
+    tempo_total = round(time.time() - inicio_health, 2)
+
+    qtd_ok = int(saude_bases["Status"].astype(str).str.contains("OK", na=False).sum()) if "Status" in saude_bases.columns else 0
+    qtd_alerta = int(saude_bases["Status"].astype(str).str.contains("Desatualizada", na=False).sum()) if "Status" in saude_bases.columns else 0
+    qtd_erro = int(saude_bases["Status"].astype(str).str.contains("Não encontrada", na=False).sum()) if "Status" in saude_bases.columns else 0
+
+    saude_geral = "🟢 Sistema saudável"
+    if qtd_erro > 0:
+        saude_geral = "🔴 Atenção crítica"
+    elif qtd_alerta > 0:
+        saude_geral = "🟡 Atenção"
+
+    st.markdown("### 🧭 Painel Executivo de Saúde")
+
+    k1, k2, k3, k4, k5 = st.columns(5)
+    k1.metric("Bases monitoradas", bases_monitoradas)
+    k2.metric("Arquivos encontrados", _health_numero_br(arquivos_total))
+    k3.metric("Registros totais", _health_numero_br(registros_total))
+    k4.metric("Última atualização", ultima_atualizacao)
+    k5.metric("Tempo de leitura", f"{tempo_total}s")
+
+    st.markdown(
+        f"""
+        <div class="eirox-card">
+            <div class="eirox-section-title">Status Geral</div>
+            <h2 style="margin:0;">{saude_geral}</h2>
+            <p>Bases OK: {qtd_ok} | Alertas: {qtd_alerta} | Erros: {qtd_erro}</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown("### 📁 Status das bases")
+
+    saude_view = saude_bases.copy()
+    if "Registros" in saude_view.columns:
+        saude_view["Registros"] = saude_view["Registros"].apply(_health_numero_br)
+
+    st.dataframe(
+        saude_view[[c for c in ["Base", "Status", "Arquivos", "Registros", "Última Atualização", "Tempo Leitura (s)", "Erros"] if c in saude_view.columns]],
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.markdown("### 🔐 Segurança e operação")
+
+    total_usuarios, usuarios_ativos, usuarios_bloqueados = health_status_usuarios()
+    logs = carregar_logs_acesso() if "carregar_logs_acesso" in globals() else pd.DataFrame()
+    usuarios_ativos_hoje = 0
+
+    try:
+        if not logs.empty and "Data_Hora" in logs.columns and "Usuario" in logs.columns:
+            logs_temp = logs.copy()
+            logs_temp["Data_Hora_dt"] = pd.to_datetime(logs_temp["Data_Hora"], format="%d/%m/%Y %H:%M:%S", errors="coerce")
+            hoje_txt = datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y")
+            logs_temp["Data"] = logs_temp["Data_Hora_dt"].dt.strftime("%d/%m/%Y")
+            usuarios_ativos_hoje = logs_temp.loc[logs_temp["Data"] == hoje_txt, "Usuario"].nunique()
+    except Exception:
+        pass
+
+    s1, s2, s3, s4, s5 = st.columns(5)
+    s1.metric("Telegram", health_status_telegram())
+    s2.metric("Usuários cadastrados", total_usuarios)
+    s3.metric("Usuários ativos", usuarios_ativos)
+    s4.metric("Usuários bloqueados", usuarios_bloqueados)
+    s5.metric("Último login", health_ultimo_login())
+
+    st.metric("Usuários ativos hoje", usuarios_ativos_hoje)
+
+    st.markdown("### 🔍 Diagnóstico automático")
+
+    if st.button("🔍 Executar Diagnóstico", use_container_width=True):
+        diag = diagnostico_integridade_basico()
+
+        if diag.empty:
+            st.info("Nenhum diagnóstico disponível.")
+        else:
+            total_ocorrencias = int(diag.loc[~diag["Status"].astype(str).str.contains("OK", na=False), "Ocorrências"].sum())
+
+            if total_ocorrencias == 0:
+                st.success("🟢 Sistema saudável. Nenhuma inconsistência crítica encontrada.")
+            else:
+                st.warning(f"🟡 Foram encontradas {total_ocorrencias:,} ocorrências para análise.".replace(",", "."))
+
+            st.dataframe(diag, use_container_width=True, hide_index=True)
+
+            csv_diag = diag.to_csv(index=False, sep=";", encoding="utf-8-sig")
+            st.download_button("📥 Exportar Diagnóstico CSV", data=csv_diag, file_name="diagnostico_saude_sistema.csv", mime="text/csv", use_container_width=True)
+
+    st.markdown("### 📊 Histórico de atualização das bases")
+    st.dataframe(saude_bases, use_container_width=True, hide_index=True)
+
+    csv_health = saude_bases.to_csv(index=False, sep=";", encoding="utf-8-sig")
+    st.download_button("📥 Exportar Saúde do Sistema CSV", data=csv_health, file_name="saude_sistema_eirox.csv", mime="text/csv", use_container_width=True)
 
     st.stop()
 
