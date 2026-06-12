@@ -9,6 +9,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import plotly.io as pio
 import hashlib
+import csv
 import urllib.request
 import urllib.parse
 from pathlib import Path
@@ -146,7 +147,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.33.7"
+VERSAO_APP = "v1.34.0"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -1757,6 +1758,82 @@ def registrar_alerta_login(usuario, nome, perfil):
 
 
 
+
+# --------------------------------------------------
+# CENTRAL DE AUDITORIA / LOGS DE ACESSO
+# --------------------------------------------------
+
+LOG_DIR = Path("logs")
+LOG_ARQUIVO = LOG_DIR / "log_acessos.csv"
+
+
+def usuario_pode_ver_auditoria():
+    try:
+        return str(st.session_state.get("usuario", "")).strip().lower() == "paulomarques"
+    except Exception:
+        return False
+
+
+def salvar_log_acesso(evento, tela="", detalhe=""):
+    try:
+        LOG_DIR.mkdir(exist_ok=True)
+
+        geo = {}
+        try:
+            geo = obter_localizacao_query_params()
+        except Exception:
+            geo = {}
+
+        ambiente = "Streamlit Cloud" if "/mount/src" in str(Path.cwd()) else "Localhost"
+
+        linha = {
+            "Data_Hora": horario_brasil_formatado() if "horario_brasil_formatado" in globals() else datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            "Usuario": st.session_state.get("usuario", ""),
+            "Nome": st.session_state.get("nome_usuario", ""),
+            "Perfil": st.session_state.get("perfil_usuario", ""),
+            "Evento": str(evento),
+            "Tela": str(tela),
+            "Detalhe": str(detalhe),
+            "Latitude": geo.get("lat", "") if isinstance(geo, dict) else "",
+            "Longitude": geo.get("lon", "") if isinstance(geo, dict) else "",
+            "Precisao_Metros": geo.get("acc", "") if isinstance(geo, dict) else "",
+            "Status_Localizacao": geo.get("status", "") if isinstance(geo, dict) else "",
+            "Ambiente": ambiente,
+            "Versao": VERSAO_APP
+        }
+
+        existe = LOG_ARQUIVO.exists()
+
+        with open(LOG_ARQUIVO, "a", newline="", encoding="utf-8-sig") as f:
+            writer = csv.DictWriter(f, fieldnames=list(linha.keys()), delimiter=";")
+            if not existe:
+                writer.writeheader()
+            writer.writerow(linha)
+
+    except Exception:
+        pass
+
+
+def carregar_logs_acesso():
+    try:
+        if not LOG_ARQUIVO.exists():
+            return pd.DataFrame()
+
+        logs = pd.read_csv(LOG_ARQUIVO, sep=";", encoding="utf-8-sig")
+
+        if not logs.empty and "Data_Hora" in logs.columns:
+            logs["Data_Hora_dt"] = pd.to_datetime(
+                logs["Data_Hora"],
+                format="%d/%m/%Y %H:%M:%S",
+                errors="coerce"
+            )
+
+        return logs
+    except Exception:
+        return pd.DataFrame()
+
+
+
 # --------------------------------------------------
 # LOGIN E CONTROLE DE ACESSO
 # --------------------------------------------------
@@ -2183,6 +2260,12 @@ def tela_login():
             st.session_state["nome_usuario"] = USUARIOS[usuario_key]["nome"]
             st.session_state["perfil_usuario"] = USUARIOS[usuario_key]["perfil"]
 
+            salvar_log_acesso(
+                "Login",
+                "Sistema",
+                "Usuário autenticado com sucesso"
+            )
+
             registrar_alerta_login(
                 usuario_key,
                 USUARIOS[usuario_key]["nome"],
@@ -2607,6 +2690,9 @@ paginas_liberadas = PERMISSOES_TELAS.get(
     ]
 )
 
+if usuario_pode_ver_auditoria() and "🔐 Central de Auditoria" not in paginas_liberadas:
+    paginas_liberadas = paginas_liberadas + ["🔐 Central de Auditoria"]
+
 pagina = st.sidebar.radio(
     "Escolha a visão",
     paginas_liberadas,
@@ -2620,6 +2706,10 @@ if pagina not in paginas_liberadas:
     pagina = paginas_liberadas[0]
 
 registrar_pagina_acessada(pagina)
+
+if st.session_state.get("ultima_pagina_logada") != pagina:
+    salvar_log_acesso("Navegação", pagina, "Troca de tela")
+    st.session_state["ultima_pagina_logada"] = pagina
 enviar_alerta_localizacao_capturada()
 enviar_resumo_periodico_navegacao()
 
@@ -2739,6 +2829,124 @@ df_filtrado = propagar_ganho_potencial(df_filtrado)
 
 # Mantém a barra visual durante a renderização da tela.
 # Ela desaparece suavemente via CSS, evitando tela parada sem feedback.
+
+
+# --------------------------------------------------
+# CENTRAL DE AUDITORIA
+# --------------------------------------------------
+
+if pagina == "🔐 Central de Auditoria":
+
+    if not usuario_pode_ver_auditoria():
+        st.error("Acesso não autorizado.")
+        st.stop()
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">Auditoria Enterprise</div>
+            <h1>🔐 Central de Auditoria</h1>
+            <p>Histórico de acessos, navegação, usuários, telas acessadas e eventos do sistema.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    logs = carregar_logs_acesso()
+
+    if logs.empty:
+        st.info("Ainda não existem logs registrados.")
+        st.stop()
+
+    logs_view = logs.copy()
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+
+    eventos_total = len(logs_view)
+    usuarios_unicos = logs_view["Usuario"].nunique() if "Usuario" in logs_view.columns else 0
+    logins = int((logs_view["Evento"].astype(str) == "Login").sum()) if "Evento" in logs_view.columns else 0
+    navegacoes = int((logs_view["Evento"].astype(str) == "Navegação").sum()) if "Evento" in logs_view.columns else 0
+    ultima_acao = "-"
+
+    if "Data_Hora_dt" in logs_view.columns and logs_view["Data_Hora_dt"].notna().any():
+        ultima_acao = logs_view.sort_values("Data_Hora_dt", ascending=False)["Data_Hora"].iloc[0]
+
+    c1.metric("Eventos", f"{eventos_total:,}".replace(",", "."))
+    c2.metric("Usuários únicos", usuarios_unicos)
+    c3.metric("Logins", logins)
+    c4.metric("Navegações", navegacoes)
+    c5.metric("Última ação", ultima_acao)
+
+    st.markdown("### 🔎 Filtros")
+
+    f1, f2, f3 = st.columns(3)
+
+    usuarios = sorted(logs_view["Usuario"].dropna().astype(str).unique()) if "Usuario" in logs_view.columns else []
+    eventos = sorted(logs_view["Evento"].dropna().astype(str).unique()) if "Evento" in logs_view.columns else []
+    telas = sorted(logs_view["Tela"].dropna().astype(str).unique()) if "Tela" in logs_view.columns else []
+
+    filtro_usuario = f1.multiselect("Usuário", usuarios)
+    filtro_evento = f2.multiselect("Evento", eventos)
+    filtro_tela = f3.multiselect("Tela", telas)
+
+    if filtro_usuario:
+        logs_view = logs_view[logs_view["Usuario"].astype(str).isin(filtro_usuario)]
+    if filtro_evento:
+        logs_view = logs_view[logs_view["Evento"].astype(str).isin(filtro_evento)]
+    if filtro_tela:
+        logs_view = logs_view[logs_view["Tela"].astype(str).isin(filtro_tela)]
+
+    st.markdown("### 📊 Ranking de usuários")
+
+    if all(c in logs_view.columns for c in ["Usuario", "Nome", "Perfil"]):
+        ranking_usuarios = (
+            logs_view
+            .groupby(["Usuario", "Nome", "Perfil"], dropna=False)
+            .size()
+            .reset_index(name="Eventos")
+            .sort_values("Eventos", ascending=False)
+        )
+        st.dataframe(ranking_usuarios, use_container_width=True, hide_index=True)
+
+    st.markdown("### 🧭 Ranking de telas acessadas")
+
+    if "Tela" in logs_view.columns:
+        ranking_telas = (
+            logs_view
+            .groupby("Tela", dropna=False)
+            .size()
+            .reset_index(name="Acessos")
+            .sort_values("Acessos", ascending=False)
+        )
+        st.dataframe(ranking_telas, use_container_width=True, hide_index=True)
+
+    st.markdown("### 📋 Histórico detalhado")
+
+    if "Data_Hora_dt" in logs_view.columns:
+        logs_view = logs_view.sort_values("Data_Hora_dt", ascending=False)
+
+    colunas = [
+        "Data_Hora", "Usuario", "Nome", "Perfil", "Evento", "Tela", "Detalhe",
+        "Latitude", "Longitude", "Precisao_Metros", "Status_Localizacao",
+        "Ambiente", "Versao"
+    ]
+    colunas = [c for c in colunas if c in logs_view.columns]
+
+    st.dataframe(logs_view[colunas], use_container_width=True, hide_index=True)
+
+    csv_export = logs_view[colunas].to_csv(index=False, sep=";", encoding="utf-8-sig")
+
+    st.download_button(
+        "📥 Exportar Auditoria CSV",
+        data=csv_export,
+        file_name="auditoria_eirox_pricing.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+
+    st.stop()
+
+
 
 # --------------------------------------------------
 # SUGESTÃO INTELIGENTE DE PESQUISA DE PREÇO
