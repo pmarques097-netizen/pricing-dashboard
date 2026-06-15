@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.38.0-crm-enterprise"
+VERSAO_APP = "v1.38.0-crm-enterprise-master-paulo-fix-licenca"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -2652,8 +2652,8 @@ def inicializar_licencas():
                         "Plano": "Enterprise",
                         "DataInicio": hoje.strftime("%d/%m/%Y"),
                         "DataExpiracao": (hoje + pd.DateOffset(years=1)).strftime("%d/%m/%Y"),
-                        "MaxUsuarios": PLANOS_EIROX["Enterprise"]["MaxUsuarios"],
-                        "MaxLojas": PLANOS_EIROX["Enterprise"]["MaxLojas"],
+                        "MaxUsuarios": str(PLANOS_EIROX["Enterprise"]["MaxUsuarios"]),
+                        "MaxLojas": str(PLANOS_EIROX["Enterprise"]["MaxLojas"]),
                         "Status": "Ativa",
                         "Observacao": "Licença inicial de homologação"
                     },
@@ -2663,8 +2663,8 @@ def inicializar_licencas():
                         "Plano": "Starter",
                         "DataInicio": hoje.strftime("%d/%m/%Y"),
                         "DataExpiracao": (hoje + pd.DateOffset(days=30)).strftime("%d/%m/%Y"),
-                        "MaxUsuarios": PLANOS_EIROX["Starter"]["MaxUsuarios"],
-                        "MaxLojas": PLANOS_EIROX["Starter"]["MaxLojas"],
+                        "MaxUsuarios": str(PLANOS_EIROX["Starter"]["MaxUsuarios"]),
+                        "MaxLojas": str(PLANOS_EIROX["Starter"]["MaxLojas"]),
                         "Status": "Trial",
                         "Observacao": "Cliente teste"
                     }
@@ -2734,6 +2734,7 @@ def salvar_licencas_sistema(base):
 
     try:
         base = base.copy()
+        base = base.astype(str)
         base["EmpresaID"] = base["EmpresaID"].astype(str).str.strip()
 
         base.to_csv(
@@ -3042,8 +3043,8 @@ def criar_ou_atualizar_licenca(empresa_id, empresa, plano, data_inicio, data_exp
             base.loc[idx, "Plano"] = plano
             base.loc[idx, "DataInicio"] = data_inicio
             base.loc[idx, "DataExpiracao"] = data_expiracao
-            base.loc[idx, "MaxUsuarios"] = plano_info["MaxUsuarios"]
-            base.loc[idx, "MaxLojas"] = plano_info["MaxLojas"]
+            base.loc[idx, "MaxUsuarios"] = str(plano_info["MaxUsuarios"])
+            base.loc[idx, "MaxLojas"] = str(plano_info["MaxLojas"])
             base.loc[idx, "Status"] = status
             base.loc[idx, "Observacao"] = observacao
 
@@ -3058,8 +3059,8 @@ def criar_ou_atualizar_licenca(empresa_id, empresa, plano, data_inicio, data_exp
                         "Plano": plano,
                         "DataInicio": data_inicio,
                         "DataExpiracao": data_expiracao,
-                        "MaxUsuarios": plano_info["MaxUsuarios"],
-                        "MaxLojas": plano_info["MaxLojas"],
+                        "MaxUsuarios": str(plano_info["MaxUsuarios"]),
+                        "MaxLojas": str(plano_info["MaxLojas"]),
                         "Status": status,
                         "Observacao": observacao
                     }
