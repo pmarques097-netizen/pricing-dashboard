@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.37.0-ia-pricing-enterprise"
+VERSAO_APP = "v1.37.1-workflow-comercial"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -2359,10 +2359,22 @@ EMPRESAS_ARQUIVO = Path("EMPRESAS_EIROX.csv")
 
 
 def usuario_master():
+    """
+    Usuários master da plataforma.
+    """
+
     try:
-        return str(st.session_state.get("usuario", "")).strip().lower() == "paulomarques"
+        usuarios_master = [
+            "paulomarques",
+            "vanderlei",
+            "ubiratan"
+        ]
+
+        return str(st.session_state.get("usuario", "")).strip().lower() in usuarios_master
+
     except Exception:
         return False
+
 
 
 def inicializar_empresas():
@@ -2865,7 +2877,7 @@ def validar_licenca_login(usuario):
     try:
         usuario = str(usuario).strip().lower()
 
-        if usuario == "paulomarques":
+        if usuario in ["paulomarques", "vanderlei", "ubiratan"]:
             return True, ""
 
         dados = obter_dados_usuario(usuario) if "obter_dados_usuario" in globals() else None
@@ -3897,6 +3909,176 @@ def enviar_ia_pricing_telegram(ia_df, limite_envio=10):
         return bool(ok), "Recomendações enviadas ao Telegram." if ok else "Não foi possível enviar ao Telegram."
     except Exception as erro:
         return False, str(erro)
+
+
+
+# --------------------------------------------------
+# WORKFLOW COMERCIAL - v1.37.1
+# --------------------------------------------------
+
+WORKFLOW_COMERCIAL_ARQUIVO = Path("WORKFLOW_COMERCIAL_EIROX.csv")
+
+
+def usuario_pode_ver_workflow_comercial():
+    try:
+        return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() in ["paulomarques", "vanderlei", "ubiratan"]
+    except Exception:
+        return False
+
+
+def _wf_data_hora():
+    try:
+        return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S")
+    except Exception:
+        return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+def carregar_workflow_comercial():
+    try:
+        if not WORKFLOW_COMERCIAL_ARQUIVO.exists():
+            return pd.DataFrame(columns=[
+                "ID", "Data_Hora", "EmpresaID", "Empresa", "Usuario", "EAN", "Produto",
+                "Acao_IA", "Preco_Atual", "Preco_Recomendado", "Ganho_Estimado",
+                "Status", "Justificativa", "Origem", "Versao"
+            ])
+
+        return pd.read_csv(
+            WORKFLOW_COMERCIAL_ARQUIVO,
+            sep=";",
+            encoding="utf-8-sig",
+            dtype=str
+        ).fillna("")
+
+    except Exception:
+        return pd.DataFrame()
+
+
+def salvar_workflow_comercial(base):
+    try:
+        base.to_csv(
+            WORKFLOW_COMERCIAL_ARQUIVO,
+            index=False,
+            sep=";",
+            encoding="utf-8-sig"
+        )
+        return True
+    except Exception:
+        return False
+
+
+def adicionar_recomendacoes_ao_workflow(recomendacoes_df, origem="IA Pricing"):
+    try:
+        if recomendacoes_df is None or recomendacoes_df.empty:
+            return False, "Nenhuma recomendação disponível."
+
+        workflow = carregar_workflow_comercial()
+        novos = []
+
+        for _, row in recomendacoes_df.iterrows():
+            empresa_id = str(row.get("EmpresaID", empresa_contexto_atual() if "empresa_contexto_atual" in globals() else "1"))
+            empresa = str(row.get("Empresa", obter_nome_empresa(empresa_id) if "obter_nome_empresa" in globals() else ""))
+            ean = str(row.get("EAN", ""))
+            produto = str(row.get("Produto", ""))
+            acao = str(row.get("Ação", row.get("Tipo_Oportunidade", "")))
+            preco_atual = str(row.get("Preço_Atual", row.get("Preco_Medio", "")))
+            preco_rec = str(row.get("Preço_Recomendado", row.get("Preco_Recomendado", "")))
+            ganho = str(row.get("Ganho_Estimado", row.get("Ganho_Potencial", "")))
+
+            if not workflow.empty and all(c in workflow.columns for c in ["EAN", "Produto", "EmpresaID", "Status"]):
+                pendente = workflow[
+                    (workflow["EAN"].astype(str) == ean) &
+                    (workflow["Produto"].astype(str) == produto) &
+                    (workflow["EmpresaID"].astype(str) == empresa_id) &
+                    (workflow["Status"].astype(str).isin(["Pendente", "Em análise"]))
+                ]
+                if not pendente.empty:
+                    continue
+
+            novos.append({
+                "ID": f"WF-{datetime.now().strftime('%Y%m%d%H%M%S')}-{len(novos)+1}",
+                "Data_Hora": _wf_data_hora(),
+                "EmpresaID": empresa_id,
+                "Empresa": empresa,
+                "Usuario": st.session_state.get("usuario", ""),
+                "EAN": ean,
+                "Produto": produto,
+                "Acao_IA": acao,
+                "Preco_Atual": preco_atual,
+                "Preco_Recomendado": preco_rec,
+                "Ganho_Estimado": ganho,
+                "Status": "Pendente",
+                "Justificativa": "",
+                "Origem": origem,
+                "Versao": VERSAO_APP
+            })
+
+        if not novos:
+            return False, "Nenhuma nova recomendação foi adicionada. Pode já existir pendência para esses itens."
+
+        final = pd.concat([workflow, pd.DataFrame(novos)], ignore_index=True)
+        salvar_workflow_comercial(final)
+
+        try:
+            enviar_alerta_telegram(
+                "📋 <b>Workflow Comercial atualizado</b>\\n\\n"
+                f"✅ <b>Novas recomendações:</b> {len(novos)}\\n"
+                f"👤 <b>Usuário:</b> {st.session_state.get('usuario', '')}\\n"
+                f"🕒 <b>Horário:</b> {_wf_data_hora()}\\n"
+                f"🏷️ <b>Versão:</b> {VERSAO_APP}"
+            )
+        except Exception:
+            pass
+
+        return True, f"{len(novos)} recomendações enviadas para aprovação."
+
+    except Exception as erro:
+        return False, f"Erro ao adicionar ao workflow: {erro}"
+
+
+def atualizar_status_workflow(ids, novo_status, justificativa):
+    try:
+        if not ids:
+            return False, "Selecione ao menos uma recomendação."
+
+        if novo_status in ["Aprovado", "Rejeitado"] and not str(justificativa).strip():
+            return False, "Justificativa obrigatória para aprovar ou rejeitar."
+
+        base = carregar_workflow_comercial()
+
+        if base.empty:
+            return False, "Workflow vazio."
+
+        ids = [str(i) for i in ids]
+        mask = base["ID"].astype(str).isin(ids)
+
+        if not mask.any():
+            return False, "Nenhum ID encontrado."
+
+        base.loc[mask, "Status"] = novo_status
+        base.loc[mask, "Justificativa"] = str(justificativa).strip()
+        base.loc[mask, "Usuario"] = st.session_state.get("usuario", "")
+        base.loc[mask, "Data_Hora"] = _wf_data_hora()
+        base.loc[mask, "Versao"] = VERSAO_APP
+
+        salvar_workflow_comercial(base)
+
+        try:
+            enviar_alerta_telegram(
+                "📋 <b>Status do Workflow Comercial alterado</b>\\n\\n"
+                f"🔁 <b>Status:</b> {novo_status}\\n"
+                f"📦 <b>Itens:</b> {len(ids)}\\n"
+                f"👤 <b>Usuário:</b> {st.session_state.get('usuario', '')}\\n"
+                f"🕒 <b>Horário:</b> {_wf_data_hora()}\\n"
+                f"📝 <b>Justificativa:</b> {str(justificativa).strip()[:300]}"
+            )
+        except Exception:
+            pass
+
+        return True, f"{len(ids)} recomendações atualizadas para {novo_status}."
+
+    except Exception as erro:
+        return False, f"Erro ao atualizar workflow: {erro}"
+
 
 
 # --------------------------------------------------
@@ -5304,6 +5486,10 @@ if usuario_pode_ver_release_candidate() and "🏁 Release Candidate" not in pagi
 if usuario_pode_ver_ia_pricing() and "🤖 IA Pricing Enterprise" not in paginas_liberadas:
     paginas_liberadas = paginas_liberadas + ["🤖 IA Pricing Enterprise"]
 
+
+if usuario_pode_ver_workflow_comercial() and "📋 Workflow Comercial" not in paginas_liberadas:
+    paginas_liberadas = paginas_liberadas + ["📋 Workflow Comercial"]
+
 pagina = st.sidebar.radio(
     "Escolha a visão",
     paginas_liberadas,
@@ -5451,6 +5637,143 @@ df_filtrado = propagar_ganho_potencial(df_filtrado)
 
 # --------------------------------------------------
 # IA PRICING ENTERPRISE
+
+# --------------------------------------------------
+# WORKFLOW COMERCIAL
+# --------------------------------------------------
+
+if pagina == "📋 Workflow Comercial":
+
+    if not usuario_pode_ver_workflow_comercial():
+        st.error("Acesso não autorizado.")
+        st.stop()
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">Commercial Approval Flow</div>
+            <h1>📋 Workflow Comercial</h1>
+            <p>Fluxo de aprovação, rejeição e auditoria das recomendações comerciais geradas pela IA Pricing.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.caption("ⓘ Fluxo de aprovação, rejeição e auditoria das recomendações comerciais da IA Pricing.")
+
+    workflow = carregar_workflow_comercial()
+
+    pendentes = int((workflow["Status"].astype(str) == "Pendente").sum()) if not workflow.empty and "Status" in workflow.columns else 0
+    analise = int((workflow["Status"].astype(str) == "Em análise").sum()) if not workflow.empty and "Status" in workflow.columns else 0
+    aprovados = int((workflow["Status"].astype(str) == "Aprovado").sum()) if not workflow.empty and "Status" in workflow.columns else 0
+    rejeitados = int((workflow["Status"].astype(str) == "Rejeitado").sum()) if not workflow.empty and "Status" in workflow.columns else 0
+
+    st.markdown("### 🧭 Painel Executivo do Workflow")
+
+    w1, w2, w3, w4, w5 = st.columns(5)
+    w1.metric("Pendentes", pendentes)
+    w2.metric("Em análise", analise)
+    w3.metric("Aprovadas", aprovados)
+    w4.metric("Rejeitadas", rejeitados)
+    w5.metric("Total", len(workflow))
+
+    st.markdown("### ➕ Enviar recomendações para aprovação")
+
+    col_add1, col_add2 = st.columns(2)
+
+    if col_add1.button("🤖 Importar recomendações da IA Pricing", use_container_width=True):
+        ia_df = st.session_state.get("ia_pricing_df", pd.DataFrame())
+        if ia_df.empty:
+            st.info("Nenhuma recomendação da IA Pricing encontrada na sessão. Gere primeiro na tela IA Pricing Enterprise.")
+        else:
+            ok, msg = adicionar_recomendacoes_ao_workflow(ia_df, origem="IA Pricing")
+            if ok:
+                st.success(msg)
+                st.rerun()
+            else:
+                st.warning(msg)
+
+    if col_add2.button("💰 Importar Motor de Oportunidades", use_container_width=True):
+        op_df = st.session_state.get("motor_oportunidades_df", pd.DataFrame())
+        if op_df.empty:
+            st.info("Nenhuma oportunidade encontrada na sessão. Gere primeiro na tela Motor de Oportunidades.")
+        else:
+            ok, msg = adicionar_recomendacoes_ao_workflow(op_df, origem="Motor de Oportunidades")
+            if ok:
+                st.success(msg)
+                st.rerun()
+            else:
+                st.warning(msg)
+
+    st.markdown("### 🔎 Recomendações em workflow")
+
+    if workflow.empty:
+        st.info("Nenhuma recomendação no workflow comercial.")
+        st.stop()
+
+    view = workflow.copy()
+
+    filtro_status = st.multiselect(
+        "Filtrar status",
+        sorted(view["Status"].dropna().astype(str).unique().tolist()) if "Status" in view.columns else []
+    )
+
+    filtro_origem = st.multiselect(
+        "Filtrar origem",
+        sorted(view["Origem"].dropna().astype(str).unique().tolist()) if "Origem" in view.columns else []
+    )
+
+    if filtro_status and "Status" in view.columns:
+        view = view[view["Status"].astype(str).isin(filtro_status)]
+
+    if filtro_origem and "Origem" in view.columns:
+        view = view[view["Origem"].astype(str).isin(filtro_origem)]
+
+    st.dataframe(view, use_container_width=True, hide_index=True)
+
+    st.markdown("### ✅ Aprovação / Rejeição")
+
+    ids_disponiveis = view["ID"].dropna().astype(str).tolist() if "ID" in view.columns else []
+
+    ids_sel = st.multiselect(
+        "Selecionar recomendações",
+        ids_disponiveis
+    )
+
+    novo_status = st.selectbox(
+        "Novo status",
+        ["Em análise", "Aprovado", "Rejeitado", "Pendente"]
+    )
+
+    justificativa = st.text_area(
+        "Justificativa",
+        placeholder="Informe o motivo da aprovação, rejeição ou alteração de status."
+    )
+
+    if st.button("💾 Atualizar status selecionado", use_container_width=True):
+        ok, msg = atualizar_status_workflow(ids_sel, novo_status, justificativa)
+        if ok:
+            st.success(msg)
+            st.rerun()
+        else:
+            st.error(msg)
+
+    st.markdown("### 📤 Exportação")
+
+    csv_workflow = view.to_csv(index=False, sep=";", encoding="utf-8-sig")
+
+    st.download_button(
+        "📥 Exportar Workflow CSV",
+        data=csv_workflow,
+        file_name="workflow_comercial_eirox.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+
+    st.stop()
+
+
+
 # --------------------------------------------------
 
 if pagina == "🤖 IA Pricing Enterprise":
