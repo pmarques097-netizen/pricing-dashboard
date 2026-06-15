@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.35.5-beta-multiempresa-menu-fix"
+VERSAO_APP = "v1.35.6-enterprise"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -2351,6 +2351,217 @@ def health_ultimo_login():
 
 
 
+
+# --------------------------------------------------
+# SOBRE O EIROX ENTERPRISE
+# --------------------------------------------------
+
+if pagina == "📌 Sobre o Eirox":
+
+    if not usuario_pode_ver_multiempresa():
+        st.error("Acesso não autorizado.")
+        st.stop()
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">Eirox Pricing Enterprise</div>
+            <h1>📌 Sobre o Eirox Enterprise</h1>
+            <p>Plataforma de inteligência de pricing, competitividade e governança para redes de farmácia.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    legenda_tela("📌 Sobre o Eirox")
+
+    c1, c2, c3 = st.columns(3)
+
+    c1.metric("Categoria", "Pricing SaaS")
+    c2.metric("Versão", f"Enterprise {VERSAO_APP.split('-')[0]}")
+    c3.metric("Status", "Homologação avançada")
+
+    card_enterprise(
+        "Propósito",
+        "Centralizar informações de concorrência, margem, compras, estoque, simulação e auditoria para apoiar decisões comerciais de alta precisão.",
+        "🎯"
+    )
+
+    card_enterprise(
+        "Principais diferenciais",
+        "Auditoria completa, controle de usuários, saúde do sistema, backup, multiempresa e inteligência competitiva em uma única plataforma.",
+        "🚀"
+    )
+
+    card_enterprise(
+        "Governança",
+        "Módulos administrativos restritos ao usuário master paulomarques, com logs, rastreabilidade, controle de acesso e proteção operacional.",
+        "🔐"
+    )
+
+    st.markdown("### 🧩 Módulos Enterprise")
+
+    modulos = pd.DataFrame(
+        [
+            {"Módulo": "Dashboard Geral", "Status": "✅ Operacional", "Finalidade": "Indicadores executivos de pricing e competitividade"},
+            {"Módulo": "Rede/Loja vs Concorrentes", "Status": "✅ Operacional", "Finalidade": "Comparativo por loja, rede e concorrentes"},
+            {"Módulo": "Simulador Inteligente", "Status": "✅ Operacional", "Finalidade": "Simulação de preço, margem e oportunidade"},
+            {"Módulo": "Controle de Usuários", "Status": "✅ Operacional", "Finalidade": "Cadastro, bloqueio, reset e expiração"},
+            {"Módulo": "Central de Auditoria", "Status": "✅ Operacional", "Finalidade": "Histórico de acessos e navegação"},
+            {"Módulo": "Saúde do Sistema", "Status": "✅ Operacional", "Finalidade": "Monitoramento das bases e ambiente"},
+            {"Módulo": "Backup Center", "Status": "✅ Operacional", "Finalidade": "Backup, histórico e download"},
+            {"Módulo": "Multiempresa", "Status": "🟡 Beta", "Finalidade": "Preparação SaaS para múltiplos clientes"}
+        ]
+    )
+
+    st.dataframe(
+        modulos,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.stop()
+
+
+# --------------------------------------------------
+# ROADMAP DO PRODUTO
+# --------------------------------------------------
+
+if pagina == "🧭 Roadmap do Produto":
+
+    if not usuario_pode_ver_multiempresa():
+        st.error("Acesso não autorizado.")
+        st.stop()
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">Product Strategy</div>
+            <h1>🧭 Roadmap do Produto</h1>
+            <p>Plano evolutivo da plataforma Eirox Pricing Enterprise.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    legenda_tela("🧭 Roadmap do Produto")
+
+    roadmap = pd.DataFrame(
+        [
+            {"Versão": "v1.34.0", "Marco": "Produção congelada", "Status": "✅ Concluído", "Objetivo": "Base estável para clientes"},
+            {"Versão": "v1.35.0", "Marco": "Controle de Usuários", "Status": "✅ Concluído", "Objetivo": "Governança e segurança"},
+            {"Versão": "v1.35.2", "Marco": "Auditoria Avançada", "Status": "✅ Concluído", "Objetivo": "Rastreabilidade de uso"},
+            {"Versão": "v1.35.3", "Marco": "Saúde do Sistema", "Status": "✅ Concluído", "Objetivo": "Monitoramento operacional"},
+            {"Versão": "v1.35.4", "Marco": "Backup Center", "Status": "✅ Concluído", "Objetivo": "Proteção e recuperação"},
+            {"Versão": "v1.35.5", "Marco": "Multiempresa", "Status": "🟡 Beta", "Objetivo": "Preparação SaaS"},
+            {"Versão": "v1.36.0", "Marco": "Versão Comercial", "Status": "🔄 Planejado", "Objetivo": "Venda piloto"},
+            {"Versão": "v1.37.0", "Marco": "Alertas Inteligentes", "Status": "🔄 Planejado", "Objetivo": "Automação comercial"},
+            {"Versão": "v2.0.0", "Marco": "IA Pricing Enterprise", "Status": "🔮 Futuro", "Objetivo": "Recomendação automática avançada"}
+        ]
+    )
+
+    st.dataframe(
+        roadmap,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.markdown("### 🎯 Próximas prioridades")
+
+    p1, p2, p3 = st.columns(3)
+
+    with p1:
+        card_enterprise(
+            "Alertas Inteligentes",
+            "Notificações automáticas para margem baixa, concorrência agressiva, preço fora da estratégia e bases desatualizadas.",
+            "🚨"
+        )
+
+    with p2:
+        card_enterprise(
+            "Licenciamento SaaS",
+            "Controle de planos, empresas, usuários contratados e módulos liberados por cliente.",
+            "💼"
+        )
+
+    with p3:
+        card_enterprise(
+            "IA de Recomendação",
+            "Motor inteligente para sugerir preço ideal com base em concorrência, custo, estoque e elasticidade.",
+            "🤖"
+        )
+
+    st.stop()
+
+
+# --------------------------------------------------
+# LICENCIAMENTO MULTIEMPRESA
+# --------------------------------------------------
+
+if pagina == "💼 Licenciamento Multiempresa":
+
+    if not usuario_pode_ver_multiempresa():
+        st.error("Acesso não autorizado.")
+        st.stop()
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">Commercial SaaS Model</div>
+            <h1>💼 Licenciamento Multiempresa</h1>
+            <p>Estrutura comercial sugerida para operação SaaS com múltiplas redes de farmácia.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    legenda_tela("💼 Licenciamento Multiempresa")
+
+    planos = pd.DataFrame(
+        [
+            {"Plano": "Starter", "Empresas": "1", "Usuários": "Até 5", "Módulos": "Dashboard + Concorrência", "Indicação": "Rede pequena ou piloto"},
+            {"Plano": "Professional", "Empresas": "1", "Usuários": "Até 20", "Módulos": "Dashboard + Simulador + Auditoria", "Indicação": "Rede regional"},
+            {"Plano": "Enterprise", "Empresas": "Até 5", "Usuários": "Até 100", "Módulos": "Todos os módulos + Backup + Saúde", "Indicação": "Grupo com múltiplas redes"},
+            {"Plano": "Enterprise Plus", "Empresas": "Ilimitado", "Usuários": "Sob contrato", "Módulos": "Todos + APIs + IA Pricing", "Indicação": "Operação nacional"}
+        ]
+    )
+
+    st.markdown("### 📦 Planos sugeridos")
+
+    st.dataframe(
+        planos,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.markdown("### 🔐 Regras comerciais recomendadas")
+
+    regras = pd.DataFrame(
+        [
+            {"Regra": "Isolamento de dados", "Descrição": "Cada empresa visualiza apenas seus próprios dados e usuários."},
+            {"Regra": "Usuário master", "Descrição": "Apenas paulomarques ou administradores autorizados podem acessar módulos administrativos."},
+            {"Regra": "Backup por cliente", "Descrição": "Backups separados por empresa para segurança e recuperação."},
+            {"Regra": "Auditoria por cliente", "Descrição": "Logs vinculados a empresa, usuário, tela e evento."},
+            {"Regra": "Módulos por plano", "Descrição": "Funcionalidades liberadas conforme pacote contratado."}
+        ]
+    )
+
+    st.dataframe(
+        regras,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    card_enterprise(
+        "Próximo passo técnico",
+        "Criar a tabela PLANOS_EIROX.csv e vincular cada EmpresaID a um plano comercial, quantidade de usuários permitidos e módulos contratados.",
+        "🧩"
+    )
+
+    st.stop()
+
+
+
 # --------------------------------------------------
 # MULTIEMPRESA - HOMOLOGAÇÃO v1.35.5
 # --------------------------------------------------
@@ -2540,6 +2751,62 @@ def preparar_base_usuarios_multiempresa():
 
 def usuario_pode_ver_multiempresa():
     return usuario_master()
+
+
+
+
+# --------------------------------------------------
+# EXPERIÊNCIA ENTERPRISE - SUBTÍTULOS E AJUDA
+# --------------------------------------------------
+
+DESCRICOES_TELAS_ENTERPRISE = {
+    "📊 Dashboard Geral": "Visão consolidada dos principais indicadores de pricing, margem, lucratividade e competitividade.",
+    "📊 Painel Geral": "Visão consolidada dos principais indicadores de pricing, margem, lucratividade e competitividade.",
+    "🔎 Rede/Loja vs Concorrentes": "Comparativo detalhado entre preços praticados pela rede e seus principais concorrentes.",
+    "🔍 Rede/Loja vs Concorrentes": "Comparativo detalhado entre preços praticados pela rede e seus principais concorrentes.",
+    "📈 Evolução Histórica": "Acompanhamento da evolução dos preços ao longo do tempo por produto e farmácia.",
+    "🗺️ Mapa Farmácias": "Distribuição geográfica das farmácias pesquisadas e análise regional de preços.",
+    "🧠 Simulador Inteligente": "Simule cenários de preço, margem e competitividade antes de tomar decisões comerciais.",
+    "👥 Controle de Usuários": "Gerenciamento de acessos, permissões, bloqueios, expiração de senha e políticas de segurança.",
+    "🔐 Central de Auditoria": "Monitoramento completo dos acessos, navegação e atividades realizadas pelos usuários.",
+    "🟢 Saúde do Sistema": "Monitoramento operacional do ambiente, performance, integridade das bases e integrações.",
+    "📦 Backup Center": "Gerenciamento de backups, restauração e proteção das informações críticas do sistema.",
+    "🏢 Multiempresa": "Administração de empresas, segregação de dados e preparação do ambiente SaaS.",
+    "📌 Sobre o Eirox": "Informações institucionais, propósito da plataforma e visão geral do produto.",
+    "🧭 Roadmap do Produto": "Plano evolutivo da plataforma, módulos concluídos, próximos ciclos e prioridades.",
+    "💼 Licenciamento Multiempresa": "Modelo comercial, planos de uso, governança de clientes e expansão SaaS."
+}
+
+
+def legenda_tela(titulo, texto=None):
+    """
+    Padroniza legenda corporativa e ajuda visual em cada visão.
+    """
+
+    try:
+        descricao = texto or DESCRICOES_TELAS_ENTERPRISE.get(titulo, "")
+
+        if descricao:
+            st.caption(f"ⓘ {descricao}")
+
+    except Exception:
+        pass
+
+
+def card_enterprise(titulo, descricao, icone="ⓘ"):
+    """
+    Card simples para páginas institucionais.
+    """
+
+    st.markdown(
+        f"""
+        <div class="eirox-card">
+            <div class="eirox-section-title">{icone} {titulo}</div>
+            <p>{descricao}</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 
 
@@ -3918,6 +4185,15 @@ if usuario_pode_ver_auditoria() and "📦 Backup Center" not in paginas_liberada
 
 if usuario_pode_ver_multiempresa() and "🏢 Multiempresa" not in paginas_liberadas:
     paginas_liberadas = paginas_liberadas + ["🏢 Multiempresa"]
+
+if usuario_pode_ver_multiempresa():
+    for pagina_enterprise in [
+        "📌 Sobre o Eirox",
+        "🧭 Roadmap do Produto",
+        "💼 Licenciamento Multiempresa"
+    ]:
+        if pagina_enterprise not in paginas_liberadas:
+            paginas_liberadas = paginas_liberadas + [pagina_enterprise]
 
 if usuario_pode_ver_auditoria() and "🔐 Central de Auditoria" not in paginas_liberadas:
     paginas_liberadas = paginas_liberadas + ["🔐 Central de Auditoria"]
