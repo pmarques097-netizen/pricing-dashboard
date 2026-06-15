@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.37.1-workflow-comercial-clientes-ajustados"
+VERSAO_APP = "v1.38.0-crm-enterprise"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -4081,6 +4081,278 @@ def atualizar_status_workflow(ids, novo_status, justificativa):
 
 
 
+
+# --------------------------------------------------
+# CRM ENTERPRISE / GESTÃO DE CLIENTES - v1.38.0
+# --------------------------------------------------
+
+CLIENTES_EIROX_ARQUIVO = Path("CLIENTES_EIROX.csv")
+
+
+def usuario_pode_ver_crm_enterprise():
+    try:
+        return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() in ["paulomarques", "vanderlei", "ubiratan"]
+    except Exception:
+        return False
+
+
+def _crm_data_hora():
+    try:
+        return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S")
+    except Exception:
+        return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+def _crm_numero_br(valor, casas=2):
+    try:
+        return f"{float(valor):,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return "0,00"
+
+
+def inicializar_clientes_eirox():
+    try:
+        if not CLIENTES_EIROX_ARQUIVO.exists():
+            base = pd.DataFrame(
+                [
+                    {
+                        "ClienteID": "1",
+                        "EmpresaID": "1",
+                        "Cliente": "Marabá - Cliente teste",
+                        "CNPJ": "",
+                        "Cidade": "Marabá",
+                        "UF": "PA",
+                        "Qtd_Lojas": "0",
+                        "Plano": "Enterprise",
+                        "MRR": "0",
+                        "Data_Implantacao": "",
+                        "Data_Renovacao": "",
+                        "Status": "Implantação",
+                        "Responsavel_Comercial": "",
+                        "Observacao": "Cliente teste criado automaticamente",
+                        "Criado_Em": _crm_data_hora()
+                    },
+                    {
+                        "ClienteID": "2",
+                        "EmpresaID": "2",
+                        "Cliente": "Belém - Cliente teste",
+                        "CNPJ": "",
+                        "Cidade": "Belém",
+                        "UF": "PA",
+                        "Qtd_Lojas": "0",
+                        "Plano": "Starter",
+                        "MRR": "0",
+                        "Data_Implantacao": "",
+                        "Data_Renovacao": "",
+                        "Status": "Implantação",
+                        "Responsavel_Comercial": "",
+                        "Observacao": "Cliente teste criado automaticamente",
+                        "Criado_Em": _crm_data_hora()
+                    }
+                ]
+            )
+
+            base.to_csv(
+                CLIENTES_EIROX_ARQUIVO,
+                index=False,
+                sep=";",
+                encoding="utf-8-sig"
+            )
+
+        return True
+    except Exception:
+        return False
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_clientes_eirox():
+    try:
+        inicializar_clientes_eirox()
+
+        base = pd.read_csv(
+            CLIENTES_EIROX_ARQUIVO,
+            sep=";",
+            encoding="utf-8-sig",
+            dtype=str
+        ).fillna("")
+
+        obrigatorias = [
+            "ClienteID",
+            "EmpresaID",
+            "Cliente",
+            "CNPJ",
+            "Cidade",
+            "UF",
+            "Qtd_Lojas",
+            "Plano",
+            "MRR",
+            "Data_Implantacao",
+            "Data_Renovacao",
+            "Status",
+            "Responsavel_Comercial",
+            "Observacao",
+            "Criado_Em"
+        ]
+
+        for col in obrigatorias:
+            if col not in base.columns:
+                base[col] = ""
+
+        return base[obrigatorias].copy()
+
+    except Exception:
+        return pd.DataFrame()
+
+
+def salvar_clientes_eirox(base):
+    try:
+        base = base.copy()
+
+        base.to_csv(
+            CLIENTES_EIROX_ARQUIVO,
+            index=False,
+            sep=";",
+            encoding="utf-8-sig"
+        )
+
+        try:
+            carregar_clientes_eirox.clear()
+        except Exception:
+            pass
+
+        return True
+
+    except Exception:
+        return False
+
+
+def criar_ou_atualizar_cliente_eirox(
+    cliente_id,
+    empresa_id,
+    cliente,
+    cnpj,
+    cidade,
+    uf,
+    qtd_lojas,
+    plano,
+    mrr,
+    data_implantacao,
+    data_renovacao,
+    status,
+    responsavel,
+    observacao
+):
+    try:
+        cliente_id = str(cliente_id).strip()
+        empresa_id = str(empresa_id).strip()
+        cliente = str(cliente).strip()
+
+        if not cliente_id or not empresa_id or not cliente:
+            return False, "ClienteID, EmpresaID e Cliente são obrigatórios."
+
+        base = carregar_clientes_eirox()
+
+        nova_linha = {
+            "ClienteID": cliente_id,
+            "EmpresaID": empresa_id,
+            "Cliente": cliente,
+            "CNPJ": str(cnpj).strip(),
+            "Cidade": str(cidade).strip(),
+            "UF": str(uf).strip().upper(),
+            "Qtd_Lojas": str(qtd_lojas).strip(),
+            "Plano": str(plano).strip(),
+            "MRR": str(mrr).strip(),
+            "Data_Implantacao": str(data_implantacao).strip(),
+            "Data_Renovacao": str(data_renovacao).strip(),
+            "Status": str(status).strip(),
+            "Responsavel_Comercial": str(responsavel).strip(),
+            "Observacao": str(observacao).strip(),
+            "Criado_Em": _crm_data_hora()
+        }
+
+        if not base.empty and cliente_id in base["ClienteID"].astype(str).tolist():
+            idx = base.index[base["ClienteID"].astype(str) == cliente_id][0]
+            for k, v in nova_linha.items():
+                if k != "Criado_Em":
+                    base.loc[idx, k] = v
+            acao = "Atualização de cliente"
+        else:
+            base = pd.concat([base, pd.DataFrame([nova_linha])], ignore_index=True)
+            acao = "Criação de cliente"
+
+        salvar_clientes_eirox(base)
+
+        try:
+            registrar_log_usuario(
+                acao,
+                cliente,
+                f"EmpresaID={empresa_id} | Plano={plano} | Status={status}"
+            )
+        except Exception:
+            pass
+
+        try:
+            enviar_alerta_telegram(
+                "🏢 <b>Cliente CRM Eirox atualizado</b>\\n\\n"
+                f"🏪 <b>Cliente:</b> {cliente}\\n"
+                f"📦 <b>Plano:</b> {plano}\\n"
+                f"🔐 <b>Status:</b> {status}\\n"
+                f"💰 <b>MRR:</b> R$ {_crm_numero_br(str(mrr).replace(',', '.'))}\\n"
+                f"👤 <b>Usuário:</b> {st.session_state.get('usuario', '')}\\n"
+                f"🕒 <b>Horário:</b> {_crm_data_hora()}\\n"
+                f"🏷️ <b>Versão:</b> {VERSAO_APP}"
+            )
+        except Exception:
+            pass
+
+        return True, f"{acao} realizada com sucesso."
+
+    except Exception as erro:
+        return False, f"Erro ao salvar cliente: {erro}"
+
+
+def metricas_crm_enterprise():
+    try:
+        base = carregar_clientes_eirox()
+
+        if base.empty:
+            return {
+                "Clientes": 0,
+                "Ativos": 0,
+                "Implantacao": 0,
+                "Suspensos": 0,
+                "Lojas": 0,
+                "MRR": 0
+            }
+
+        mrr = pd.to_numeric(
+            base["MRR"].astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False),
+            errors="coerce"
+        ).fillna(0)
+
+        lojas = pd.to_numeric(base["Qtd_Lojas"], errors="coerce").fillna(0)
+
+        return {
+            "Clientes": int(len(base)),
+            "Ativos": int((base["Status"].astype(str).str.lower() == "ativo").sum()),
+            "Implantacao": int((base["Status"].astype(str).str.lower() == "implantação").sum() + (base["Status"].astype(str).str.lower() == "implantacao").sum()),
+            "Suspensos": int((base["Status"].astype(str).str.lower() == "suspenso").sum()),
+            "Lojas": int(lojas.sum()),
+            "MRR": float(mrr.sum())
+        }
+
+    except Exception:
+        return {
+            "Clientes": 0,
+            "Ativos": 0,
+            "Implantacao": 0,
+            "Suspensos": 0,
+            "Lojas": 0,
+            "MRR": 0
+        }
+
+
+
 # --------------------------------------------------
 # LOGIN E CONTROLE DE ACESSO
 # --------------------------------------------------
@@ -5490,6 +5762,10 @@ if usuario_pode_ver_ia_pricing() and "🤖 IA Pricing Enterprise" not in paginas
 if usuario_pode_ver_workflow_comercial() and "📋 Workflow Comercial" not in paginas_liberadas:
     paginas_liberadas = paginas_liberadas + ["📋 Workflow Comercial"]
 
+
+if usuario_pode_ver_crm_enterprise() and "🏢 CRM Enterprise" not in paginas_liberadas:
+    paginas_liberadas = paginas_liberadas + ["🏢 CRM Enterprise"]
+
 pagina = st.sidebar.radio(
     "Escolha a visão",
     paginas_liberadas,
@@ -5640,6 +5916,321 @@ df_filtrado = propagar_ganho_potencial(df_filtrado)
 
 # --------------------------------------------------
 # WORKFLOW COMERCIAL
+
+# --------------------------------------------------
+# CRM ENTERPRISE
+# --------------------------------------------------
+
+if pagina == "🏢 CRM Enterprise":
+
+    if not usuario_pode_ver_crm_enterprise():
+        st.error("Acesso não autorizado.")
+        st.stop()
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">Customer Revenue Management</div>
+            <h1>🏢 CRM Enterprise</h1>
+            <p>Gestão comercial de clientes, planos, implantação, receita recorrente e renovação de licenças.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.caption("ⓘ Cadastro e acompanhamento comercial dos clientes SaaS da plataforma Eirox.")
+
+    metricas = metricas_crm_enterprise()
+
+    st.markdown("### 🧭 Painel Executivo de Clientes")
+
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+
+    c1.metric("Clientes", metricas.get("Clientes", 0))
+    c2.metric("Ativos", metricas.get("Ativos", 0))
+    c3.metric("Implantação", metricas.get("Implantacao", 0))
+    c4.metric("Suspensos", metricas.get("Suspensos", 0))
+    c5.metric("Lojas", metricas.get("Lojas", 0))
+    c6.metric("MRR", f"R$ {_crm_numero_br(metricas.get('MRR', 0))}")
+
+    clientes = carregar_clientes_eirox()
+
+    aba_cadastro, aba_base, aba_dashboard = st.tabs(
+        [
+            "✍️ Cadastro",
+            "📋 Base de Clientes",
+            "📊 Dashboard Comercial"
+        ]
+    )
+
+    with aba_cadastro:
+
+        st.markdown("### ✍️ Cadastro / Atualização de Cliente")
+
+        opcoes = ["Novo cliente"]
+
+        if not clientes.empty:
+            opcoes += [
+                f'{row["ClienteID"]} - {row["Cliente"]}'
+                for _, row in clientes.iterrows()
+            ]
+
+        cliente_sel = st.selectbox(
+            "Selecionar cliente",
+            opcoes,
+            key="crm_cliente_sel"
+        )
+
+        dados = {}
+
+        if cliente_sel != "Novo cliente":
+            cliente_id_sel = cliente_sel.split(" - ")[0].strip()
+            linha = clientes[clientes["ClienteID"].astype(str) == cliente_id_sel]
+            if not linha.empty:
+                dados = linha.iloc[0].to_dict()
+
+        with st.form("form_crm_enterprise"):
+
+            f1, f2, f3 = st.columns(3)
+
+            cliente_id = f1.text_input(
+                "ClienteID",
+                value=dados.get("ClienteID", "")
+            )
+
+            empresa_id = f2.text_input(
+                "EmpresaID",
+                value=dados.get("EmpresaID", "")
+            )
+
+            cliente_nome = f3.text_input(
+                "Cliente",
+                value=dados.get("Cliente", "")
+            )
+
+            f4, f5, f6 = st.columns(3)
+
+            cnpj = f4.text_input(
+                "CNPJ",
+                value=dados.get("CNPJ", "")
+            )
+
+            cidade = f5.text_input(
+                "Cidade",
+                value=dados.get("Cidade", "")
+            )
+
+            uf = f6.text_input(
+                "UF",
+                value=dados.get("UF", "")
+            )
+
+            f7, f8, f9 = st.columns(3)
+
+            qtd_lojas = f7.text_input(
+                "Quantidade de lojas",
+                value=dados.get("Qtd_Lojas", "0")
+            )
+
+            plano = f8.selectbox(
+                "Plano",
+                ["Starter", "Professional", "Enterprise", "Enterprise Plus"],
+                index=["Starter", "Professional", "Enterprise", "Enterprise Plus"].index(dados.get("Plano", "Starter")) if dados.get("Plano", "Starter") in ["Starter", "Professional", "Enterprise", "Enterprise Plus"] else 0
+            )
+
+            mrr = f9.text_input(
+                "MRR mensal",
+                value=dados.get("MRR", "0")
+            )
+
+            f10, f11, f12 = st.columns(3)
+
+            data_implantacao = f10.text_input(
+                "Data implantação",
+                value=dados.get("Data_Implantacao", ""),
+                placeholder="dd/mm/aaaa"
+            )
+
+            data_renovacao = f11.text_input(
+                "Data renovação",
+                value=dados.get("Data_Renovacao", ""),
+                placeholder="dd/mm/aaaa"
+            )
+
+            status = f12.selectbox(
+                "Status",
+                ["Implantação", "Ativo", "Suspenso", "Cancelado", "Trial"],
+                index=["Implantação", "Ativo", "Suspenso", "Cancelado", "Trial"].index(dados.get("Status", "Implantação")) if dados.get("Status", "Implantação") in ["Implantação", "Ativo", "Suspenso", "Cancelado", "Trial"] else 0
+            )
+
+            responsavel = st.text_input(
+                "Responsável comercial",
+                value=dados.get("Responsavel_Comercial", "")
+            )
+
+            observacao = st.text_area(
+                "Observação",
+                value=dados.get("Observacao", "")
+            )
+
+            salvar = st.form_submit_button(
+                "💾 Salvar cliente",
+                use_container_width=True
+            )
+
+        if salvar:
+            ok, msg = criar_ou_atualizar_cliente_eirox(
+                cliente_id,
+                empresa_id,
+                cliente_nome,
+                cnpj,
+                cidade,
+                uf,
+                qtd_lojas,
+                plano,
+                mrr,
+                data_implantacao,
+                data_renovacao,
+                status,
+                responsavel,
+                observacao
+            )
+
+            if ok:
+                st.success(msg)
+                st.rerun()
+            else:
+                st.error(msg)
+
+    with aba_base:
+
+        st.markdown("### 📋 Base de Clientes")
+
+        if clientes.empty:
+            st.info("Nenhum cliente cadastrado.")
+        else:
+            filtro_status = st.multiselect(
+                "Filtrar status",
+                sorted(clientes["Status"].dropna().astype(str).unique().tolist())
+            )
+
+            filtro_plano = st.multiselect(
+                "Filtrar plano",
+                sorted(clientes["Plano"].dropna().astype(str).unique().tolist())
+            )
+
+            view = clientes.copy()
+
+            if filtro_status:
+                view = view[view["Status"].astype(str).isin(filtro_status)]
+
+            if filtro_plano:
+                view = view[view["Plano"].astype(str).isin(filtro_plano)]
+
+            st.dataframe(
+                view,
+                use_container_width=True,
+                hide_index=True
+            )
+
+            csv_clientes = view.to_csv(
+                index=False,
+                sep=";",
+                encoding="utf-8-sig"
+            )
+
+            st.download_button(
+                "📥 Exportar Clientes CSV",
+                data=csv_clientes,
+                file_name="clientes_eirox.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+
+    with aba_dashboard:
+
+        st.markdown("### 📊 Dashboard Comercial")
+
+        if clientes.empty:
+            st.info("Nenhum cliente cadastrado para análise.")
+        else:
+            dash = clientes.copy()
+
+            dash["MRR_Num"] = pd.to_numeric(
+                dash["MRR"].astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False),
+                errors="coerce"
+            ).fillna(0)
+
+            dash["Qtd_Lojas_Num"] = pd.to_numeric(
+                dash["Qtd_Lojas"],
+                errors="coerce"
+            ).fillna(0)
+
+            d1, d2 = st.columns(2)
+
+            status_df = (
+                dash
+                .groupby("Status", dropna=False)
+                .size()
+                .reset_index(name="Clientes")
+            )
+
+            fig_status = px.bar(
+                status_df,
+                x="Status",
+                y="Clientes",
+                title="Clientes por status"
+            )
+
+            fig_status.update_layout(height=380)
+
+            d1.plotly_chart(
+                fig_status,
+                use_container_width=True
+            )
+
+            plano_df = (
+                dash
+                .groupby("Plano", dropna=False)
+                .agg(
+                    MRR=("MRR_Num", "sum"),
+                    Clientes=("Cliente", "count"),
+                    Lojas=("Qtd_Lojas_Num", "sum")
+                )
+                .reset_index()
+                .sort_values("MRR", ascending=False)
+            )
+
+            fig_plano = px.bar(
+                plano_df,
+                x="MRR",
+                y="Plano",
+                orientation="h",
+                title="MRR por plano"
+            )
+
+            fig_plano.update_layout(
+                height=380,
+                yaxis=dict(autorange="reversed")
+            )
+
+            d2.plotly_chart(
+                fig_plano,
+                use_container_width=True
+            )
+
+            st.markdown("### 💰 Receita por plano")
+
+            st.dataframe(
+                plano_df,
+                use_container_width=True,
+                hide_index=True
+            )
+
+    st.stop()
+
+
+
 # --------------------------------------------------
 
 if pagina == "📋 Workflow Comercial":

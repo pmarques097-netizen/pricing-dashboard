@@ -1,0 +1,3 @@
+﻿ClienteID;EmpresaID;Cliente;CNPJ;Cidade;UF;Qtd_Lojas;Plano;MRR;Data_Implantacao;Data_Renovacao;Status;Responsavel_Comercial;Observacao;Criado_Em
+1;1;Marabá - Cliente teste;;Marabá;PA;0;Enterprise;0;;;Implantação;;Cliente teste criado automaticamente;
+2;2;Belém - Cliente teste;;Belém;PA;0;Starter;0;;;Implantação;;Cliente teste criado automaticamente;
