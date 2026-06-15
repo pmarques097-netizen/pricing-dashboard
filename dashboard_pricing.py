@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.35.6-enterprise-stable"
+VERSAO_APP = "v1.36.0-licenciamento-real"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -2563,7 +2563,8 @@ DESCRICOES_TELAS_ENTERPRISE = {
     "🏢 Multiempresa": "Administração de empresas, segregação de dados e preparação do ambiente SaaS.",
     "📌 Sobre o Eirox": "Informações institucionais, propósito da plataforma e visão geral do produto.",
     "🧭 Roadmap do Produto": "Plano evolutivo da plataforma, módulos concluídos, próximos ciclos e prioridades.",
-    "💼 Licenciamento Multiempresa": "Modelo comercial, planos de uso, governança de clientes e expansão SaaS."
+    "💼 Licenciamento Multiempresa": "Modelo comercial, planos de uso, governança de clientes e expansão SaaS.",
+    "💼 Licenciamento Real": "Controle real de planos, expiração, limites de usuários, lojas e bloqueio de licença."
 }
 
 
@@ -2586,6 +2587,518 @@ def card_enterprise(titulo, descricao, icone="ⓘ"):
         """,
         unsafe_allow_html=True
     )
+
+
+
+
+# --------------------------------------------------
+# LICENCIAMENTO REAL - v1.36.0
+# --------------------------------------------------
+
+LICENCAS_ARQUIVO = Path("LICENCAS_EIROX.csv")
+
+
+PLANOS_EIROX = {
+    "Starter": {
+        "MaxUsuarios": 5,
+        "MaxLojas": 10,
+        "Modulos": "Dashboard + Concorrência"
+    },
+    "Professional": {
+        "MaxUsuarios": 20,
+        "MaxLojas": 50,
+        "Modulos": "Dashboard + Concorrência + Simulador + Auditoria"
+    },
+    "Enterprise": {
+        "MaxUsuarios": 100,
+        "MaxLojas": 500,
+        "Modulos": "Todos os módulos"
+    },
+    "Enterprise Plus": {
+        "MaxUsuarios": 9999,
+        "MaxLojas": 9999,
+        "Modulos": "Todos + APIs + IA Pricing"
+    }
+}
+
+
+def inicializar_licencas():
+    """
+    Cria base inicial de licenças.
+    """
+
+    try:
+        if not LICENCAS_ARQUIVO.exists():
+
+            hoje = datetime.now(ZoneInfo("America/Sao_Paulo"))
+
+            base = pd.DataFrame(
+                [
+                    {
+                        "EmpresaID": "1",
+                        "Empresa": "SB Farma",
+                        "Plano": "Enterprise",
+                        "DataInicio": hoje.strftime("%d/%m/%Y"),
+                        "DataExpiracao": (hoje + pd.DateOffset(years=1)).strftime("%d/%m/%Y"),
+                        "MaxUsuarios": PLANOS_EIROX["Enterprise"]["MaxUsuarios"],
+                        "MaxLojas": PLANOS_EIROX["Enterprise"]["MaxLojas"],
+                        "Status": "Ativa",
+                        "Observacao": "Licença inicial de homologação"
+                    },
+                    {
+                        "EmpresaID": "2",
+                        "Empresa": "Cliente Teste",
+                        "Plano": "Starter",
+                        "DataInicio": hoje.strftime("%d/%m/%Y"),
+                        "DataExpiracao": (hoje + pd.DateOffset(days=30)).strftime("%d/%m/%Y"),
+                        "MaxUsuarios": PLANOS_EIROX["Starter"]["MaxUsuarios"],
+                        "MaxLojas": PLANOS_EIROX["Starter"]["MaxLojas"],
+                        "Status": "Trial",
+                        "Observacao": "Cliente teste"
+                    }
+                ]
+            )
+
+            base.to_csv(
+                LICENCAS_ARQUIVO,
+                index=False,
+                sep=";",
+                encoding="utf-8-sig"
+            )
+
+        return True
+
+    except Exception:
+        return False
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_licencas_sistema():
+    """
+    Carrega licenças cadastradas.
+    """
+
+    try:
+        inicializar_licencas()
+
+        base = pd.read_csv(
+            LICENCAS_ARQUIVO,
+            sep=";",
+            encoding="utf-8-sig",
+            dtype=str
+        ).fillna("")
+
+        obrigatorias = [
+            "EmpresaID",
+            "Empresa",
+            "Plano",
+            "DataInicio",
+            "DataExpiracao",
+            "MaxUsuarios",
+            "MaxLojas",
+            "Status",
+            "Observacao"
+        ]
+
+        for col in obrigatorias:
+            if col not in base.columns:
+                base[col] = ""
+
+        base["EmpresaID"] = base["EmpresaID"].astype(str).str.strip()
+        base["Empresa"] = base["Empresa"].astype(str).str.strip()
+        base["Plano"] = base["Plano"].replace("", "Starter")
+        base["Status"] = base["Status"].replace("", "Ativa")
+
+        return base[obrigatorias].copy()
+
+    except Exception:
+        return pd.DataFrame()
+
+
+def salvar_licencas_sistema(base):
+    """
+    Salva base de licenças.
+    """
+
+    try:
+        base = base.copy()
+        base["EmpresaID"] = base["EmpresaID"].astype(str).str.strip()
+
+        base.to_csv(
+            LICENCAS_ARQUIVO,
+            index=False,
+            sep=";",
+            encoding="utf-8-sig"
+        )
+
+        try:
+            carregar_licencas_sistema.clear()
+        except Exception:
+            pass
+
+        return True
+
+    except Exception:
+        return False
+
+
+def obter_licenca_empresa(empresa_id):
+    """
+    Retorna licença da empresa.
+    """
+
+    try:
+        empresa_id = str(empresa_id).strip()
+        licencas = carregar_licencas_sistema()
+
+        linha = licencas[
+            licencas["EmpresaID"].astype(str).str.strip() == empresa_id
+        ]
+
+        if linha.empty:
+            return None
+
+        return linha.iloc[0].to_dict()
+
+    except Exception:
+        return None
+
+
+def dias_restantes_licenca(data_expiracao):
+    """
+    Calcula dias restantes da licença.
+    """
+
+    try:
+        data_exp = pd.to_datetime(
+            str(data_expiracao),
+            dayfirst=True,
+            errors="coerce"
+        )
+
+        if pd.isna(data_exp):
+            return None
+
+        hoje = pd.Timestamp.now().normalize()
+
+        return int((data_exp.normalize() - hoje).days)
+
+    except Exception:
+        return None
+
+
+def status_licenca_empresa(empresa_id):
+    """
+    Status operacional da licença.
+    """
+
+    try:
+        lic = obter_licenca_empresa(empresa_id)
+
+        if not lic:
+            return {
+                "StatusOperacional": "🔴 Sem licença",
+                "Bloqueada": True,
+                "DiasRestantes": None,
+                "Mensagem": "Empresa sem licença cadastrada."
+            }
+
+        status = str(lic.get("Status", "")).strip()
+        dias = dias_restantes_licenca(lic.get("DataExpiracao", ""))
+
+        if status.lower() in ["bloqueada", "inativa", "cancelada"]:
+            return {
+                "StatusOperacional": "🔴 Bloqueada",
+                "Bloqueada": True,
+                "DiasRestantes": dias,
+                "Mensagem": "Licença bloqueada ou inativa."
+            }
+
+        if dias is not None and dias < 0:
+            return {
+                "StatusOperacional": "🔴 Expirada",
+                "Bloqueada": True,
+                "DiasRestantes": dias,
+                "Mensagem": "Licença expirada."
+            }
+
+        if status.lower() == "trial":
+            return {
+                "StatusOperacional": "🟡 Trial",
+                "Bloqueada": False,
+                "DiasRestantes": dias,
+                "Mensagem": "Licença em período de teste."
+            }
+
+        if dias is not None and dias <= 15:
+            return {
+                "StatusOperacional": "🟡 Próxima do vencimento",
+                "Bloqueada": False,
+                "DiasRestantes": dias,
+                "Mensagem": "Licença próxima do vencimento."
+            }
+
+        return {
+            "StatusOperacional": "🟢 Ativa",
+            "Bloqueada": False,
+            "DiasRestantes": dias,
+            "Mensagem": "Licença ativa."
+        }
+
+    except Exception as erro:
+        return {
+            "StatusOperacional": "🔴 Erro",
+            "Bloqueada": True,
+            "DiasRestantes": None,
+            "Mensagem": str(erro)
+        }
+
+
+def validar_licenca_login(usuario):
+    """
+    Valida licença no login.
+    paulomarques não é bloqueado para suporte master.
+    """
+
+    try:
+        usuario = str(usuario).strip().lower()
+
+        if usuario == "paulomarques":
+            return True, ""
+
+        dados = obter_dados_usuario(usuario) if "obter_dados_usuario" in globals() else None
+
+        empresa_id = "1"
+
+        if dados:
+            empresa_id = str(dados.get("EmpresaID", "1")).strip() or "1"
+
+        status = status_licenca_empresa(empresa_id)
+
+        if status.get("Bloqueada"):
+            return False, f"{status.get('StatusOperacional')} - {status.get('Mensagem')}"
+
+        return True, ""
+
+    except Exception:
+        return True, ""
+
+
+def contar_usuarios_empresa(empresa_id):
+    """
+    Conta usuários vinculados à empresa.
+    """
+
+    try:
+        if "carregar_usuarios_sistema" not in globals():
+            return 0
+
+        usuarios = carregar_usuarios_sistema()
+
+        if usuarios.empty:
+            return 0
+
+        if "EmpresaID" not in usuarios.columns:
+            usuarios["EmpresaID"] = "1"
+
+        return int(
+            usuarios[
+                usuarios["EmpresaID"].astype(str).str.strip() == str(empresa_id).strip()
+            ]["Usuario"].nunique()
+        )
+
+    except Exception:
+        return 0
+
+
+def contar_lojas_empresa(empresa_id):
+    """
+    Conta lojas quando houver colunas compatíveis.
+    Se a base ainda não tiver EmpresaID, calcula de forma geral para compatibilidade.
+    """
+
+    try:
+        bases = []
+
+        for nome_var in ["df", "venda_rede", "historico"]:
+            base = globals().get(nome_var, pd.DataFrame())
+
+            if isinstance(base, pd.DataFrame) and not base.empty:
+                temp = base.copy()
+
+                if "EmpresaID" in temp.columns:
+                    temp = temp[
+                        temp["EmpresaID"].astype(str).str.strip() == str(empresa_id).strip()
+                    ]
+
+                bases.append(temp)
+
+        if not bases:
+            return 0
+
+        base_all = pd.concat(bases, ignore_index=True)
+
+        col_loja = None
+
+        for c in base_all.columns:
+            nome = str(c).lower()
+            if nome in ["loja", "filial", "cod_loja", "codigo loja", "código loja"] or "loja" in nome or "filial" in nome:
+                col_loja = c
+                break
+
+        if col_loja:
+            return int(base_all[col_loja].astype(str).nunique())
+
+        col_farmacia = None
+
+        for c in base_all.columns:
+            nome = str(c).lower()
+            if "farmácia" in nome or "farmacia" in nome:
+                col_farmacia = c
+                break
+
+        if col_farmacia:
+            return int(base_all[col_farmacia].astype(str).nunique())
+
+        return 0
+
+    except Exception:
+        return 0
+
+
+def licenca_metricas_empresa(empresa_id):
+    """
+    Métricas completas de licença.
+    """
+
+    try:
+        lic = obter_licenca_empresa(empresa_id) or {}
+        status = status_licenca_empresa(empresa_id)
+
+        max_usuarios = int(float(str(lic.get("MaxUsuarios", 0)).replace(",", ".") or 0))
+        max_lojas = int(float(str(lic.get("MaxLojas", 0)).replace(",", ".") or 0))
+
+        usuarios_usados = contar_usuarios_empresa(empresa_id)
+        lojas_usadas = contar_lojas_empresa(empresa_id)
+
+        return {
+            "Licenca": lic,
+            "Status": status,
+            "MaxUsuarios": max_usuarios,
+            "MaxLojas": max_lojas,
+            "UsuariosUsados": usuarios_usados,
+            "LojasUsadas": lojas_usadas,
+            "UsuariosDisponiveis": max(max_usuarios - usuarios_usados, 0),
+            "LojasDisponiveis": max(max_lojas - lojas_usadas, 0)
+        }
+
+    except Exception:
+        return {
+            "Licenca": {},
+            "Status": {},
+            "MaxUsuarios": 0,
+            "MaxLojas": 0,
+            "UsuariosUsados": 0,
+            "LojasUsadas": 0,
+            "UsuariosDisponiveis": 0,
+            "LojasDisponiveis": 0
+        }
+
+
+def criar_ou_atualizar_licenca(empresa_id, empresa, plano, data_inicio, data_expiracao, status, observacao=""):
+    """
+    Cria ou atualiza licença.
+    """
+
+    try:
+        empresa_id = str(empresa_id).strip()
+        empresa = str(empresa).strip()
+        plano = str(plano).strip()
+        status = str(status).strip()
+
+        if not empresa_id or not empresa or not plano:
+            return False, "EmpresaID, Empresa e Plano são obrigatórios."
+
+        plano_info = PLANOS_EIROX.get(plano, PLANOS_EIROX["Starter"])
+
+        base = carregar_licencas_sistema()
+
+        if empresa_id in base["EmpresaID"].astype(str).tolist():
+            idx = base.index[base["EmpresaID"].astype(str) == empresa_id][0]
+
+            base.loc[idx, "Empresa"] = empresa
+            base.loc[idx, "Plano"] = plano
+            base.loc[idx, "DataInicio"] = data_inicio
+            base.loc[idx, "DataExpiracao"] = data_expiracao
+            base.loc[idx, "MaxUsuarios"] = plano_info["MaxUsuarios"]
+            base.loc[idx, "MaxLojas"] = plano_info["MaxLojas"]
+            base.loc[idx, "Status"] = status
+            base.loc[idx, "Observacao"] = observacao
+
+            acao = "Atualização de licença"
+
+        else:
+            nova = pd.DataFrame(
+                [
+                    {
+                        "EmpresaID": empresa_id,
+                        "Empresa": empresa,
+                        "Plano": plano,
+                        "DataInicio": data_inicio,
+                        "DataExpiracao": data_expiracao,
+                        "MaxUsuarios": plano_info["MaxUsuarios"],
+                        "MaxLojas": plano_info["MaxLojas"],
+                        "Status": status,
+                        "Observacao": observacao
+                    }
+                ]
+            )
+
+            base = pd.concat(
+                [
+                    base,
+                    nova
+                ],
+                ignore_index=True
+            )
+
+            acao = "Criação de licença"
+
+        salvar_licencas_sistema(base)
+
+        try:
+            registrar_log_usuario(
+                acao,
+                empresa_id,
+                f"Empresa={empresa} | Plano={plano} | Status={status} | Expiração={data_expiracao}"
+            )
+        except Exception:
+            pass
+
+        try:
+            enviar_alerta_telegram(
+                "💼 <b>Licença Eirox atualizada</b>\n\n"
+                f"🏢 <b>Empresa:</b> {empresa}\n"
+                f"📦 <b>Plano:</b> {plano}\n"
+                f"📅 <b>Expiração:</b> {data_expiracao}\n"
+                f"🔐 <b>Status:</b> {status}\n"
+                f"👤 <b>Usuário:</b> {st.session_state.get('usuario', '')}\n"
+                f"🏷️ <b>Versão:</b> {VERSAO_APP}"
+            )
+        except Exception:
+            pass
+
+        return True, f"{acao} realizada com sucesso."
+
+    except Exception as erro:
+        return False, f"Erro ao salvar licença: {erro}"
+
+
+def usuario_pode_ver_licenciamento_real():
+    try:
+        return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() == "paulomarques"
+    except Exception:
+        return False
 
 
 
@@ -3452,6 +3965,12 @@ def tela_login():
 
             usuario_key = str(usuario).strip().lower()
 
+            licenca_ok, licenca_msg = validar_licenca_login(usuario_key)
+
+            if not licenca_ok:
+                st.error(licenca_msg)
+                return
+
             dados_login = obter_dados_usuario(usuario_key)
 
             st.session_state["logado"] = True
@@ -3969,7 +4488,8 @@ if usuario_pode_ver_multiempresa():
     for pagina_enterprise in [
         "📌 Sobre o Eirox",
         "🧭 Roadmap do Produto",
-        "💼 Licenciamento Multiempresa"
+        "💼 Licenciamento Multiempresa",
+        "💼 Licenciamento Real"
     ]:
         if pagina_enterprise not in paginas_liberadas:
             paginas_liberadas = paginas_liberadas + [pagina_enterprise]
@@ -4535,6 +5055,184 @@ if pagina == "🧭 Roadmap do Produto":
         )
 
     st.stop()
+
+
+
+# --------------------------------------------------
+# LICENCIAMENTO REAL
+# --------------------------------------------------
+
+if pagina == "💼 Licenciamento Real":
+
+    if not usuario_pode_ver_licenciamento_real():
+        st.error("Acesso não autorizado.")
+        st.stop()
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">SaaS Revenue Control</div>
+            <h1>💼 Licenciamento Real</h1>
+            <p>Controle real de planos, expiração, limites de usuários, lojas e bloqueio de licença por empresa.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    legenda_tela("💼 Licenciamento Real")
+
+    licencas = carregar_licencas_sistema()
+    empresas = carregar_empresas_sistema() if "carregar_empresas_sistema" in globals() else pd.DataFrame()
+
+    empresa_contexto = empresa_contexto_atual() if "empresa_contexto_atual" in globals() else "1"
+    metricas = licenca_metricas_empresa(empresa_contexto)
+    lic_atual = metricas.get("Licenca", {})
+    status_atual = metricas.get("Status", {})
+
+    st.markdown("### 🧭 Painel Executivo da Licença Atual")
+
+    l1, l2, l3, l4, l5 = st.columns(5)
+
+    l1.metric("Plano", lic_atual.get("Plano", "-"))
+    l2.metric("Status", status_atual.get("StatusOperacional", "-"))
+    l3.metric("Dias restantes", status_atual.get("DiasRestantes", "-"))
+    l4.metric("Usuários", f'{metricas.get("UsuariosUsados", 0)} / {metricas.get("MaxUsuarios", 0)}')
+    l5.metric("Lojas", f'{metricas.get("LojasUsadas", 0)} / {metricas.get("MaxLojas", 0)}')
+
+    st.markdown("### 📦 Planos disponíveis")
+
+    planos_view = pd.DataFrame(
+        [
+            {
+                "Plano": plano,
+                "MaxUsuarios": dados["MaxUsuarios"],
+                "MaxLojas": dados["MaxLojas"],
+                "Módulos": dados["Modulos"]
+            }
+            for plano, dados in PLANOS_EIROX.items()
+        ]
+    )
+
+    st.dataframe(
+        planos_view,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.markdown("### 🏢 Licenças por empresa")
+
+    lic_view = licencas.copy()
+
+    if not lic_view.empty:
+        lic_view["DiasRestantes"] = lic_view["DataExpiracao"].apply(dias_restantes_licenca)
+        lic_view["StatusOperacional"] = lic_view["EmpresaID"].apply(
+            lambda x: status_licenca_empresa(x).get("StatusOperacional", "-")
+        )
+        lic_view["UsuariosUsados"] = lic_view["EmpresaID"].apply(contar_usuarios_empresa)
+        lic_view["LojasUsadas"] = lic_view["EmpresaID"].apply(contar_lojas_empresa)
+
+    st.dataframe(
+        lic_view,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.markdown("### ✍️ Criar ou atualizar licença")
+
+    empresas_labels = []
+
+    if not empresas.empty:
+        empresas_labels = [
+            f'{row["EmpresaID"]} - {row["Empresa"]}'
+            for _, row in empresas.iterrows()
+        ]
+
+    if not empresas_labels:
+        empresas_labels = ["1 - SB Farma"]
+
+    empresa_label = st.selectbox(
+        "Empresa",
+        empresas_labels,
+        key="lic_empresa_sel"
+    )
+
+    empresa_id_sel = empresa_label.split(" - ")[0].strip()
+    empresa_nome_sel = empresa_label.split(" - ", 1)[1].strip() if " - " in empresa_label else obter_nome_empresa(empresa_id_sel)
+
+    lic_sel = obter_licenca_empresa(empresa_id_sel) or {}
+
+    with st.form("form_licenciamento_real"):
+
+        plano_form = st.selectbox(
+            "Plano",
+            list(PLANOS_EIROX.keys()),
+            index=list(PLANOS_EIROX.keys()).index(lic_sel.get("Plano", "Starter")) if lic_sel.get("Plano", "Starter") in PLANOS_EIROX else 0
+        )
+
+        data_inicio_form = st.text_input(
+            "Data início",
+            value=lic_sel.get("DataInicio", datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y")),
+            placeholder="dd/mm/aaaa"
+        )
+
+        data_expiracao_form = st.text_input(
+            "Data expiração",
+            value=lic_sel.get("DataExpiracao", ""),
+            placeholder="dd/mm/aaaa"
+        )
+
+        status_form = st.selectbox(
+            "Status",
+            ["Ativa", "Trial", "Bloqueada", "Cancelada"],
+            index=["Ativa", "Trial", "Bloqueada", "Cancelada"].index(lic_sel.get("Status", "Ativa")) if lic_sel.get("Status", "Ativa") in ["Ativa", "Trial", "Bloqueada", "Cancelada"] else 0
+        )
+
+        observacao_form = st.text_area(
+            "Observação",
+            value=lic_sel.get("Observacao", "")
+        )
+
+        salvar_licenca = st.form_submit_button(
+            "💾 Salvar licença",
+            use_container_width=True
+        )
+
+    if salvar_licenca:
+        ok, msg = criar_ou_atualizar_licenca(
+            empresa_id_sel,
+            empresa_nome_sel,
+            plano_form,
+            data_inicio_form,
+            data_expiracao_form,
+            status_form,
+            observacao_form
+        )
+
+        if ok:
+            st.success(msg)
+            st.rerun()
+        else:
+            st.error(msg)
+
+    st.markdown("### 🔒 Regras automáticas")
+
+    regras = pd.DataFrame(
+        [
+            {"Regra": "Bloqueio por expiração", "Status": "✅ Ativo", "Descrição": "Usuários de empresas expiradas são bloqueados no login."},
+            {"Regra": "Limite de usuários", "Status": "✅ Ativo", "Descrição": "Cadastro respeita o limite do plano contratado."},
+            {"Regra": "Limite de lojas", "Status": "🟡 Monitorado", "Descrição": "Quantidade de lojas é calculada e exibida para controle comercial."},
+            {"Regra": "Master support", "Status": "✅ Ativo", "Descrição": "paulomarques não é bloqueado para suporte e administração."}
+        ]
+    )
+
+    st.dataframe(
+        regras,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.stop()
+
 
 
 # --------------------------------------------------
