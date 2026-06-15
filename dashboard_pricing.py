@@ -2360,21 +2360,19 @@ EMPRESAS_ARQUIVO = Path("EMPRESAS_EIROX.csv")
 
 def usuario_master():
     """
-    Usuários master da plataforma.
+    Usuário master da plataforma.
     """
 
     try:
-        usuarios_master = [
-            "paulomarques",
-            "vanderlei",
-            "ubiratan"
-        ]
-
-        return str(st.session_state.get("usuario", "")).strip().lower() in usuarios_master
+        return (
+            str(st.session_state.get("usuario", ""))
+            .strip()
+            .lower()
+            == "paulomarques"
+        )
 
     except Exception:
         return False
-
 
 
 def inicializar_empresas():
@@ -2877,7 +2875,7 @@ def validar_licenca_login(usuario):
     try:
         usuario = str(usuario).strip().lower()
 
-        if usuario in ["paulomarques", "vanderlei", "ubiratan"]:
+        if usuario in ["paulomarques"]:
             return True, ""
 
         dados = obter_dados_usuario(usuario) if "obter_dados_usuario" in globals() else None
@@ -3921,7 +3919,7 @@ WORKFLOW_COMERCIAL_ARQUIVO = Path("WORKFLOW_COMERCIAL_EIROX.csv")
 
 def usuario_pode_ver_workflow_comercial():
     try:
-        return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() in ["paulomarques", "vanderlei", "ubiratan"]
+        return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() in ["paulomarques"]
     except Exception:
         return False
 
@@ -4091,7 +4089,7 @@ CLIENTES_EIROX_ARQUIVO = Path("CLIENTES_EIROX.csv")
 
 def usuario_pode_ver_crm_enterprise():
     try:
-        return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() in ["paulomarques", "vanderlei", "ubiratan"]
+        return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() in ["paulomarques"]
     except Exception:
         return False
 
