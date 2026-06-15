@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.40.4-lts-map-zoom-close"
+VERSAO_APP = "v1.40.5-lts-map-zoom-18"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -5292,15 +5292,18 @@ def centro_mapa_eirox(df_mapa, col_lat=None, col_lon=None):
             return None
 
         return {
-            "lat": float(base["lat"].mean()),
-            "lon": float(base["lon"].mean())
+            "lat": float(base["lat"].median()),
+            "lon": float(base["lon"].median())
         }
     except Exception:
         return None
 
 
-def aplicar_zoom_mapa_eirox(fig, df_mapa=None, zoom=15.5):
+def aplicar_zoom_mapa_eirox(fig, df_mapa=None, zoom=18):
     try:
+        if df_mapa is not None and isinstance(df_mapa, pd.DataFrame) and len(df_mapa.dropna(how="all")) <= 2:
+            zoom = 19
+
         centro = centro_mapa_eirox(df_mapa)
 
         layout_mapbox = {"zoom": zoom}
@@ -12300,7 +12303,7 @@ if pagina == "🌎 Mapa Geográfico de Concorrência":
         mapbox=dict(
             style="carto-darkmatter",
             center=dict(lat=centro_lat, lon=centro_lon),
-            zoom=15.5
+            zoom=18
         ),
         height=680,
         margin=dict(l=0, r=0, t=20, b=0),
@@ -12309,7 +12312,7 @@ paper_bgcolor="rgba(0,0,0,0)"
 
     try:
 
-        fig_mapa = aplicar_zoom_mapa_eirox(fig_mapa, df_mapa_filtrado if "df_mapa_filtrado" in locals() else (df_mapa if "df_mapa" in locals() else (dados_mapa if "dados_mapa" in locals() else (mapa_df if "mapa_df" in locals() else None))), zoom=15.5)
+        fig_mapa = aplicar_zoom_mapa_eirox(fig_mapa, df_mapa_filtrado if "df_mapa_filtrado" in locals() else (df_mapa if "df_mapa" in locals() else (dados_mapa if "dados_mapa" in locals() else (mapa_df if "mapa_df" in locals() else None))), zoom=18)
 
     except Exception:
 
