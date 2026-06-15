@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.38.0-crm-enterprise-master-paulo-fix-licenca"
+VERSAO_APP = "v1.38.1-menu-por-plano"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -1772,7 +1772,7 @@ LOG_ARQUIVO = LOG_DIR / "log_acessos.csv"
 
 def usuario_pode_ver_auditoria():
     try:
-        return str(st.session_state.get("usuario", "")).strip().lower() == "paulomarques"
+        return usuario_master()
     except Exception:
         return False
 
@@ -4352,6 +4352,155 @@ def metricas_crm_enterprise():
 
 
 
+
+# --------------------------------------------------
+# MENU POR PLANO - v1.38.1
+# --------------------------------------------------
+
+TELAS_CLIENTE_POR_PLANO = {
+    "Starter": [
+        "📊 Dashboard Geral",
+        "📊 Painel Geral",
+        "🔎 Rede/Loja vs Concorrentes",
+        "🔍 Rede/Loja vs Concorrentes",
+        "📈 Evolução Histórica"
+    ],
+    "Professional": [
+        "📊 Dashboard Geral",
+        "📊 Painel Geral",
+        "🔎 Rede/Loja vs Concorrentes",
+        "🔍 Rede/Loja vs Concorrentes",
+        "📈 Evolução Histórica",
+        "🗺️ Mapa Farmácias",
+        "🧠 Simulador Inteligente",
+        "🚨 Alertas Inteligentes",
+        "💰 Motor de Oportunidades"
+    ],
+    "Enterprise": [
+        "📊 Dashboard Geral",
+        "📊 Painel Geral",
+        "🔎 Rede/Loja vs Concorrentes",
+        "🔍 Rede/Loja vs Concorrentes",
+        "📈 Evolução Histórica",
+        "🗺️ Mapa Farmácias",
+        "🧠 Simulador Inteligente",
+        "🚨 Alertas Inteligentes",
+        "💰 Motor de Oportunidades",
+        "🤖 IA Pricing Enterprise",
+        "📋 Workflow Comercial"
+    ],
+    "Enterprise Plus": [
+        "📊 Dashboard Geral",
+        "📊 Painel Geral",
+        "🔎 Rede/Loja vs Concorrentes",
+        "🔍 Rede/Loja vs Concorrentes",
+        "📈 Evolução Histórica",
+        "🗺️ Mapa Farmácias",
+        "🧠 Simulador Inteligente",
+        "🚨 Alertas Inteligentes",
+        "💰 Motor de Oportunidades",
+        "🤖 IA Pricing Enterprise",
+        "📋 Workflow Comercial"
+    ]
+}
+
+TELAS_ADMIN_EIROX = [
+    "👥 Controle de Usuários",
+    "🔐 Central de Auditoria",
+    "📋 Central de Auditoria",
+    "🟢 Saúde do Sistema",
+    "📦 Backup Center",
+    "🏢 Multiempresa",
+    "💼 Licenciamento Multiempresa",
+    "💼 Licenciamento Real",
+    "🏢 CRM Enterprise",
+    "🏁 Release Candidate",
+    "📌 Sobre o Eirox",
+    "🧭 Roadmap do Produto"
+]
+
+
+def plano_empresa_contexto():
+    try:
+        empresa_id = empresa_contexto_atual() if "empresa_contexto_atual" in globals() else st.session_state.get("empresa_id_usuario", "1")
+        lic = obter_licenca_empresa(empresa_id) if "obter_licenca_empresa" in globals() else None
+        if lic:
+            return str(lic.get("Plano", "Starter")).strip() or "Starter"
+        return "Starter"
+    except Exception:
+        return "Starter"
+
+
+def tela_liberada_por_plano(pagina_nome):
+    try:
+        if usuario_master():
+            return True
+
+        plano = plano_empresa_contexto()
+        telas = TELAS_CLIENTE_POR_PLANO.get(plano, TELAS_CLIENTE_POR_PLANO["Starter"])
+
+        return str(pagina_nome) in telas
+
+    except Exception:
+        return False
+
+
+def filtrar_paginas_por_plano(paginas):
+    try:
+        paginas = list(paginas)
+
+        if usuario_master():
+            return paginas
+
+        return [
+            p for p in paginas
+            if tela_liberada_por_plano(p)
+        ]
+
+    except Exception:
+        return paginas
+
+
+def dividir_menu_cliente_admin(paginas):
+    """
+    Separa menu em Área do Cliente e Administração Eirox.
+    Para usuários comuns, mostra apenas a Área do Cliente conforme plano.
+    """
+
+    try:
+        paginas = list(paginas)
+        plano = plano_empresa_contexto()
+
+        telas_cliente_plano = TELAS_CLIENTE_POR_PLANO.get(
+            plano,
+            TELAS_CLIENTE_POR_PLANO["Starter"]
+        )
+
+        cliente = [
+            p for p in paginas
+            if p in telas_cliente_plano
+        ]
+
+        admin = [
+            p for p in paginas
+            if p in TELAS_ADMIN_EIROX
+        ]
+
+        outros = [
+            p for p in paginas
+            if p not in cliente and p not in admin
+        ]
+
+        if usuario_master():
+            return cliente + outros, admin
+
+        return cliente + outros, []
+
+    except Exception:
+        return paginas, []
+
+
+
 # --------------------------------------------------
 # LOGIN E CONTROLE DE ACESSO
 # --------------------------------------------------
@@ -5765,12 +5914,57 @@ if usuario_pode_ver_workflow_comercial() and "📋 Workflow Comercial" not in pa
 if usuario_pode_ver_crm_enterprise() and "🏢 CRM Enterprise" not in paginas_liberadas:
     paginas_liberadas = paginas_liberadas + ["🏢 CRM Enterprise"]
 
-pagina = st.sidebar.radio(
-    "Escolha a visão",
-    paginas_liberadas,
-    key="menu_principal_v3",
-    label_visibility="collapsed"
+
+# Aplica plano e separa menu por área
+paginas_liberadas = filtrar_paginas_por_plano(paginas_liberadas)
+paginas_cliente_menu, paginas_admin_menu = dividir_menu_cliente_admin(paginas_liberadas)
+
+plano_atual_menu = plano_empresa_contexto()
+
+st.sidebar.markdown(
+    f"""
+    <div class="sidebar-section">Área do Cliente</div>
+    <div class="sidebar-user">Plano: <b>{plano_atual_menu}</b></div>
+    """,
+    unsafe_allow_html=True
 )
+
+pagina = None
+
+if paginas_cliente_menu:
+    pagina_cliente = st.sidebar.radio(
+        "Cliente",
+        paginas_cliente_menu,
+        index=0,
+        label_visibility="collapsed",
+        key="menu_area_cliente"
+    )
+    pagina = pagina_cliente
+
+if usuario_master() and paginas_admin_menu:
+    st.sidebar.markdown("---")
+    st.sidebar.markdown(
+        """
+        <div class="sidebar-section">Administração Eirox</div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    pagina_admin = st.sidebar.radio(
+        "Administração",
+        ["Selecionar..."] + paginas_admin_menu,
+        index=0,
+        label_visibility="collapsed",
+        key="menu_area_admin"
+    )
+
+    if pagina_admin != "Selecionar...":
+        pagina = pagina_admin
+
+if pagina is None:
+    st.error("Nenhuma página disponível para o plano atual.")
+    st.stop()
+
 
 
 
