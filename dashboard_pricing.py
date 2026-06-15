@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.40.3-lts-visual-map-fix"
+VERSAO_APP = "v1.40.4-lts-map-zoom-close"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -5299,7 +5299,7 @@ def centro_mapa_eirox(df_mapa, col_lat=None, col_lon=None):
         return None
 
 
-def aplicar_zoom_mapa_eirox(fig, df_mapa=None, zoom=13):
+def aplicar_zoom_mapa_eirox(fig, df_mapa=None, zoom=15.5):
     try:
         centro = centro_mapa_eirox(df_mapa)
 
@@ -12300,7 +12300,7 @@ if pagina == "🌎 Mapa Geográfico de Concorrência":
         mapbox=dict(
             style="carto-darkmatter",
             center=dict(lat=centro_lat, lon=centro_lon),
-            zoom=13
+            zoom=15.5
         ),
         height=680,
         margin=dict(l=0, r=0, t=20, b=0),
@@ -12309,7 +12309,7 @@ paper_bgcolor="rgba(0,0,0,0)"
 
     try:
 
-        fig_mapa = aplicar_zoom_mapa_eirox(fig_mapa, df_mapa if "df_mapa" in locals() else (dados_mapa if "dados_mapa" in locals() else (mapa_df if "mapa_df" in locals() else (df_mapa_filtrado if "df_mapa_filtrado" in locals() else None))), zoom=13)
+        fig_mapa = aplicar_zoom_mapa_eirox(fig_mapa, df_mapa_filtrado if "df_mapa_filtrado" in locals() else (df_mapa if "df_mapa" in locals() else (dados_mapa if "dados_mapa" in locals() else (mapa_df if "mapa_df" in locals() else None))), zoom=15.5)
 
     except Exception:
 
