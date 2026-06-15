@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.40.1-menu-enterprise-fix"
+VERSAO_APP = "v1.40.2-menu-enterprise-full-fix"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -3392,12 +3392,9 @@ def enviar_alertas_telegram(alertas_df, limite_envio=10):
 
 def usuario_pode_ver_alertas_inteligentes():
     try:
-        return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() == "paulomarques"
+        return usuario_master() or tela_liberada_por_plano("🚨 Alertas Inteligentes")
     except Exception:
         return False
-
-
-
 
 # --------------------------------------------------
 # MOTOR DE OPORTUNIDADES - v1.36.2
@@ -3624,12 +3621,9 @@ def enviar_oportunidades_telegram(oportunidades_df, limite_envio=10):
 
 def usuario_pode_ver_motor_oportunidades():
     try:
-        return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() == "paulomarques"
+        return usuario_master() or tela_liberada_por_plano("💰 Motor de Oportunidades")
     except Exception:
         return False
-
-
-
 
 # --------------------------------------------------
 # RELEASE CANDIDATE CENTER - v1.36.3 RC
@@ -3739,7 +3733,7 @@ IA_PRICING_ARQUIVO = Path("IA_PRICING_EIROX.csv")
 
 def usuario_pode_ver_ia_pricing():
     try:
-        return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() == "paulomarques"
+        return usuario_master() or tela_liberada_por_plano("🤖 IA Pricing Enterprise")
     except Exception:
         return False
 
@@ -3920,7 +3914,7 @@ WORKFLOW_COMERCIAL_ARQUIVO = Path("WORKFLOW_COMERCIAL_EIROX.csv")
 
 def usuario_pode_ver_workflow_comercial():
     try:
-        return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() in ["paulomarques"]
+        return usuario_master() or tela_liberada_por_plano("📋 Workflow Comercial")
     except Exception:
         return False
 
@@ -4359,50 +4353,50 @@ def metricas_crm_enterprise():
 
 TELAS_CLIENTE_POR_PLANO = {
     "Starter": [
+        "🏢 Portal do Cliente",
+        "🎯 Sugestão de Pesquisa",
         "🏢 Dashboard Executivo",
         "🔎 Rede/Loja vs Concorrentes",
-        "🎯 Sugestão de Pesquisa",
-        "🏢 Portal do Cliente",
     ],
     "Professional": [
-        "🏢 Dashboard Executivo",
-        "🔎 Rede/Loja vs Concorrentes",
-        "🎯 Sugestão de Pesquisa",
         "🏢 Portal do Cliente",
-        "📈 Simulador Inteligente",
-        "🌎 Mapa Geográfico de Concorrência",
-        "🚨 Alertas Inteligentes",
-        "🚨 Central de Alertas",
         "💰 Motor de Oportunidades",
+        "🚨 Alertas Inteligentes",
+        "🎯 Sugestão de Pesquisa",
+        "📈 Simulador Inteligente",
+        "🏢 Dashboard Executivo",
+        "🌎 Mapa Geográfico de Concorrência",
+        "🔎 Rede/Loja vs Concorrentes",
         "🛒 Negociação Compras",
+        "🚨 Central de Alertas",
     ],
     "Enterprise": [
-        "🏢 Dashboard Executivo",
-        "🔎 Rede/Loja vs Concorrentes",
-        "🎯 Sugestão de Pesquisa",
         "🏢 Portal do Cliente",
-        "📈 Simulador Inteligente",
-        "🌎 Mapa Geográfico de Concorrência",
-        "🚨 Alertas Inteligentes",
-        "🚨 Central de Alertas",
-        "💰 Motor de Oportunidades",
-        "🛒 Negociação Compras",
-        "🤖 IA Pricing Enterprise",
         "📋 Workflow Comercial",
+        "🤖 IA Pricing Enterprise",
+        "💰 Motor de Oportunidades",
+        "🚨 Alertas Inteligentes",
+        "🎯 Sugestão de Pesquisa",
+        "📈 Simulador Inteligente",
+        "🏢 Dashboard Executivo",
+        "🌎 Mapa Geográfico de Concorrência",
+        "🔎 Rede/Loja vs Concorrentes",
+        "🛒 Negociação Compras",
+        "🚨 Central de Alertas",
     ],
     "Enterprise Plus": [
-        "🏢 Dashboard Executivo",
-        "🔎 Rede/Loja vs Concorrentes",
-        "🎯 Sugestão de Pesquisa",
         "🏢 Portal do Cliente",
-        "📈 Simulador Inteligente",
-        "🌎 Mapa Geográfico de Concorrência",
-        "🚨 Alertas Inteligentes",
-        "🚨 Central de Alertas",
-        "💰 Motor de Oportunidades",
-        "🛒 Negociação Compras",
-        "🤖 IA Pricing Enterprise",
         "📋 Workflow Comercial",
+        "🤖 IA Pricing Enterprise",
+        "💰 Motor de Oportunidades",
+        "🚨 Alertas Inteligentes",
+        "🎯 Sugestão de Pesquisa",
+        "📈 Simulador Inteligente",
+        "🏢 Dashboard Executivo",
+        "🌎 Mapa Geográfico de Concorrência",
+        "🔎 Rede/Loja vs Concorrentes",
+        "🛒 Negociação Compras",
+        "🚨 Central de Alertas",
     ]
 }
 
@@ -4495,10 +4489,26 @@ def filtrar_paginas_por_plano(paginas):
         if usuario_master():
             return paginas
 
+        plano = plano_empresa_contexto()
+
+        admin_pages = ['🏁 Release Candidate', '🏢 CRM Enterprise', '🏢 Multiempresa', '👥 Controle de Usuários', '💳 Billing Enterprise', '💼 Licenciamento Multiempresa', '💼 Licenciamento Real', '📌 Sobre o Eirox', '📦 Backup Center', '🔐 Central de Auditoria', '🟢 Saúde do Sistema', '🧪 Diagnóstico', '🧭 Roadmap do Produto']
+
+        # Garante que todas as páginas de cliente existentes entrem no menu conforme o plano.
+        todas_paginas_cliente = ['🏢 Portal do Cliente', '📋 Workflow Comercial', '🤖 IA Pricing Enterprise', '💰 Motor de Oportunidades', '🚨 Alertas Inteligentes', '🎯 Sugestão de Pesquisa', '📈 Simulador Inteligente', '🏢 Dashboard Executivo', '🌎 Mapa Geográfico de Concorrência', '🔎 Rede/Loja vs Concorrentes', '🛒 Negociação Compras', '🚨 Central de Alertas']
+
+        for p in todas_paginas_cliente:
+            if p not in paginas:
+                paginas.append(p)
+
+        telas_liberadas = TELAS_CLIENTE_POR_PLANO.get(plano, TELAS_CLIENTE_POR_PLANO["Starter"])
+
         liberadas = []
 
         for p in paginas:
-            if tela_liberada_por_plano(p):
+            if p in admin_pages:
+                continue
+
+            if p in telas_liberadas:
                 liberadas.append(p)
 
         return liberadas
@@ -4510,31 +4520,20 @@ def filtrar_paginas_por_plano(paginas):
 def dividir_menu_cliente_admin(paginas):
     """
     Separa menu em Área do Cliente e Administração Eirox.
-    Para usuários comuns, mostra apenas a Área do Cliente conforme plano.
     """
 
     try:
         paginas = list(paginas)
 
-        cliente = [
-            p for p in paginas
-            if tela_liberada_por_plano(p) and p not in TELAS_ADMIN_EIROX
-        ]
+        admin_pages = ['🏁 Release Candidate', '🏢 CRM Enterprise', '🏢 Multiempresa', '👥 Controle de Usuários', '💳 Billing Enterprise', '💼 Licenciamento Multiempresa', '💼 Licenciamento Real', '📌 Sobre o Eirox', '📦 Backup Center', '🔐 Central de Auditoria', '🟢 Saúde do Sistema', '🧪 Diagnóstico', '🧭 Roadmap do Produto']
 
-        admin = [
-            p for p in paginas
-            if p in TELAS_ADMIN_EIROX
-        ]
-
-        outros = [
-            p for p in paginas
-            if p not in cliente and p not in admin
-        ]
+        cliente = [p for p in paginas if p not in admin_pages]
+        admin = [p for p in paginas if p in admin_pages]
 
         if usuario_master():
-            return cliente + outros, admin
+            return cliente, admin
 
-        return cliente + outros, []
+        return cliente, []
 
     except Exception:
         return paginas, []
