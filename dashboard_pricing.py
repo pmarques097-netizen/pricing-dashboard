@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.37.1-workflow-comercial"
+VERSAO_APP = "v1.37.1-workflow-comercial-clientes-ajustados"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -2384,13 +2384,13 @@ def inicializar_empresas():
                 [
                     {
                         "EmpresaID": "1",
-                        "Empresa": "SB Farma",
+                        "Empresa": "Marabá - Cliente teste",
                         "Ativa": "Sim",
                         "Criado_Em": horario_brasil_formatado() if "horario_brasil_formatado" in globals() else datetime.now().strftime("%d/%m/%Y %H:%M:%S")
                     },
                     {
                         "EmpresaID": "2",
-                        "Empresa": "Cliente Teste",
+                        "Empresa": "Belém - Cliente teste",
                         "Ativa": "Sim",
                         "Criado_Em": horario_brasil_formatado() if "horario_brasil_formatado" in globals() else datetime.now().strftime("%d/%m/%Y %H:%M:%S")
                     }
@@ -2421,7 +2421,7 @@ def carregar_empresas_sistema():
         return base[obrigatorias].copy()
 
     except Exception:
-        return pd.DataFrame([{"EmpresaID": "1", "Empresa": "SB Farma", "Ativa": "Sim", "Criado_Em": ""}])
+        return pd.DataFrame([{"EmpresaID": "1", "Empresa": "Marabá - Cliente teste", "Ativa": "Sim", "Criado_Em": ""}])
 
 
 def salvar_empresas_sistema(base):
@@ -2650,7 +2650,7 @@ def inicializar_licencas():
                 [
                     {
                         "EmpresaID": "1",
-                        "Empresa": "SB Farma",
+                        "Empresa": "Marabá - Cliente teste",
                         "Plano": "Enterprise",
                         "DataInicio": hoje.strftime("%d/%m/%Y"),
                         "DataExpiracao": (hoje + pd.DateOffset(years=1)).strftime("%d/%m/%Y"),
@@ -2661,7 +2661,7 @@ def inicializar_licencas():
                     },
                     {
                         "EmpresaID": "2",
-                        "Empresa": "Cliente Teste",
+                        "Empresa": "Belém - Cliente teste",
                         "Plano": "Starter",
                         "DataInicio": hoje.strftime("%d/%m/%Y"),
                         "DataExpiracao": (hoje + pd.DateOffset(days=30)).strftime("%d/%m/%Y"),
@@ -6721,7 +6721,7 @@ if pagina == "💼 Licenciamento Real":
         ]
 
     if not empresas_labels:
-        empresas_labels = ["1 - SB Farma"]
+        empresas_labels = ["1 - Marabá - Cliente teste"]
 
     empresa_label = st.selectbox(
         "Empresa",
