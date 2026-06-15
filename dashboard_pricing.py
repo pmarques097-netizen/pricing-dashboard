@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.38.1-menu-por-plano"
+VERSAO_APP = "v1.39.1-portal-cliente-enterprise"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -4363,7 +4363,8 @@ TELAS_CLIENTE_POR_PLANO = {
         "📊 Painel Geral",
         "🔎 Rede/Loja vs Concorrentes",
         "🔍 Rede/Loja vs Concorrentes",
-        "📈 Evolução Histórica"
+        "📈 Evolução Histórica",
+        "🏢 Portal do Cliente"
     ],
     "Professional": [
         "📊 Dashboard Geral",
@@ -4374,7 +4375,8 @@ TELAS_CLIENTE_POR_PLANO = {
         "🗺️ Mapa Farmácias",
         "🧠 Simulador Inteligente",
         "🚨 Alertas Inteligentes",
-        "💰 Motor de Oportunidades"
+        "💰 Motor de Oportunidades",
+        "🏢 Portal do Cliente"
     ],
     "Enterprise": [
         "📊 Dashboard Geral",
@@ -4387,7 +4389,8 @@ TELAS_CLIENTE_POR_PLANO = {
         "🚨 Alertas Inteligentes",
         "💰 Motor de Oportunidades",
         "🤖 IA Pricing Enterprise",
-        "📋 Workflow Comercial"
+        "📋 Workflow Comercial",
+        "🏢 Portal do Cliente"
     ],
     "Enterprise Plus": [
         "📊 Dashboard Geral",
@@ -4400,7 +4403,8 @@ TELAS_CLIENTE_POR_PLANO = {
         "🚨 Alertas Inteligentes",
         "💰 Motor de Oportunidades",
         "🤖 IA Pricing Enterprise",
-        "📋 Workflow Comercial"
+        "📋 Workflow Comercial",
+        "🏢 Portal do Cliente"
     ]
 }
 
@@ -4498,6 +4502,283 @@ def dividir_menu_cliente_admin(paginas):
 
     except Exception:
         return paginas, []
+
+
+
+
+# --------------------------------------------------
+# PORTAL DO CLIENTE ENTERPRISE - v1.39.1
+# --------------------------------------------------
+
+SUPORTE_CLIENTE_ARQUIVO = Path("SUPORTE_CLIENTE_EIROX.csv")
+
+
+def usuario_pode_ver_portal_cliente():
+    return True
+
+
+def _portal_data_hora():
+    try:
+        return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S")
+    except Exception:
+        return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+def _portal_numero_br(valor, casas=2):
+    try:
+        return f"{float(valor):,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return "0,00"
+
+
+def _portal_percentual(valor):
+    try:
+        valor = float(valor)
+        return max(min(valor, 100), 0)
+    except Exception:
+        return 0
+
+
+def _portal_barra_consumo(valor):
+    try:
+        valor = _portal_percentual(valor)
+        cheios = int(round(valor / 10))
+        vazios = 10 - cheios
+        return "█" * cheios + "░" * vazios + f" {valor:.0f}%"
+    except Exception:
+        return "░░░░░░░░░░ 0%"
+
+
+def portal_empresa_atual():
+    try:
+        empresa_id = empresa_contexto_atual() if "empresa_contexto_atual" in globals() else st.session_state.get("empresa_id_usuario", "1")
+        empresa_nome = obter_nome_empresa(empresa_id) if "obter_nome_empresa" in globals() else "Empresa não identificada"
+        return str(empresa_id), str(empresa_nome)
+    except Exception:
+        return "1", "Empresa não identificada"
+
+
+def portal_dados_cliente():
+    try:
+        empresa_id, empresa_nome = portal_empresa_atual()
+
+        dados = {
+            "EmpresaID": empresa_id,
+            "Cliente": empresa_nome,
+            "CNPJ": "",
+            "Cidade": "",
+            "UF": "",
+            "Qtd_Lojas": "",
+            "Plano": plano_empresa_contexto() if "plano_empresa_contexto" in globals() else "Starter",
+            "Status": "",
+            "Data_Implantacao": "",
+            "Data_Renovacao": "",
+            "Responsavel_Comercial": "",
+            "Observacao": ""
+        }
+
+        if "carregar_clientes_eirox" in globals():
+            clientes = carregar_clientes_eirox()
+            if isinstance(clientes, pd.DataFrame) and not clientes.empty and "EmpresaID" in clientes.columns:
+                linha = clientes[clientes["EmpresaID"].astype(str).str.strip() == str(empresa_id)]
+                if not linha.empty:
+                    dados.update(linha.iloc[0].to_dict())
+
+        return dados
+
+    except Exception:
+        return {}
+
+
+def portal_metricas_licenca():
+    try:
+        empresa_id, _ = portal_empresa_atual()
+
+        if "licenca_metricas_empresa" in globals():
+            return licenca_metricas_empresa(empresa_id)
+
+        return {
+            "Licenca": {},
+            "Status": {},
+            "MaxUsuarios": 0,
+            "MaxLojas": 0,
+            "UsuariosUsados": 0,
+            "LojasUsadas": 0,
+            "UsuariosDisponiveis": 0,
+            "LojasDisponiveis": 0
+        }
+
+    except Exception:
+        return {
+            "Licenca": {},
+            "Status": {},
+            "MaxUsuarios": 0,
+            "MaxLojas": 0,
+            "UsuariosUsados": 0,
+            "LojasUsadas": 0,
+            "UsuariosDisponiveis": 0,
+            "LojasDisponiveis": 0
+        }
+
+
+def portal_metricas_uso():
+    try:
+        empresa_id, _ = portal_empresa_atual()
+
+        logs = carregar_logs_acesso() if "carregar_logs_acesso" in globals() else pd.DataFrame()
+
+        total_acessos = 0
+        usuarios_ativos = 0
+        ultimo_acesso = "-"
+
+        if isinstance(logs, pd.DataFrame) and not logs.empty:
+            logs_empresa = logs.copy()
+
+            if "EmpresaID" in logs_empresa.columns:
+                logs_empresa = logs_empresa[logs_empresa["EmpresaID"].astype(str).str.strip() == str(empresa_id)]
+
+            total_acessos = len(logs_empresa)
+
+            if "Usuario" in logs_empresa.columns:
+                usuarios_ativos = logs_empresa["Usuario"].astype(str).nunique()
+
+            if "Data_Hora_dt" in logs_empresa.columns and logs_empresa["Data_Hora_dt"].notna().any():
+                ultimo_acesso = logs_empresa["Data_Hora_dt"].max().strftime("%d/%m/%Y %H:%M:%S")
+            elif "Data_Hora" in logs_empresa.columns and not logs_empresa.empty:
+                ultimo_acesso = str(logs_empresa.tail(1).iloc[0].get("Data_Hora", "-"))
+
+        produtos_monitorados = 0
+        recomendacoes_ia = 0
+        alertas = 0
+
+        try:
+            base = globals().get("df", pd.DataFrame())
+            if isinstance(base, pd.DataFrame) and not base.empty:
+                if "EmpresaID" in base.columns:
+                    base = base[base["EmpresaID"].astype(str).str.strip() == str(empresa_id)]
+
+                if "EAN" in base.columns:
+                    produtos_monitorados = int(base["EAN"].astype(str).nunique())
+                else:
+                    produtos_monitorados = int(len(base))
+        except Exception:
+            pass
+
+        try:
+            hist_ia = carregar_historico_ia_pricing() if "carregar_historico_ia_pricing" in globals() else pd.DataFrame()
+            if isinstance(hist_ia, pd.DataFrame) and not hist_ia.empty:
+                if "EmpresaID" in hist_ia.columns:
+                    hist_ia = hist_ia[hist_ia["EmpresaID"].astype(str).str.strip() == str(empresa_id)]
+                recomendacoes_ia = len(hist_ia)
+        except Exception:
+            pass
+
+        try:
+            hist_alertas = carregar_historico_alertas() if "carregar_historico_alertas" in globals() else pd.DataFrame()
+            if isinstance(hist_alertas, pd.DataFrame) and not hist_alertas.empty:
+                if "EmpresaID" in hist_alertas.columns:
+                    hist_alertas = hist_alertas[hist_alertas["EmpresaID"].astype(str).str.strip() == str(empresa_id)]
+                alertas = len(hist_alertas)
+        except Exception:
+            pass
+
+        return {
+            "UltimoAcesso": ultimo_acesso,
+            "UsuariosAtivos": usuarios_ativos,
+            "TotalAcessos": total_acessos,
+            "ProdutosMonitorados": produtos_monitorados,
+            "RecomendacoesIA": recomendacoes_ia,
+            "Alertas": alertas
+        }
+
+    except Exception:
+        return {
+            "UltimoAcesso": "-",
+            "UsuariosAtivos": 0,
+            "TotalAcessos": 0,
+            "ProdutosMonitorados": 0,
+            "RecomendacoesIA": 0,
+            "Alertas": 0
+        }
+
+
+def carregar_chamados_suporte_cliente():
+    try:
+        if not SUPORTE_CLIENTE_ARQUIVO.exists():
+            return pd.DataFrame(columns=[
+                "ID", "Data_Hora", "EmpresaID", "Empresa", "Usuario",
+                "Assunto", "Prioridade", "Status", "Mensagem", "Versao"
+            ])
+
+        return pd.read_csv(
+            SUPORTE_CLIENTE_ARQUIVO,
+            sep=";",
+            encoding="utf-8-sig",
+            dtype=str
+        ).fillna("")
+
+    except Exception:
+        return pd.DataFrame()
+
+
+def salvar_chamado_suporte_cliente(assunto, prioridade, mensagem):
+    try:
+        empresa_id, empresa_nome = portal_empresa_atual()
+
+        base = carregar_chamados_suporte_cliente()
+
+        novo = {
+            "ID": f"SUP-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            "Data_Hora": _portal_data_hora(),
+            "EmpresaID": empresa_id,
+            "Empresa": empresa_nome,
+            "Usuario": st.session_state.get("usuario", ""),
+            "Assunto": str(assunto).strip(),
+            "Prioridade": str(prioridade).strip(),
+            "Status": "Aberto",
+            "Mensagem": str(mensagem).strip(),
+            "Versao": VERSAO_APP
+        }
+
+        final = pd.concat([base, pd.DataFrame([novo])], ignore_index=True)
+
+        final.to_csv(
+            SUPORTE_CLIENTE_ARQUIVO,
+            index=False,
+            sep=";",
+            encoding="utf-8-sig"
+        )
+
+        try:
+            enviar_alerta_telegram(
+                "🎫 <b>Novo chamado no Portal do Cliente</b>\\n\\n"
+                f"🏢 <b>Empresa:</b> {empresa_nome}\\n"
+                f"👤 <b>Usuário:</b> {st.session_state.get('usuario', '')}\\n"
+                f"📌 <b>Assunto:</b> {assunto}\\n"
+                f"⚠️ <b>Prioridade:</b> {prioridade}\\n"
+                f"🕒 <b>Horário:</b> {_portal_data_hora()}\\n"
+                f"🏷️ <b>Versão:</b> {VERSAO_APP}"
+            )
+        except Exception:
+            pass
+
+        return True, "Chamado aberto com sucesso."
+
+    except Exception as erro:
+        return False, f"Erro ao abrir chamado: {erro}"
+
+
+def portal_novidades():
+    return pd.DataFrame(
+        [
+            {"Versão": "v1.39.1", "Novidade": "Portal do Cliente Enterprise", "Descrição": "Minha empresa, licença, uso, suporte e central de conhecimento."},
+            {"Versão": "v1.38.1", "Novidade": "Menu por plano", "Descrição": "Área do Cliente separada da Administração Eirox."},
+            {"Versão": "v1.38.0", "Novidade": "CRM Enterprise", "Descrição": "Gestão comercial de clientes, planos, MRR e implantação."},
+            {"Versão": "v1.37.1", "Novidade": "Workflow Comercial", "Descrição": "Aprovação e rejeição de recomendações da IA."},
+            {"Versão": "v1.37.0", "Novidade": "IA Pricing Enterprise", "Descrição": "Recomendações automáticas de preço."},
+            {"Versão": "v1.36.2", "Novidade": "Motor de Oportunidades", "Descrição": "Ranking financeiro de oportunidades comerciais."}
+        ]
+    )
 
 
 
@@ -5916,6 +6197,10 @@ if usuario_pode_ver_crm_enterprise() and "🏢 CRM Enterprise" not in paginas_li
 
 
 # Aplica plano e separa menu por área
+
+if usuario_pode_ver_portal_cliente() and "🏢 Portal do Cliente" not in paginas_liberadas:
+    paginas_liberadas = paginas_liberadas + ["🏢 Portal do Cliente"]
+
 paginas_liberadas = filtrar_paginas_por_plano(paginas_liberadas)
 paginas_cliente_menu, paginas_admin_menu = dividir_menu_cliente_admin(paginas_liberadas)
 
@@ -6112,6 +6397,204 @@ df_filtrado = propagar_ganho_potencial(df_filtrado)
 
 # --------------------------------------------------
 # CRM ENTERPRISE
+
+# --------------------------------------------------
+# PORTAL DO CLIENTE
+# --------------------------------------------------
+
+if pagina == "🏢 Portal do Cliente":
+
+    if not usuario_pode_ver_portal_cliente():
+        st.error("Acesso não autorizado.")
+        st.stop()
+
+    dados_cliente = portal_dados_cliente()
+    metricas_lic = portal_metricas_licenca()
+    metricas_uso = portal_metricas_uso()
+
+    licenca = metricas_lic.get("Licenca", {})
+    status_lic = metricas_lic.get("Status", {})
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">Client Success Portal</div>
+            <h1>🏢 Portal do Cliente</h1>
+            <p>Informações da empresa, licença, consumo, utilização, suporte e novidades da plataforma Eirox.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.caption("ⓘ Área exclusiva para acompanhamento da empresa, plano contratado, uso da licença e suporte.")
+
+    aba_empresa, aba_licenca, aba_uso, aba_conhecimento, aba_suporte, aba_novidades = st.tabs(
+        [
+            "🏢 Minha Empresa",
+            "💳 Minha Licença",
+            "📈 Uso da Plataforma",
+            "📚 Conhecimento",
+            "🎫 Suporte",
+            "🔔 Novidades"
+        ]
+    )
+
+    with aba_empresa:
+
+        st.markdown("### 🏢 Minha Empresa")
+
+        e1, e2, e3, e4 = st.columns(4)
+
+        e1.metric("Empresa", dados_cliente.get("Cliente", dados_cliente.get("Empresa", "-")))
+        e2.metric("Cidade/UF", f'{dados_cliente.get("Cidade", "-")} / {dados_cliente.get("UF", "-")}')
+        e3.metric("Lojas", dados_cliente.get("Qtd_Lojas", metricas_lic.get("LojasUsadas", 0)))
+        e4.metric("Status", dados_cliente.get("Status", status_lic.get("StatusOperacional", "-")))
+
+        st.markdown("### 📋 Dados cadastrais")
+
+        dados_view = pd.DataFrame(
+            [
+                {"Campo": "EmpresaID", "Informação": dados_cliente.get("EmpresaID", "")},
+                {"Campo": "Cliente", "Informação": dados_cliente.get("Cliente", "")},
+                {"Campo": "CNPJ", "Informação": dados_cliente.get("CNPJ", "")},
+                {"Campo": "Cidade", "Informação": dados_cliente.get("Cidade", "")},
+                {"Campo": "UF", "Informação": dados_cliente.get("UF", "")},
+                {"Campo": "Data implantação", "Informação": dados_cliente.get("Data_Implantacao", "")},
+                {"Campo": "Responsável comercial", "Informação": dados_cliente.get("Responsavel_Comercial", "")},
+                {"Campo": "Observação", "Informação": dados_cliente.get("Observacao", "")}
+            ]
+        )
+
+        st.dataframe(dados_view, use_container_width=True, hide_index=True)
+
+    with aba_licenca:
+
+        st.markdown("### 💳 Minha Licença")
+
+        max_usuarios = int(metricas_lic.get("MaxUsuarios", 0) or 0)
+        usuarios_usados = int(metricas_lic.get("UsuariosUsados", 0) or 0)
+        max_lojas = int(metricas_lic.get("MaxLojas", 0) or 0)
+        lojas_usadas = int(metricas_lic.get("LojasUsadas", 0) or 0)
+
+        perc_usuarios = (usuarios_usados / max_usuarios * 100) if max_usuarios else 0
+        perc_lojas = (lojas_usadas / max_lojas * 100) if max_lojas else 0
+
+        l1, l2, l3, l4, l5 = st.columns(5)
+
+        l1.metric("Plano", licenca.get("Plano", dados_cliente.get("Plano", "-")))
+        l2.metric("Status", status_lic.get("StatusOperacional", "-"))
+        l3.metric("Dias restantes", status_lic.get("DiasRestantes", "-"))
+        l4.metric("Usuários", f"{usuarios_usados} / {max_usuarios}")
+        l5.metric("Lojas", f"{lojas_usadas} / {max_lojas}")
+
+        st.markdown("### 📊 Consumo da licença")
+
+        consumo = pd.DataFrame(
+            [
+                {"Recurso": "Usuários", "Utilizado": usuarios_usados, "Limite": max_usuarios, "Consumo": _portal_barra_consumo(perc_usuarios)},
+                {"Recurso": "Lojas", "Utilizado": lojas_usadas, "Limite": max_lojas, "Consumo": _portal_barra_consumo(perc_lojas)}
+            ]
+        )
+
+        st.dataframe(consumo, use_container_width=True, hide_index=True)
+
+        st.info(f"Data de renovação cadastrada: {dados_cliente.get('Data_Renovacao', licenca.get('DataExpiracao', '-'))}")
+
+    with aba_uso:
+
+        st.markdown("### 📈 Utilização da Plataforma")
+
+        u1, u2, u3, u4, u5 = st.columns(5)
+
+        u1.metric("Último acesso", metricas_uso.get("UltimoAcesso", "-"))
+        u2.metric("Usuários ativos", metricas_uso.get("UsuariosAtivos", 0))
+        u3.metric("Total de acessos", metricas_uso.get("TotalAcessos", 0))
+        u4.metric("Produtos monitorados", metricas_uso.get("ProdutosMonitorados", 0))
+        u5.metric("Recomendações IA", metricas_uso.get("RecomendacoesIA", 0))
+
+        atividade = pd.DataFrame(
+            [
+                {"Indicador": "Alertas gerados", "Valor": metricas_uso.get("Alertas", 0)},
+                {"Indicador": "Produtos monitorados", "Valor": metricas_uso.get("ProdutosMonitorados", 0)},
+                {"Indicador": "Recomendações IA", "Valor": metricas_uso.get("RecomendacoesIA", 0)},
+                {"Indicador": "Total de acessos", "Valor": metricas_uso.get("TotalAcessos", 0)}
+            ]
+        )
+
+        st.dataframe(atividade, use_container_width=True, hide_index=True)
+
+    with aba_conhecimento:
+
+        st.markdown("### 📚 Central de Conhecimento")
+
+        materiais = pd.DataFrame(
+            [
+                {"Material": "Manual do Usuário", "Tipo": "PDF", "Status": "Disponível em breve", "Descrição": "Guia operacional da plataforma."},
+                {"Material": "Manual Executivo", "Tipo": "PDF", "Status": "Disponível em breve", "Descrição": "Visão gerencial para diretores e gestores."},
+                {"Material": "Guia IA Pricing", "Tipo": "PDF", "Status": "Disponível em breve", "Descrição": "Como interpretar recomendações da IA."},
+                {"Material": "Roadmap Público", "Tipo": "Página", "Status": "Disponível", "Descrição": "Evolução planejada da plataforma."},
+                {"Material": "Treinamento Comercial", "Tipo": "Vídeo", "Status": "Disponível em breve", "Descrição": "Capacitação para uso comercial."}
+            ]
+        )
+
+        st.dataframe(materiais, use_container_width=True, hide_index=True)
+
+        st.info("Os arquivos físicos dos manuais poderão ser adicionados em uma próxima etapa na pasta DOCUMENTOS_EIROX.")
+
+    with aba_suporte:
+
+        st.markdown("### 🎫 Central de Suporte")
+
+        with st.form("form_suporte_cliente"):
+
+            assunto = st.text_input("Assunto", placeholder="Ex.: Dúvida sobre IA Pricing")
+            prioridade = st.selectbox("Prioridade", ["Baixa", "Média", "Alta", "Crítica"])
+            mensagem = st.text_area("Mensagem", placeholder="Descreva sua dúvida ou solicitação.")
+
+            abrir = st.form_submit_button("🎫 Abrir chamado", use_container_width=True)
+
+        if abrir:
+            if not assunto.strip() or not mensagem.strip():
+                st.error("Assunto e mensagem são obrigatórios.")
+            else:
+                ok, msg = salvar_chamado_suporte_cliente(assunto, prioridade, mensagem)
+
+                if ok:
+                    st.success(msg)
+                    st.rerun()
+                else:
+                    st.error(msg)
+
+        st.markdown("### 📜 Histórico de chamados")
+
+        chamados = carregar_chamados_suporte_cliente()
+
+        empresa_id, _ = portal_empresa_atual()
+
+        if not chamados.empty and "EmpresaID" in chamados.columns:
+            chamados = chamados[chamados["EmpresaID"].astype(str).str.strip() == str(empresa_id)]
+
+        if chamados.empty:
+            st.info("Nenhum chamado aberto para esta empresa.")
+        else:
+            st.dataframe(chamados.tail(100), use_container_width=True, hide_index=True)
+
+    with aba_novidades:
+
+        st.markdown("### 🔔 Novidades da Plataforma")
+
+        novidades = portal_novidades()
+
+        st.dataframe(novidades, use_container_width=True, hide_index=True)
+
+        st.markdown("### 🚀 Próxima evolução")
+
+        st.info("A próxima etapa sugerida é a v1.40.0 Billing Enterprise, com faturas, mensalidades, renovação, upgrades de plano e controle financeiro.")
+
+    st.stop()
+
+
+
 # --------------------------------------------------
 
 if pagina == "🏢 CRM Enterprise":
