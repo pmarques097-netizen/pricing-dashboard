@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.39.1-portal-cliente-menu-fix"
+VERSAO_APP = "v1.40.0-billing-enterprise"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -4418,8 +4418,8 @@ TELAS_ADMIN_EIROX = [
     "🏁 Release Candidate",
     "📌 Sobre o Eirox",
     "🧭 Roadmap do Produto",
-    "🧪 Diagnóstico"
-]
+    "🧪 Diagnóstico",
+    "💳 Billing Enterprise"]
 
 
 def plano_empresa_contexto():
@@ -4777,6 +4777,430 @@ def portal_novidades():
             {"Versão": "v1.36.2", "Novidade": "Motor de Oportunidades", "Descrição": "Ranking financeiro de oportunidades comerciais."}
         ]
     )
+
+
+
+
+# --------------------------------------------------
+# BILLING ENTERPRISE - v1.40.0
+# --------------------------------------------------
+
+BILLING_EIROX_ARQUIVO = Path("BILLING_EIROX.csv")
+
+
+PLANOS_BILLING_EIROX = {
+    "Starter": {
+        "Mensalidade": 490,
+        "MaxUsuarios": 5,
+        "MaxLojas": 10
+    },
+    "Professional": {
+        "Mensalidade": 1290,
+        "MaxUsuarios": 20,
+        "MaxLojas": 50
+    },
+    "Enterprise": {
+        "Mensalidade": 2990,
+        "MaxUsuarios": 100,
+        "MaxLojas": 500
+    },
+    "Enterprise Plus": {
+        "Mensalidade": 5990,
+        "MaxUsuarios": 9999,
+        "MaxLojas": 9999
+    }
+}
+
+
+def usuario_pode_ver_billing_enterprise():
+    try:
+        return usuario_master()
+    except Exception:
+        return str(st.session_state.get("usuario", "")).strip().lower() == "paulomarques"
+
+
+def _billing_data_hora():
+    try:
+        return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S")
+    except Exception:
+        return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+def _billing_numero_br(valor, casas=2):
+    try:
+        return f"{float(valor):,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return "0,00"
+
+
+def _billing_parse_numero(valor):
+    try:
+        return float(str(valor).replace("R$", "").replace(" ", "").replace(".", "").replace(",", "."))
+    except Exception:
+        return 0.0
+
+
+def _billing_dias_vencimento(data_vencimento):
+    try:
+        dt = pd.to_datetime(str(data_vencimento), dayfirst=True, errors="coerce")
+        if pd.isna(dt):
+            return None
+        hoje = pd.Timestamp.now().normalize()
+        return int((dt.normalize() - hoje).days)
+    except Exception:
+        return None
+
+
+def inicializar_billing_eirox():
+    try:
+        if not BILLING_EIROX_ARQUIVO.exists():
+            hoje = datetime.now(ZoneInfo("America/Sao_Paulo"))
+
+            base = pd.DataFrame(
+                [
+                    {
+                        "FaturaID": "FAT-0001",
+                        "EmpresaID": "1",
+                        "Cliente": "Marabá - Cliente teste",
+                        "Plano": "Enterprise",
+                        "Valor_Mensal": str(PLANOS_BILLING_EIROX["Enterprise"]["Mensalidade"]),
+                        "Data_Emissao": hoje.strftime("%d/%m/%Y"),
+                        "Data_Vencimento": (hoje + pd.DateOffset(days=30)).strftime("%d/%m/%Y"),
+                        "Data_Pagamento": "",
+                        "Status": "Em aberto",
+                        "Ciclo": "Mensal",
+                        "Forma_Pagamento": "",
+                        "Observacao": "Fatura inicial de teste",
+                        "Criado_Em": _billing_data_hora()
+                    },
+                    {
+                        "FaturaID": "FAT-0002",
+                        "EmpresaID": "2",
+                        "Cliente": "Belém - Cliente teste",
+                        "Plano": "Starter",
+                        "Valor_Mensal": str(PLANOS_BILLING_EIROX["Starter"]["Mensalidade"]),
+                        "Data_Emissao": hoje.strftime("%d/%m/%Y"),
+                        "Data_Vencimento": (hoje + pd.DateOffset(days=30)).strftime("%d/%m/%Y"),
+                        "Data_Pagamento": "",
+                        "Status": "Trial",
+                        "Ciclo": "Mensal",
+                        "Forma_Pagamento": "",
+                        "Observacao": "Fatura inicial de teste",
+                        "Criado_Em": _billing_data_hora()
+                    }
+                ]
+            )
+
+            base.to_csv(
+                BILLING_EIROX_ARQUIVO,
+                index=False,
+                sep=";",
+                encoding="utf-8-sig"
+            )
+
+        return True
+
+    except Exception:
+        return False
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_billing_eirox():
+    try:
+        inicializar_billing_eirox()
+
+        base = pd.read_csv(
+            BILLING_EIROX_ARQUIVO,
+            sep=";",
+            encoding="utf-8-sig",
+            dtype=str
+        ).fillna("")
+
+        obrigatorias = [
+            "FaturaID",
+            "EmpresaID",
+            "Cliente",
+            "Plano",
+            "Valor_Mensal",
+            "Data_Emissao",
+            "Data_Vencimento",
+            "Data_Pagamento",
+            "Status",
+            "Ciclo",
+            "Forma_Pagamento",
+            "Observacao",
+            "Criado_Em"
+        ]
+
+        for col in obrigatorias:
+            if col not in base.columns:
+                base[col] = ""
+
+        return base[obrigatorias].copy()
+
+    except Exception:
+        return pd.DataFrame()
+
+
+def salvar_billing_eirox(base):
+    try:
+        base = base.copy().astype(str)
+
+        base.to_csv(
+            BILLING_EIROX_ARQUIVO,
+            index=False,
+            sep=";",
+            encoding="utf-8-sig"
+        )
+
+        try:
+            carregar_billing_eirox.clear()
+        except Exception:
+            pass
+
+        return True
+
+    except Exception:
+        return False
+
+
+def gerar_id_fatura():
+    try:
+        base = carregar_billing_eirox()
+        if base.empty:
+            return "FAT-0001"
+
+        nums = []
+        for x in base["FaturaID"].astype(str).tolist():
+            m = re.search(r'(\d+)$', x)
+            if m:
+                nums.append(int(m.group(1)))
+
+        prox = max(nums) + 1 if nums else len(base) + 1
+        return f"FAT-{prox:04d}"
+
+    except Exception:
+        return f"FAT-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+
+def criar_ou_atualizar_fatura_eirox(
+    fatura_id,
+    empresa_id,
+    cliente,
+    plano,
+    valor_mensal,
+    data_emissao,
+    data_vencimento,
+    data_pagamento,
+    status,
+    ciclo,
+    forma_pagamento,
+    observacao
+):
+    try:
+        fatura_id = str(fatura_id).strip() or gerar_id_fatura()
+        empresa_id = str(empresa_id).strip()
+        cliente = str(cliente).strip()
+
+        if not empresa_id or not cliente:
+            return False, "EmpresaID e Cliente são obrigatórios."
+
+        base = carregar_billing_eirox()
+
+        linha = {
+            "FaturaID": fatura_id,
+            "EmpresaID": empresa_id,
+            "Cliente": cliente,
+            "Plano": str(plano).strip(),
+            "Valor_Mensal": str(valor_mensal).strip(),
+            "Data_Emissao": str(data_emissao).strip(),
+            "Data_Vencimento": str(data_vencimento).strip(),
+            "Data_Pagamento": str(data_pagamento).strip(),
+            "Status": str(status).strip(),
+            "Ciclo": str(ciclo).strip(),
+            "Forma_Pagamento": str(forma_pagamento).strip(),
+            "Observacao": str(observacao).strip(),
+            "Criado_Em": _billing_data_hora()
+        }
+
+        if not base.empty and fatura_id in base["FaturaID"].astype(str).tolist():
+            idx = base.index[base["FaturaID"].astype(str) == fatura_id][0]
+            for k, v in linha.items():
+                if k != "Criado_Em":
+                    base.loc[idx, k] = v
+            acao = "Atualização de fatura"
+        else:
+            base = pd.concat([base, pd.DataFrame([linha])], ignore_index=True)
+            acao = "Criação de fatura"
+
+        salvar_billing_eirox(base)
+
+        try:
+            registrar_log_usuario(
+                acao,
+                fatura_id,
+                f"Cliente={cliente} | Plano={plano} | Valor={valor_mensal} | Status={status}"
+            )
+        except Exception:
+            pass
+
+        try:
+            enviar_alerta_telegram(
+                "💳 <b>Billing Eirox atualizado</b>\\n\\n"
+                f"📄 <b>Fatura:</b> {fatura_id}\\n"
+                f"🏢 <b>Cliente:</b> {cliente}\\n"
+                f"📦 <b>Plano:</b> {plano}\\n"
+                f"💰 <b>Valor:</b> R$ {_billing_numero_br(_billing_parse_numero(valor_mensal))}\\n"
+                f"🔐 <b>Status:</b> {status}\\n"
+                f"👤 <b>Usuário:</b> {st.session_state.get('usuario', '')}\\n"
+                f"🕒 <b>Horário:</b> {_billing_data_hora()}\\n"
+                f"🏷️ <b>Versão:</b> {VERSAO_APP}"
+            )
+        except Exception:
+            pass
+
+        return True, f"{acao} realizada com sucesso."
+
+    except Exception as erro:
+        return False, f"Erro ao salvar fatura: {erro}"
+
+
+def metricas_billing_enterprise():
+    try:
+        base = carregar_billing_eirox()
+
+        if base.empty:
+            return {
+                "Faturas": 0,
+                "EmAberto": 0,
+                "Pagas": 0,
+                "Vencidas": 0,
+                "Trial": 0,
+                "MRR": 0,
+                "ARR": 0,
+                "ReceitaPaga": 0
+            }
+
+        b = base.copy()
+
+        valores = b["Valor_Mensal"].apply(_billing_parse_numero)
+
+        dias = b["Data_Vencimento"].apply(_billing_dias_vencimento)
+
+        status = b["Status"].astype(str).str.lower()
+
+        vencidas_mask = (dias < 0) & (~status.isin(["paga", "cancelada"]))
+
+        mrr_mask = status.isin(["em aberto", "paga", "trial"])
+        mrr = float(valores[mrr_mask].sum())
+
+        pagas = status.eq("paga")
+
+        return {
+            "Faturas": int(len(b)),
+            "EmAberto": int(status.eq("em aberto").sum()),
+            "Pagas": int(pagas.sum()),
+            "Vencidas": int(vencidas_mask.sum()),
+            "Trial": int(status.eq("trial").sum()),
+            "MRR": mrr,
+            "ARR": mrr * 12,
+            "ReceitaPaga": float(valores[pagas].sum())
+        }
+
+    except Exception:
+        return {
+            "Faturas": 0,
+            "EmAberto": 0,
+            "Pagas": 0,
+            "Vencidas": 0,
+            "Trial": 0,
+            "MRR": 0,
+            "ARR": 0,
+            "ReceitaPaga": 0
+        }
+
+
+def atualizar_licenca_por_billing(empresa_id, cliente, plano, status_financeiro):
+    """
+    Integra billing com licenciamento.
+    Se inadimplente/suspenso/cancelado, bloqueia licença.
+    Se pago/em aberto/trial, mantém licença ativa/trial.
+    """
+
+    try:
+        if "criar_ou_atualizar_licenca" not in globals():
+            return False, "Licenciamento não disponível."
+
+        hoje = datetime.now(ZoneInfo("America/Sao_Paulo"))
+
+        if str(status_financeiro).lower() in ["vencida", "suspenso", "cancelada", "inadimplente"]:
+            status_lic = "Bloqueada"
+        elif str(status_financeiro).lower() == "trial":
+            status_lic = "Trial"
+        else:
+            status_lic = "Ativa"
+
+        data_inicio = hoje.strftime("%d/%m/%Y")
+        data_expiracao = (hoje + pd.DateOffset(days=30)).strftime("%d/%m/%Y")
+
+        return criar_ou_atualizar_licenca(
+            empresa_id,
+            cliente,
+            plano,
+            data_inicio,
+            data_expiracao,
+            status_lic,
+            f"Atualizado automaticamente pelo Billing Enterprise em {_billing_data_hora()}"
+        )
+
+    except Exception as erro:
+        return False, str(erro)
+
+
+def faturamento_por_plano():
+    try:
+        base = carregar_billing_eirox()
+        if base.empty:
+            return pd.DataFrame()
+
+        b = base.copy()
+        b["Valor_Num"] = b["Valor_Mensal"].apply(_billing_parse_numero)
+
+        return (
+            b.groupby("Plano", dropna=False)
+            .agg(
+                Faturas=("FaturaID", "count"),
+                Receita=("Valor_Num", "sum")
+            )
+            .reset_index()
+            .sort_values("Receita", ascending=False)
+        )
+
+    except Exception:
+        return pd.DataFrame()
+
+
+def faturamento_por_cliente():
+    try:
+        base = carregar_billing_eirox()
+        if base.empty:
+            return pd.DataFrame()
+
+        b = base.copy()
+        b["Valor_Num"] = b["Valor_Mensal"].apply(_billing_parse_numero)
+
+        return (
+            b.groupby(["EmpresaID", "Cliente"], dropna=False)
+            .agg(
+                Faturas=("FaturaID", "count"),
+                Receita=("Valor_Num", "sum")
+            )
+            .reset_index()
+            .sort_values("Receita", ascending=False)
+        )
+
+    except Exception:
+        return pd.DataFrame()
 
 
 
@@ -6199,6 +6623,10 @@ if usuario_pode_ver_crm_enterprise() and "🏢 CRM Enterprise" not in paginas_li
 if usuario_pode_ver_portal_cliente() and "🏢 Portal do Cliente" not in paginas_liberadas:
     paginas_liberadas = paginas_liberadas + ["🏢 Portal do Cliente"]
 
+
+if usuario_pode_ver_billing_enterprise() and "💳 Billing Enterprise" not in paginas_liberadas:
+    paginas_liberadas = paginas_liberadas + ["💳 Billing Enterprise"]
+
 paginas_liberadas = filtrar_paginas_por_plano(paginas_liberadas)
 paginas_cliente_menu, paginas_admin_menu = dividir_menu_cliente_admin(paginas_liberadas)
 
@@ -6398,6 +6826,402 @@ df_filtrado = propagar_ganho_potencial(df_filtrado)
 
 # --------------------------------------------------
 # PORTAL DO CLIENTE
+
+# --------------------------------------------------
+# BILLING ENTERPRISE
+# --------------------------------------------------
+
+if pagina == "💳 Billing Enterprise":
+
+    if not usuario_pode_ver_billing_enterprise():
+        st.error("Acesso não autorizado.")
+        st.stop()
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">SaaS Revenue Operations</div>
+            <h1>💳 Billing Enterprise</h1>
+            <p>Gestão de mensalidades, faturas, trial, upgrades, MRR, ARR e integração com licenciamento.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.caption("ⓘ Controle financeiro SaaS para cobrança, receita recorrente, status financeiro e bloqueio por inadimplência.")
+
+    metricas = metricas_billing_enterprise()
+
+    st.markdown("### 🧭 Painel Executivo Billing")
+
+    b1, b2, b3, b4, b5, b6, b7 = st.columns(7)
+
+    b1.metric("Faturas", metricas.get("Faturas", 0))
+    b2.metric("Em aberto", metricas.get("EmAberto", 0))
+    b3.metric("Pagas", metricas.get("Pagas", 0))
+    b4.metric("Vencidas", metricas.get("Vencidas", 0))
+    b5.metric("Trial", metricas.get("Trial", 0))
+    b6.metric("MRR", f"R$ {_billing_numero_br(metricas.get('MRR', 0))}")
+    b7.metric("ARR", f"R$ {_billing_numero_br(metricas.get('ARR', 0))}")
+
+    aba_faturas, aba_cadastro, aba_receita, aba_planos, aba_integracao = st.tabs(
+        [
+            "📄 Faturas",
+            "✍️ Nova/Editar Fatura",
+            "📈 Receita",
+            "📦 Planos",
+            "🔐 Licenciamento"
+        ]
+    )
+
+    with aba_faturas:
+
+        st.markdown("### 📄 Faturas")
+
+        billing = carregar_billing_eirox()
+
+        if billing.empty:
+            st.info("Nenhuma fatura cadastrada.")
+        else:
+            view = billing.copy()
+
+            view["Dias_Vencimento"] = view["Data_Vencimento"].apply(_billing_dias_vencimento)
+            view["Valor_Num"] = view["Valor_Mensal"].apply(_billing_parse_numero)
+
+            filtro_status = st.multiselect(
+                "Filtrar status",
+                sorted(view["Status"].dropna().astype(str).unique().tolist())
+            )
+
+            filtro_plano = st.multiselect(
+                "Filtrar plano",
+                sorted(view["Plano"].dropna().astype(str).unique().tolist())
+            )
+
+            if filtro_status:
+                view = view[view["Status"].astype(str).isin(filtro_status)]
+
+            if filtro_plano:
+                view = view[view["Plano"].astype(str).isin(filtro_plano)]
+
+            st.dataframe(
+                view,
+                use_container_width=True,
+                hide_index=True
+            )
+
+            csv_billing = view.to_csv(
+                index=False,
+                sep=";",
+                encoding="utf-8-sig"
+            )
+
+            st.download_button(
+                "📥 Exportar Billing CSV",
+                data=csv_billing,
+                file_name="billing_eirox.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+
+    with aba_cadastro:
+
+        st.markdown("### ✍️ Nova / Editar Fatura")
+
+        billing = carregar_billing_eirox()
+
+        opcoes_fatura = ["Nova fatura"]
+
+        if not billing.empty:
+            opcoes_fatura += [
+                f'{row["FaturaID"]} - {row["Cliente"]}'
+                for _, row in billing.iterrows()
+            ]
+
+        fatura_sel = st.selectbox(
+            "Selecionar fatura",
+            opcoes_fatura,
+            key="billing_fatura_sel"
+        )
+
+        dados = {}
+
+        if fatura_sel != "Nova fatura":
+            fid = fatura_sel.split(" - ")[0].strip()
+            linha = billing[billing["FaturaID"].astype(str) == fid]
+            if not linha.empty:
+                dados = linha.iloc[0].to_dict()
+
+        clientes = carregar_clientes_eirox() if "carregar_clientes_eirox" in globals() else pd.DataFrame()
+
+        cliente_labels = []
+
+        if isinstance(clientes, pd.DataFrame) and not clientes.empty:
+            cliente_labels = [
+                f'{row["EmpresaID"]} - {row["Cliente"]}'
+                for _, row in clientes.iterrows()
+            ]
+
+        if not cliente_labels:
+            cliente_labels = [
+                "1 - Marabá - Cliente teste",
+                "2 - Belém - Cliente teste"
+            ]
+
+        empresa_padrao = str(dados.get("EmpresaID", "1"))
+        idx_cliente = 0
+
+        for i, label in enumerate(cliente_labels):
+            if label.split(" - ")[0].strip() == empresa_padrao:
+                idx_cliente = i
+                break
+
+        with st.form("form_billing_enterprise"):
+
+            f1, f2, f3 = st.columns(3)
+
+            fatura_id = f1.text_input(
+                "FaturaID",
+                value=dados.get("FaturaID", gerar_id_fatura())
+            )
+
+            cliente_label = f2.selectbox(
+                "Cliente",
+                cliente_labels,
+                index=idx_cliente
+            )
+
+            plano = f3.selectbox(
+                "Plano",
+                list(PLANOS_BILLING_EIROX.keys()),
+                index=list(PLANOS_BILLING_EIROX.keys()).index(dados.get("Plano", "Starter")) if dados.get("Plano", "Starter") in PLANOS_BILLING_EIROX else 0
+            )
+
+            empresa_id = cliente_label.split(" - ")[0].strip()
+            cliente_nome = cliente_label.split(" - ", 1)[1].strip() if " - " in cliente_label else cliente_label
+
+            valor_sugerido = str(PLANOS_BILLING_EIROX.get(plano, {}).get("Mensalidade", 0))
+
+            f4, f5, f6 = st.columns(3)
+
+            valor_mensal = f4.text_input(
+                "Valor mensal",
+                value=dados.get("Valor_Mensal", valor_sugerido)
+            )
+
+            data_emissao = f5.text_input(
+                "Data emissão",
+                value=dados.get("Data_Emissao", datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y")),
+                placeholder="dd/mm/aaaa"
+            )
+
+            data_vencimento = f6.text_input(
+                "Data vencimento",
+                value=dados.get("Data_Vencimento", ""),
+                placeholder="dd/mm/aaaa"
+            )
+
+            f7, f8, f9 = st.columns(3)
+
+            data_pagamento = f7.text_input(
+                "Data pagamento",
+                value=dados.get("Data_Pagamento", ""),
+                placeholder="dd/mm/aaaa"
+            )
+
+            status = f8.selectbox(
+                "Status",
+                ["Em aberto", "Paga", "Vencida", "Trial", "Suspenso", "Cancelada", "Inadimplente"],
+                index=["Em aberto", "Paga", "Vencida", "Trial", "Suspenso", "Cancelada", "Inadimplente"].index(dados.get("Status", "Em aberto")) if dados.get("Status", "Em aberto") in ["Em aberto", "Paga", "Vencida", "Trial", "Suspenso", "Cancelada", "Inadimplente"] else 0
+            )
+
+            ciclo = f9.selectbox(
+                "Ciclo",
+                ["Mensal", "Trimestral", "Semestral", "Anual"],
+                index=["Mensal", "Trimestral", "Semestral", "Anual"].index(dados.get("Ciclo", "Mensal")) if dados.get("Ciclo", "Mensal") in ["Mensal", "Trimestral", "Semestral", "Anual"] else 0
+            )
+
+            forma_pagamento = st.text_input(
+                "Forma pagamento",
+                value=dados.get("Forma_Pagamento", "")
+            )
+
+            observacao = st.text_area(
+                "Observação",
+                value=dados.get("Observacao", "")
+            )
+
+            salvar_fatura = st.form_submit_button(
+                "💾 Salvar fatura",
+                use_container_width=True
+            )
+
+        if salvar_fatura:
+            ok, msg = criar_ou_atualizar_fatura_eirox(
+                fatura_id,
+                empresa_id,
+                cliente_nome,
+                plano,
+                valor_mensal,
+                data_emissao,
+                data_vencimento,
+                data_pagamento,
+                status,
+                ciclo,
+                forma_pagamento,
+                observacao
+            )
+
+            if ok:
+                st.success(msg)
+                st.rerun()
+            else:
+                st.error(msg)
+
+    with aba_receita:
+
+        st.markdown("### 📈 Receita SaaS")
+
+        plano_df = faturamento_por_plano()
+        cliente_df = faturamento_por_cliente()
+
+        r1, r2 = st.columns(2)
+
+        if not plano_df.empty:
+            fig_plano = px.bar(
+                plano_df,
+                x="Receita",
+                y="Plano",
+                orientation="h",
+                title="Receita por plano"
+            )
+
+            fig_plano.update_layout(
+                height=420,
+                yaxis=dict(autorange="reversed")
+            )
+
+            r1.plotly_chart(
+                fig_plano,
+                use_container_width=True
+            )
+
+            st.markdown("### 📦 Receita por plano")
+            st.dataframe(
+                plano_df,
+                use_container_width=True,
+                hide_index=True
+            )
+
+        if not cliente_df.empty:
+            fig_cliente = px.bar(
+                cliente_df.head(15),
+                x="Receita",
+                y="Cliente",
+                orientation="h",
+                title="Receita por cliente"
+            )
+
+            fig_cliente.update_layout(
+                height=420,
+                yaxis=dict(autorange="reversed")
+            )
+
+            r2.plotly_chart(
+                fig_cliente,
+                use_container_width=True
+            )
+
+            st.markdown("### 🏢 Receita por cliente")
+            st.dataframe(
+                cliente_df,
+                use_container_width=True,
+                hide_index=True
+            )
+
+    with aba_planos:
+
+        st.markdown("### 📦 Planos comerciais")
+
+        planos_df = pd.DataFrame(
+            [
+                {
+                    "Plano": plano,
+                    "Mensalidade": dados["Mensalidade"],
+                    "MaxUsuarios": dados["MaxUsuarios"],
+                    "MaxLojas": dados["MaxLojas"],
+                    "ARR": dados["Mensalidade"] * 12
+                }
+                for plano, dados in PLANOS_BILLING_EIROX.items()
+            ]
+        )
+
+        st.dataframe(
+            planos_df,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        st.info(
+            "Os valores são parâmetros comerciais internos e podem ser ajustados no dicionário PLANOS_BILLING_EIROX."
+        )
+
+    with aba_integracao:
+
+        st.markdown("### 🔐 Integração Billing x Licenciamento")
+
+        st.info(
+            "Esta rotina atualiza a licença da empresa conforme o status financeiro da fatura selecionada."
+        )
+
+        billing = carregar_billing_eirox()
+
+        if billing.empty:
+            st.warning("Nenhuma fatura disponível.")
+        else:
+            opcoes = [
+                f'{row["FaturaID"]} - {row["Cliente"]} - {row["Status"]}'
+                for _, row in billing.iterrows()
+            ]
+
+            fatura_integracao = st.selectbox(
+                "Selecionar fatura para sincronizar",
+                opcoes,
+                key="billing_sync_licenca"
+            )
+
+            fid = fatura_integracao.split(" - ")[0].strip()
+            linha = billing[billing["FaturaID"].astype(str) == fid]
+
+            if not linha.empty:
+                dados = linha.iloc[0].to_dict()
+
+                st.dataframe(
+                    pd.DataFrame([dados]),
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+                if st.button(
+                    "🔄 Atualizar licença conforme billing",
+                    use_container_width=True
+                ):
+                    ok, msg = atualizar_licenca_por_billing(
+                        dados.get("EmpresaID", ""),
+                        dados.get("Cliente", ""),
+                        dados.get("Plano", ""),
+                        dados.get("Status", "")
+                    )
+
+                    if ok:
+                        st.success(msg)
+                    else:
+                        st.error(msg)
+
+    st.stop()
+
+
+
 # --------------------------------------------------
 
 if pagina == "🏢 Portal do Cliente":
