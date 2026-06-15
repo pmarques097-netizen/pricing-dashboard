@@ -210,6 +210,39 @@ def percentual_br(valor):
         return ""
 
 
+
+def explicacao_calculo(titulo, itens):
+    """
+    Exibe, no painel, a explicação visual dos cálculos usados em cada visão.
+    Mantém a regra de negócio transparente para o usuário final.
+    """
+
+    try:
+        if not isinstance(itens, (list, tuple)):
+            itens = [str(itens)]
+
+        lista_html = "".join(
+            f"<li>{str(item)}</li>"
+            for item in itens
+            if str(item).strip()
+        )
+
+        st.markdown(
+            f"""
+            <div class="eirox-card">
+                <div class="eirox-section-title">Como calcular</div>
+                <h4 style="margin-top:0;color:#F6FAFF!important;">{titulo}</h4>
+                <ul style="margin-bottom:0;color:#BFD7FF;line-height:1.55;">
+                    {lista_html}
+                </ul>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    except Exception:
+        pass
+
+
 def propagar_ganho_potencial(base):
     """
     Garante que todos os indicadores usem o mesmo Ganho_Potencial.
@@ -14441,6 +14474,18 @@ k6.metric(
     moeda_br(df_filtrado["Preco_Medio"].mean())
 )
 
+explicacao_calculo(
+    "Indicadores principais do Painel Geral",
+    [
+        "Produtos = quantidade de linhas/produtos após os filtros aplicados.",
+        "Margem Média = média da coluna Margem_% dos produtos filtrados.",
+        "Lucro Médio = média da coluna Lucro_Unitario dos produtos filtrados.",
+        "Ganho Potencial = soma da coluna Ganho_Potencial dos produtos filtrados.",
+        "Laboratórios = quantidade de laboratórios únicos após os filtros.",
+        "Preço Médio = média da coluna Preco_Medio dos produtos filtrados."
+    ]
+)
+
 # --------------------------------------------------
 # GRÁFICOS
 # --------------------------------------------------
@@ -14516,6 +14561,15 @@ with c2:
 # Ações recomendadas
 st.subheader(
     "📋 Ações Recomendadas"
+)
+
+explicacao_calculo(
+    "Ações recomendadas",
+    [
+        "A tabela conta quantos produtos existem em cada Recomendacao dentro do filtro atual.",
+        "Cada recomendação recebe uma orientação comercial padrão: subir preço, manter, analisar redução ou corrigir cadastro.",
+        "Ao selecionar uma recomendação, o painel detalha somente os produtos pertencentes àquela ação."
+    ]
 )
 
 acoes = {
@@ -15002,6 +15056,16 @@ st.subheader(
     "📈 Curva ABC"
 )
 
+explicacao_calculo(
+    "Curva ABC do ganho potencial",
+    [
+        "Os produtos são ordenados do maior para o menor Ganho_Potencial.",
+        "Perc_Acum representa a participação acumulada do ganho potencial no total filtrado.",
+        "Classe A concentra aproximadamente os maiores impactos financeiros; B representa impacto intermediário; C representa menor impacto.",
+        "Menor Preço, Rede, Farmácia e Data vêm do histórico de pesquisa, buscando o menor preço concorrente por produto."
+    ]
+)
+
 abc = curva_abc(df_filtrado)
 
 # --------------------------------------------------
@@ -15185,6 +15249,15 @@ st.subheader(
     "💰 Top Oportunidades"
 )
 
+explicacao_calculo(
+    "Top oportunidades",
+    [
+        "A lista é ordenada pela coluna Ganho_Potencial em ordem decrescente.",
+        "Os primeiros produtos são os que oferecem maior oportunidade financeira estimada dentro dos filtros aplicados.",
+        "Margem, lucro unitário e preço médio são exibidos apenas quando essas colunas existem na base."
+    ]
+)
+
 top_oportunidades = (
     df_filtrado
     .sort_values(
@@ -15220,6 +15293,15 @@ st.dataframe(
 
 st.subheader(
     "🔥 Mapa de calor"
+)
+
+explicacao_calculo(
+    "Mapa de calor",
+    [
+        "Por marca/família: conta a quantidade de pesquisas por Família e exibe as 40 maiores.",
+        "Por bairro: conta a quantidade de pesquisas por Bairro e exibe os 40 maiores.",
+        "A intensidade visual aumenta conforme a quantidade de pesquisas encontradas."
+    ]
 )
 
 # --------------------------------------------------
@@ -15363,6 +15445,15 @@ else:
 if not historico.empty:
 
     st.subheader("📈 Evolução Histórica")
+
+    explicacao_calculo(
+        "Evolução histórica",
+        [
+            "O gráfico filtra um produto/EAN e acompanha a variação do Preço (R$) ao longo da Data Emissão.",
+            "Cada linha representa uma farmácia pesquisada.",
+            "O rótulo de preço aparece no último ponto de cada farmácia para reduzir poluição visual."
+        ]
+    )
 
     # Garantir coluna Descricao_Unica
     if "Descricao_Unica" not in historico.columns:
@@ -15539,6 +15630,15 @@ if (
         "🗺️ Mapa Farmácias"
     )
 
+    explicacao_calculo(
+        "Mapa de farmácias",
+        [
+            "Cada ponto usa as colunas lat e lon do histórico de pesquisa.",
+            "A classificação da loja é feita pelo nome da farmácia: concorrência, Zanol e Thomaz ou Triangulo Drogaria.",
+            "O zoom inicial é calculado pela dispersão das coordenadas encontradas."
+        ]
+    )
+
     mapa_df = historico.copy()
 
     mapa_df["lat"] = pd.to_numeric(
@@ -15704,6 +15804,15 @@ if (
 
     st.subheader("🏪 Monitoramento por Rede")
 
+    explicacao_calculo(
+        "Monitoramento por rede",
+        [
+            "A rede é identificada a partir do nome da farmácia.",
+            "Quantidade de Pesquisas = contagem de preços coletados por rede.",
+            "Preço Médio = média da coluna Preço (R$) por rede."
+        ]
+    )
+
     historico["Rede"] = (
         historico["Farmácia"]
         .apply(identificar_rede)
@@ -15777,6 +15886,16 @@ if (
         "🏆 Ranking Concorrentes"
     )
 
+    explicacao_calculo(
+        "Ranking de concorrentes",
+        [
+            "O ranking agrupa o histórico por Farmácia.",
+            "Quantidade de Pesquisas = número de registros de preço da farmácia.",
+            "Preço Médio = média dos preços pesquisados na farmácia.",
+            "A ordenação prioriza maior quantidade de pesquisas e, em seguida, menor preço médio."
+        ]
+    )
+
     historico["Preço (R$)"] = pd.to_numeric(
         historico["Preço (R$)"],
         errors="coerce"
@@ -15844,6 +15963,15 @@ st.subheader(
 "💊 Famílias"
 )
 
+explicacao_calculo(
+    "Famílias",
+    [
+        "O gráfico soma o Ganho_Potencial por Família.",
+        "As famílias são ordenadas do maior para o menor ganho potencial.",
+        "A visão ajuda a identificar quais categorias concentram maior oportunidade financeira."
+    ]
+)
+
 familias = (
 df_filtrado
 .groupby("Família")
@@ -15875,6 +16003,15 @@ st.plotly_chart(
 
 st.subheader(
     "🏭 Laboratórios"
+)
+
+explicacao_calculo(
+    "Laboratórios",
+    [
+        "Ganho_Potencial = soma das oportunidades dos produtos de cada laboratório.",
+        "Margem_% = média da margem dos produtos do laboratório.",
+        "A tabela é ordenada pelo maior ganho potencial para priorizar negociação e ajuste de preço."
+    ]
 )
 
 laboratorios = (
@@ -15915,6 +16052,16 @@ if not compra.empty:
 
     st.subheader(
         "📦 Curva ABC Financeira"
+    )
+
+    explicacao_calculo(
+        "Curva ABC financeira",
+        [
+            "A base de compra é ordenada pelo Valor_Liquido em ordem decrescente.",
+            "Participação = Valor_Liquido do item dividido pelo total de Valor_Liquido.",
+            "Acumulado = soma progressiva da participação.",
+            "Classe A vai até 80% acumulado, Classe B de 80% a 95%, e Classe C acima de 95%."
+        ]
     )
 
     # Remover Total Geral definitivamente
@@ -16042,6 +16189,15 @@ st.subheader(
 "🤖 Score Eirox"
 )
 
+explicacao_calculo(
+    "Score Eirox",
+    [
+        "Score = Margem média x 60% + Ganho_Potencial total dividido por 1.000 x 40%.",
+        "A margem representa qualidade da rentabilidade.",
+        "O ganho potencial representa o tamanho financeiro da oportunidade."
+    ]
+)
+
 score = round(
 (
 df_filtrado["Margem_%"].mean()
@@ -16073,6 +16229,17 @@ if (
 ):
 
     st.subheader("📊 Comparativo de Redes")
+
+    explicacao_calculo(
+        "Comparativo de redes",
+        [
+            "O produto é filtrado pelo EAN selecionado.",
+            "Preço (R$) = média do preço pesquisado por Rede e Farmácia.",
+            "Menor Mercado = menor preço encontrado entre as lojas para o produto.",
+            "Dif R$ = preço da loja menos o menor preço de mercado.",
+            "Dif % = Dif R$ dividido pelo Menor Mercado."
+        ]
+    )
 
     if "Rede" not in historico.columns:
         historico["Rede"] = historico["Farmácia"].apply(
