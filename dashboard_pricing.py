@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.36.0-licenciamento-real"
+VERSAO_APP = "v1.36.1-alertas-inteligentes"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -2564,7 +2564,8 @@ DESCRICOES_TELAS_ENTERPRISE = {
     "📌 Sobre o Eirox": "Informações institucionais, propósito da plataforma e visão geral do produto.",
     "🧭 Roadmap do Produto": "Plano evolutivo da plataforma, módulos concluídos, próximos ciclos e prioridades.",
     "💼 Licenciamento Multiempresa": "Modelo comercial, planos de uso, governança de clientes e expansão SaaS.",
-    "💼 Licenciamento Real": "Controle real de planos, expiração, limites de usuários, lojas e bloqueio de licença."
+    "💼 Licenciamento Real": "Controle real de planos, expiração, limites de usuários, lojas e bloqueio de licença.",
+    "🚨 Alertas Inteligentes": "Monitoramento automático de riscos e oportunidades comerciais com envio via Telegram."
 }
 
 
@@ -3095,6 +3096,289 @@ def criar_ou_atualizar_licenca(empresa_id, empresa, plano, data_inicio, data_exp
 
 
 def usuario_pode_ver_licenciamento_real():
+    try:
+        return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() == "paulomarques"
+    except Exception:
+        return False
+
+
+
+
+# --------------------------------------------------
+# ALERTAS INTELIGENTES - v1.36.1
+# --------------------------------------------------
+
+ALERTAS_ARQUIVO = Path("ALERTAS_EIROX.csv")
+
+
+def _alerta_numero_br(valor, casas=2):
+    try:
+        return f"{float(valor):,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return "0,00"
+
+
+def _alerta_data_hora():
+    try:
+        return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S")
+    except Exception:
+        return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+def _alerta_salvar(alertas):
+    try:
+        if not alertas:
+            return
+
+        novos = pd.DataFrame(alertas)
+
+        if ALERTAS_ARQUIVO.exists():
+            antigo = pd.read_csv(ALERTAS_ARQUIVO, sep=";", encoding="utf-8-sig", dtype=str).fillna("")
+            final = pd.concat([antigo, novos], ignore_index=True)
+        else:
+            final = novos
+
+        final.to_csv(ALERTAS_ARQUIVO, index=False, sep=";", encoding="utf-8-sig")
+
+    except Exception:
+        pass
+
+
+def carregar_historico_alertas():
+    try:
+        if not ALERTAS_ARQUIVO.exists():
+            return pd.DataFrame()
+
+        return pd.read_csv(ALERTAS_ARQUIVO, sep=";", encoding="utf-8-sig", dtype=str).fillna("")
+    except Exception:
+        return pd.DataFrame()
+
+
+def _alerta_coluna(base, possibilidades):
+    try:
+        cols = list(base.columns)
+
+        for alvo in possibilidades:
+            alvo_norm = str(alvo).strip().lower()
+            for c in cols:
+                if str(c).strip().lower() == alvo_norm:
+                    return c
+
+        for alvo in possibilidades:
+            alvo_norm = str(alvo).strip().lower()
+            for c in cols:
+                if alvo_norm in str(c).strip().lower():
+                    return c
+
+        return None
+    except Exception:
+        return None
+
+
+def _alerta_converter_numero(serie):
+    try:
+        if "converter_numero_brasil" in globals():
+            return converter_numero_brasil(serie)
+
+        return pd.to_numeric(
+            serie.astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False),
+            errors="coerce"
+        )
+    except Exception:
+        return pd.to_numeric(serie, errors="coerce")
+
+
+def gerar_alertas_inteligentes(limite_margem=20, limite_diferenca_concorrente=10, dias_sem_pesquisa=7, limite_estoque_alto=50, limite_alertas=100):
+    alertas = []
+
+    try:
+        base = globals().get("df", pd.DataFrame())
+
+        if not isinstance(base, pd.DataFrame) or base.empty:
+            base = globals().get("base_pesquisa", pd.DataFrame())
+
+        if not isinstance(base, pd.DataFrame) or base.empty:
+            return pd.DataFrame()
+
+        base = base.copy()
+
+        try:
+            if "aplicar_filtro_empresa" in globals():
+                base = aplicar_filtro_empresa(base)
+        except Exception:
+            pass
+
+        empresa_id = empresa_contexto_atual() if "empresa_contexto_atual" in globals() else "1"
+        empresa_nome = obter_nome_empresa(empresa_id) if "obter_nome_empresa" in globals() else ""
+
+        col_ean = _alerta_coluna(base, ["EAN", "EAN (GTIN)", "GTIN", "Código de Barras"])
+        col_prod = _alerta_coluna(base, ["Produto", "Produto_Base_SIM", "Descrição", "Descricao"])
+        col_margem = _alerta_coluna(base, ["Margem_%", "Margem", "Margem %"])
+        col_preco_rede = _alerta_coluna(base, ["Preco_Rede", "Preço Rede", "Preco Loja", "Preço Loja", "Preco_Venda", "Preço (R$)"])
+        col_preco_conc = _alerta_coluna(base, ["Menor_Preco_Concorrente", "Menor Concorrente", "Preco_Concorrente", "Preço Concorrente", "Menor_Preco"])
+        col_estoque = _alerta_coluna(base, ["Estoque", "Estoque Atual", "Qtde Estoque", "Quantidade Estoque"])
+        col_data = _alerta_coluna(base, ["Data", "Data Pesquisa", "Data_Pesquisa", "Última Pesquisa", "Ultima Pesquisa"])
+        col_ganho = _alerta_coluna(base, ["Ganho_Potencial", "Ganho Potencial", "Oportunidade"])
+
+        if col_margem:
+            margem = _alerta_converter_numero(base[col_margem])
+            temp = base[margem < float(limite_margem)].copy()
+            temp["_valor_alerta"] = margem[margem < float(limite_margem)]
+
+            for _, row in temp.head(limite_alertas).iterrows():
+                alertas.append({
+                    "Data_Hora": _alerta_data_hora(),
+                    "EmpresaID": empresa_id,
+                    "Empresa": empresa_nome,
+                    "Tipo": "Margem abaixo da meta",
+                    "Severidade": "Alta",
+                    "EAN": str(row.get(col_ean, "")) if col_ean else "",
+                    "Produto": str(row.get(col_prod, "")) if col_prod else "",
+                    "Valor": _alerta_numero_br(row.get("_valor_alerta", "")),
+                    "Regra": f"Margem menor que {limite_margem}%",
+                    "Ação Sugerida": "Revisar preço, custo ou negociação de compra."
+                })
+
+        if col_preco_rede and col_preco_conc:
+            preco_rede = _alerta_converter_numero(base[col_preco_rede])
+            preco_conc = _alerta_converter_numero(base[col_preco_conc])
+            dif = ((preco_rede - preco_conc) / preco_rede.replace(0, pd.NA)) * 100
+            mask = (preco_rede > 0) & (preco_conc > 0) & (dif > float(limite_diferenca_concorrente))
+
+            temp = base[mask].copy()
+            temp["_dif_alerta"] = dif[mask]
+
+            for _, row in temp.head(limite_alertas).iterrows():
+                alertas.append({
+                    "Data_Hora": _alerta_data_hora(),
+                    "EmpresaID": empresa_id,
+                    "Empresa": empresa_nome,
+                    "Tipo": "Concorrente mais barato",
+                    "Severidade": "Alta",
+                    "EAN": str(row.get(col_ean, "")) if col_ean else "",
+                    "Produto": str(row.get(col_prod, "")) if col_prod else "",
+                    "Valor": f"{_alerta_numero_br(row.get('_dif_alerta', ''))}%",
+                    "Regra": f"Concorrente mais barato acima de {limite_diferenca_concorrente}%",
+                    "Ação Sugerida": "Avaliar ajuste de preço ou estratégia por curva/margem."
+                })
+
+        if col_data:
+            datas = pd.to_datetime(base[col_data], dayfirst=True, errors="coerce")
+            dias = (pd.Timestamp.now().normalize() - datas.dt.normalize()).dt.days
+            mask = dias > int(dias_sem_pesquisa)
+
+            temp = base[mask].copy()
+            temp["_dias_alerta"] = dias[mask]
+
+            for _, row in temp.head(limite_alertas).iterrows():
+                valor = row.get("_dias_alerta", 0)
+                alertas.append({
+                    "Data_Hora": _alerta_data_hora(),
+                    "EmpresaID": empresa_id,
+                    "Empresa": empresa_nome,
+                    "Tipo": "Produto sem pesquisa recente",
+                    "Severidade": "Média",
+                    "EAN": str(row.get(col_ean, "")) if col_ean else "",
+                    "Produto": str(row.get(col_prod, "")) if col_prod else "",
+                    "Valor": f"{int(valor) if pd.notna(valor) else 0} dias",
+                    "Regra": f"Sem pesquisa há mais de {dias_sem_pesquisa} dias",
+                    "Ação Sugerida": "Incluir produto na próxima sugestão de pesquisa."
+                })
+
+        if col_estoque and col_margem:
+            estoque = _alerta_converter_numero(base[col_estoque])
+            margem = _alerta_converter_numero(base[col_margem])
+            mask = (estoque >= float(limite_estoque_alto)) & (margem < float(limite_margem))
+
+            temp = base[mask].copy()
+            temp["_estoque_alerta"] = estoque[mask]
+
+            for _, row in temp.head(limite_alertas).iterrows():
+                alertas.append({
+                    "Data_Hora": _alerta_data_hora(),
+                    "EmpresaID": empresa_id,
+                    "Empresa": empresa_nome,
+                    "Tipo": "Estoque alto com margem baixa",
+                    "Severidade": "Alta",
+                    "EAN": str(row.get(col_ean, "")) if col_ean else "",
+                    "Produto": str(row.get(col_prod, "")) if col_prod else "",
+                    "Valor": _alerta_numero_br(row.get("_estoque_alerta", ""), 0),
+                    "Regra": f"Estoque >= {limite_estoque_alto} e margem < {limite_margem}%",
+                    "Ação Sugerida": "Avaliar promoção, negociação ou reposicionamento de preço."
+                })
+
+        if col_ganho:
+            ganho = _alerta_converter_numero(base[col_ganho])
+            limite_ganho = ganho.quantile(0.90) if ganho.notna().sum() > 10 else ganho.mean()
+
+            if pd.notna(limite_ganho) and limite_ganho > 0:
+                temp = base[ganho >= limite_ganho].copy()
+                temp["_ganho_alerta"] = ganho[ganho >= limite_ganho]
+
+                for _, row in temp.head(limite_alertas).iterrows():
+                    alertas.append({
+                        "Data_Hora": _alerta_data_hora(),
+                        "EmpresaID": empresa_id,
+                        "Empresa": empresa_nome,
+                        "Tipo": "Alta oportunidade de ganho",
+                        "Severidade": "Média",
+                        "EAN": str(row.get(col_ean, "")) if col_ean else "",
+                        "Produto": str(row.get(col_prod, "")) if col_prod else "",
+                        "Valor": f"R$ {_alerta_numero_br(row.get('_ganho_alerta', ''))}",
+                        "Regra": "Produto no top 10% de ganho potencial",
+                        "Ação Sugerida": "Priorizar na análise comercial e no simulador."
+                    })
+
+        alertas_df = pd.DataFrame(alertas)
+
+        if not alertas_df.empty:
+            alertas_df = alertas_df.drop_duplicates(subset=["EmpresaID", "Tipo", "EAN", "Produto"], keep="first").head(limite_alertas)
+
+        return alertas_df
+
+    except Exception as erro:
+        return pd.DataFrame([{
+            "Data_Hora": _alerta_data_hora(),
+            "EmpresaID": empresa_contexto_atual() if "empresa_contexto_atual" in globals() else "1",
+            "Empresa": "",
+            "Tipo": "Erro ao gerar alertas",
+            "Severidade": "Alta",
+            "EAN": "",
+            "Produto": "",
+            "Valor": "",
+            "Regra": "Falha no motor de alertas",
+            "Ação Sugerida": str(erro)
+        }])
+
+
+def enviar_alertas_telegram(alertas_df, limite_envio=10):
+    try:
+        if alertas_df is None or alertas_df.empty:
+            return False, "Nenhum alerta para enviar."
+
+        top = alertas_df.head(int(limite_envio))
+        linhas = []
+
+        for _, row in top.iterrows():
+            linhas.append(f"• <b>{row.get('Tipo', '')}</b> | {row.get('Produto', '')} | {row.get('Valor', '')}")
+
+        mensagem = (
+            "🚨 <b>Alertas Inteligentes Eirox</b>\n\n"
+            f"🏢 <b>Empresa:</b> {top.iloc[0].get('Empresa', '')}\n"
+            f"📊 <b>Total gerado:</b> {len(alertas_df)}\n"
+            f"🕒 <b>Horário:</b> {_alerta_data_hora()}\n\n"
+            + "\n".join(linhas[:limite_envio])
+            + f"\n\n🏷️ <b>Versão:</b> {VERSAO_APP}"
+        )
+
+        ok = enviar_alerta_telegram(mensagem) if "enviar_alerta_telegram" in globals() else False
+        return bool(ok), "Alertas enviados ao Telegram." if ok else "Não foi possível enviar ao Telegram."
+
+    except Exception as erro:
+        return False, str(erro)
+
+
+def usuario_pode_ver_alertas_inteligentes():
     try:
         return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() == "paulomarques"
     except Exception:
@@ -4489,7 +4773,8 @@ if usuario_pode_ver_multiempresa():
         "📌 Sobre o Eirox",
         "🧭 Roadmap do Produto",
         "💼 Licenciamento Multiempresa",
-        "💼 Licenciamento Real"
+        "💼 Licenciamento Real",
+        "🚨 Alertas Inteligentes"
     ]:
         if pagina_enterprise not in paginas_liberadas:
             paginas_liberadas = paginas_liberadas + [pagina_enterprise]
@@ -5053,6 +5338,133 @@ if pagina == "🧭 Roadmap do Produto":
             "Motor inteligente para sugerir preço ideal com base em concorrência, custo, estoque e elasticidade.",
             "🤖"
         )
+
+    st.stop()
+
+
+
+
+# --------------------------------------------------
+# ALERTAS INTELIGENTES
+# --------------------------------------------------
+
+if pagina == "🚨 Alertas Inteligentes":
+
+    if not usuario_pode_ver_alertas_inteligentes():
+        st.error("Acesso não autorizado.")
+        st.stop()
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">Intelligent Monitoring</div>
+            <h1>🚨 Alertas Inteligentes</h1>
+            <p>Monitoramento automático de riscos, oportunidades, margem, concorrência, estoque e pesquisa de mercado.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    legenda_tela("🚨 Alertas Inteligentes")
+
+    st.markdown("### ⚙️ Parâmetros dos alertas")
+
+    p1, p2, p3, p4, p5 = st.columns(5)
+
+    limite_margem = p1.number_input("Margem mínima (%)", min_value=0, max_value=100, value=20, step=1)
+    limite_diferenca = p2.number_input("Diferença concorrente (%)", min_value=0, max_value=100, value=10, step=1)
+    dias_sem_pesquisa = p3.number_input("Dias sem pesquisa", min_value=1, max_value=90, value=7, step=1)
+    limite_estoque = p4.number_input("Estoque alto", min_value=0, max_value=10000, value=50, step=10)
+    limite_alertas = p5.number_input("Máx. alertas", min_value=10, max_value=1000, value=100, step=10)
+
+    st.markdown("### 🧠 Motor de alertas")
+
+    col_gerar, col_enviar = st.columns(2)
+
+    if "alertas_inteligentes_df" not in st.session_state:
+        st.session_state["alertas_inteligentes_df"] = pd.DataFrame()
+
+    if col_gerar.button("🚨 Gerar Alertas Inteligentes", use_container_width=True):
+        with st.spinner("Analisando bases e gerando alertas..."):
+            alertas_df = gerar_alertas_inteligentes(
+                limite_margem=limite_margem,
+                limite_diferenca_concorrente=limite_diferenca,
+                dias_sem_pesquisa=dias_sem_pesquisa,
+                limite_estoque_alto=limite_estoque,
+                limite_alertas=limite_alertas
+            )
+
+        st.session_state["alertas_inteligentes_df"] = alertas_df
+
+        if alertas_df.empty:
+            st.success("🟢 Nenhum alerta crítico encontrado com os parâmetros atuais.")
+        else:
+            _alerta_salvar(alertas_df.to_dict("records"))
+            st.warning(f"🚨 {len(alertas_df)} alertas gerados.")
+
+    alertas_df = st.session_state.get("alertas_inteligentes_df", pd.DataFrame())
+
+    if col_enviar.button("📨 Enviar resumo ao Telegram", use_container_width=True):
+        if alertas_df.empty:
+            st.info("Gere os alertas antes de enviar.")
+        else:
+            ok, msg = enviar_alertas_telegram(alertas_df, limite_envio=10)
+            if ok:
+                st.success(msg)
+            else:
+                st.error(msg)
+
+    if not alertas_df.empty:
+
+        st.markdown("### 📊 Resumo executivo")
+
+        a1, a2, a3, a4 = st.columns(4)
+
+        a1.metric("Alertas", len(alertas_df))
+        a2.metric("Alta severidade", int((alertas_df["Severidade"].astype(str) == "Alta").sum()) if "Severidade" in alertas_df.columns else 0)
+        a3.metric("Tipos de alerta", alertas_df["Tipo"].nunique() if "Tipo" in alertas_df.columns else 0)
+        a4.metric("Produtos únicos", alertas_df["Produto"].nunique() if "Produto" in alertas_df.columns else 0)
+
+        st.markdown("### 🚨 Alertas gerados")
+
+        severidade_filtro = st.multiselect(
+            "Filtrar severidade",
+            sorted(alertas_df["Severidade"].dropna().astype(str).unique().tolist()) if "Severidade" in alertas_df.columns else []
+        )
+
+        tipo_filtro = st.multiselect(
+            "Filtrar tipo",
+            sorted(alertas_df["Tipo"].dropna().astype(str).unique().tolist()) if "Tipo" in alertas_df.columns else []
+        )
+
+        view = alertas_df.copy()
+
+        if severidade_filtro and "Severidade" in view.columns:
+            view = view[view["Severidade"].astype(str).isin(severidade_filtro)]
+
+        if tipo_filtro and "Tipo" in view.columns:
+            view = view[view["Tipo"].astype(str).isin(tipo_filtro)]
+
+        st.dataframe(view, use_container_width=True, hide_index=True)
+
+        csv_alertas = view.to_csv(index=False, sep=";", encoding="utf-8-sig")
+
+        st.download_button(
+            "📥 Exportar Alertas CSV",
+            data=csv_alertas,
+            file_name="alertas_inteligentes_eirox.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+
+    st.markdown("### 📜 Histórico de alertas")
+
+    historico_alertas = carregar_historico_alertas()
+
+    if historico_alertas.empty:
+        st.info("Nenhum histórico de alerta registrado ainda.")
+    else:
+        st.dataframe(historico_alertas.tail(300), use_container_width=True, hide_index=True)
 
     st.stop()
 
