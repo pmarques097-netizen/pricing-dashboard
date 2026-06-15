@@ -3854,7 +3854,7 @@ st.sidebar.markdown(
 )
 
 st.sidebar.caption(
-    f"Versão: {VERSAO_APP}"
+    f"Enterprise {VERSAO_APP.split('-')[0]}"
 )
 
 # Seletor Multiempresa no local correto do menu lateral.
