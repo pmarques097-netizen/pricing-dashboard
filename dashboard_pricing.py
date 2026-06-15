@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.40.2-menu-enterprise-full-fix"
+VERSAO_APP = "v1.40.3-lts-visual-map-fix"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -5235,6 +5235,94 @@ def faturamento_por_cliente():
 
     except Exception:
         return pd.DataFrame()
+
+
+
+
+# --------------------------------------------------
+# AJUSTES VISUAIS MAPA / HEATMAP - v1.40.3 LTS
+# --------------------------------------------------
+
+def aplicar_layout_heatmap_eirox(fig, altura=460):
+    try:
+        fig.update_xaxes(tickangle=-90)
+        fig.update_layout(
+            height=altura,
+            margin=dict(l=20, r=20, t=60, b=150)
+        )
+        try:
+            fig.update_traces(
+                textfont=dict(size=10),
+                selector=dict(type="heatmap")
+            )
+        except Exception:
+            pass
+        return fig
+    except Exception:
+        return fig
+
+
+def centro_mapa_eirox(df_mapa, col_lat=None, col_lon=None):
+    try:
+        if df_mapa is None or not isinstance(df_mapa, pd.DataFrame) or df_mapa.empty:
+            return None
+
+        if col_lat is None:
+            for c in df_mapa.columns:
+                nome = str(c).strip().lower()
+                if nome in ["latitude", "lat"] or "lat" in nome:
+                    col_lat = c
+                    break
+
+        if col_lon is None:
+            for c in df_mapa.columns:
+                nome = str(c).strip().lower()
+                if nome in ["longitude", "lon", "lng"] or "lon" in nome or "lng" in nome:
+                    col_lon = c
+                    break
+
+        if col_lat is None or col_lon is None:
+            return None
+
+        lat = pd.to_numeric(df_mapa[col_lat], errors="coerce")
+        lon = pd.to_numeric(df_mapa[col_lon], errors="coerce")
+        base = pd.DataFrame({"lat": lat, "lon": lon}).dropna()
+
+        if base.empty:
+            return None
+
+        return {
+            "lat": float(base["lat"].mean()),
+            "lon": float(base["lon"].mean())
+        }
+    except Exception:
+        return None
+
+
+def aplicar_zoom_mapa_eirox(fig, df_mapa=None, zoom=13):
+    try:
+        centro = centro_mapa_eirox(df_mapa)
+
+        layout_mapbox = {"zoom": zoom}
+        layout_map = {"zoom": zoom}
+
+        if centro:
+            layout_mapbox["center"] = centro
+            layout_map["center"] = centro
+
+        try:
+            fig.update_layout(mapbox=layout_mapbox)
+        except Exception:
+            pass
+
+        try:
+            fig.update_layout(map=layout_map)
+        except Exception:
+            pass
+
+        return fig
+    except Exception:
+        return fig
 
 
 
@@ -10392,6 +10480,8 @@ if pagina == "🎯 Sugestão de Pesquisa":
         plot_bgcolor="rgba(0,0,0,0)"
     )
 
+    fig = aplicar_layout_heatmap_eirox(fig)
+
     st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("### 🔎 Lista operacional de marcas para pesquisar")
@@ -12210,12 +12300,20 @@ if pagina == "🌎 Mapa Geográfico de Concorrência":
         mapbox=dict(
             style="carto-darkmatter",
             center=dict(lat=centro_lat, lon=centro_lon),
-            zoom=11
+            zoom=13
         ),
         height=680,
         margin=dict(l=0, r=0, t=20, b=0),
 paper_bgcolor="rgba(0,0,0,0)"
     )
+
+    try:
+
+        fig_mapa = aplicar_zoom_mapa_eirox(fig_mapa, df_mapa if "df_mapa" in locals() else (dados_mapa if "dados_mapa" in locals() else (mapa_df if "mapa_df" in locals() else (df_mapa_filtrado if "df_mapa_filtrado" in locals() else None))), zoom=13)
+
+    except Exception:
+
+        pass
 
     st.plotly_chart(fig_mapa, use_container_width=True, key="mapa_geografico_concorrencia")
 
@@ -15344,8 +15442,9 @@ if (
         }
     )
 
-    st.plotly_chart(
-        fig_bairro,
+    fig_bairro = aplicar_layout_heatmap_eirox(fig_bairro)
+
+    st.plotly_chart(fig_bairro,
         width="stretch",
         key="heatmap_bairros_quantidade"
     )
