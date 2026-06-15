@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.35.4-beta-backup-center-corrigido"
+VERSAO_APP = "v1.35.5-beta-multiempresa-menu-fix"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -2350,6 +2350,199 @@ def health_ultimo_login():
 
 
 
+
+# --------------------------------------------------
+# MULTIEMPRESA - HOMOLOGAÇÃO v1.35.5
+# --------------------------------------------------
+
+EMPRESAS_ARQUIVO = Path("EMPRESAS_EIROX.csv")
+
+
+def usuario_master():
+    try:
+        return str(st.session_state.get("usuario", "")).strip().lower() == "paulomarques"
+    except Exception:
+        return False
+
+
+def inicializar_empresas():
+    try:
+        if not EMPRESAS_ARQUIVO.exists():
+            base = pd.DataFrame(
+                [
+                    {
+                        "EmpresaID": "1",
+                        "Empresa": "SB Farma",
+                        "Ativa": "Sim",
+                        "Criado_Em": horario_brasil_formatado() if "horario_brasil_formatado" in globals() else datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                    },
+                    {
+                        "EmpresaID": "2",
+                        "Empresa": "Cliente Teste",
+                        "Ativa": "Sim",
+                        "Criado_Em": horario_brasil_formatado() if "horario_brasil_formatado" in globals() else datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                    }
+                ]
+            )
+            base.to_csv(EMPRESAS_ARQUIVO, index=False, sep=";", encoding="utf-8-sig")
+        return True
+    except Exception:
+        return False
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_empresas_sistema():
+    try:
+        inicializar_empresas()
+        base = pd.read_csv(EMPRESAS_ARQUIVO, sep=";", encoding="utf-8-sig", dtype=str).fillna("")
+
+        obrigatorias = ["EmpresaID", "Empresa", "Ativa", "Criado_Em"]
+
+        for col in obrigatorias:
+            if col not in base.columns:
+                base[col] = ""
+
+        base["EmpresaID"] = base["EmpresaID"].astype(str).str.strip()
+        base["Empresa"] = base["Empresa"].astype(str).str.strip()
+        base["Ativa"] = base["Ativa"].replace("", "Sim")
+
+        return base[obrigatorias].copy()
+
+    except Exception:
+        return pd.DataFrame([{"EmpresaID": "1", "Empresa": "SB Farma", "Ativa": "Sim", "Criado_Em": ""}])
+
+
+def salvar_empresas_sistema(base):
+    try:
+        base = base.copy()
+        base["EmpresaID"] = base["EmpresaID"].astype(str).str.strip()
+        base["Empresa"] = base["Empresa"].astype(str).str.strip()
+        base.to_csv(EMPRESAS_ARQUIVO, index=False, sep=";", encoding="utf-8-sig")
+
+        try:
+            carregar_empresas_sistema.clear()
+        except Exception:
+            pass
+
+        return True
+    except Exception:
+        return False
+
+
+def criar_ou_atualizar_empresa(empresa_id, empresa, ativa="Sim"):
+    try:
+        empresa_id = str(empresa_id).strip()
+        empresa = str(empresa).strip()
+        ativa = str(ativa).strip()
+
+        if not empresa_id or not empresa:
+            return False, "EmpresaID e nome da empresa são obrigatórios."
+
+        base = carregar_empresas_sistema()
+
+        if empresa_id in base["EmpresaID"].astype(str).tolist():
+            idx = base.index[base["EmpresaID"].astype(str) == empresa_id][0]
+            base.loc[idx, "Empresa"] = empresa
+            base.loc[idx, "Ativa"] = ativa
+            acao = "Atualização de empresa"
+        else:
+            nova = pd.DataFrame(
+                [
+                    {
+                        "EmpresaID": empresa_id,
+                        "Empresa": empresa,
+                        "Ativa": ativa,
+                        "Criado_Em": horario_brasil_formatado() if "horario_brasil_formatado" in globals() else datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                    }
+                ]
+            )
+            base = pd.concat([base, nova], ignore_index=True)
+            acao = "Criação de empresa"
+
+        salvar_empresas_sistema(base)
+
+        try:
+            registrar_log_usuario(acao, empresa_id, f"Empresa: {empresa} | Ativa: {ativa}")
+        except Exception:
+            pass
+
+        return True, f"{acao} realizada com sucesso."
+
+    except Exception as erro:
+        return False, f"Erro ao salvar empresa: {erro}"
+
+
+def obter_nome_empresa(empresa_id):
+    try:
+        empresa_id = str(empresa_id).strip()
+        empresas = carregar_empresas_sistema()
+        linha = empresas[empresas["EmpresaID"].astype(str).str.strip() == empresa_id]
+
+        if linha.empty:
+            return "Empresa não identificada"
+
+        return str(linha.iloc[0]["Empresa"])
+
+    except Exception:
+        return "Empresa não identificada"
+
+
+def empresa_usuario_logado():
+    try:
+        empresa_id = str(st.session_state.get("empresa_id_usuario", "1")).strip()
+        return empresa_id if empresa_id else "1"
+    except Exception:
+        return "1"
+
+
+def empresa_contexto_atual():
+    try:
+        if usuario_master():
+            return str(st.session_state.get("empresa_id_contexto", empresa_usuario_logado())).strip()
+        return empresa_usuario_logado()
+    except Exception:
+        return "1"
+
+
+def aplicar_filtro_empresa(base):
+    try:
+        if not isinstance(base, pd.DataFrame) or base.empty:
+            return base
+        if "EmpresaID" not in base.columns:
+            return base
+        empresa_id = empresa_contexto_atual()
+        return base[base["EmpresaID"].astype(str).str.strip() == str(empresa_id)].copy()
+    except Exception:
+        return base
+
+
+def preparar_base_usuarios_multiempresa():
+    try:
+        if "carregar_usuarios_sistema" not in globals() or "salvar_usuarios_sistema" not in globals():
+            return
+
+        base = carregar_usuarios_sistema()
+
+        if "EmpresaID" not in base.columns:
+            base["EmpresaID"] = "1"
+
+            if "Usuario" in base.columns:
+                base.loc[
+                    base["Usuario"].astype(str).str.lower().eq("paulomarques"),
+                    "EmpresaID"
+                ] = "1"
+
+            salvar_usuarios_sistema(base)
+
+    except Exception:
+        pass
+
+
+def usuario_pode_ver_multiempresa():
+    return usuario_master()
+
+
+
 # --------------------------------------------------
 # LOGIN E CONTROLE DE ACESSO
 # --------------------------------------------------
@@ -2469,6 +2662,7 @@ def _usuarios_padrao_dataframe():
                 "Ativo": "Sim",
                 "Expira_Em": "",
                 "Forcar_Reset": "Não",
+                "EmpresaID": "1",
                 "Criado_Em": _agora_brasil_txt(),
                 "Atualizado_Em": _agora_brasil_txt()
             }
@@ -2524,6 +2718,7 @@ def carregar_usuarios_sistema():
             "Ativo",
             "Expira_Em",
             "Forcar_Reset",
+            "EmpresaID",
             "Criado_Em",
             "Atualizado_Em"
         ]
@@ -2628,7 +2823,7 @@ def usuario_pode_gerenciar_usuarios():
         return False
 
 
-def criar_ou_atualizar_usuario(usuario, nome, perfil, senha=None, ativo="Sim", expira_em="", forcar_reset="Não"):
+def criar_ou_atualizar_usuario(usuario, nome, perfil, senha=None, ativo="Sim", expira_em="", forcar_reset="Não", empresa_id="1"):
     """
     Cria ou atualiza usuário na base dinâmica.
     """
@@ -2640,6 +2835,7 @@ def criar_ou_atualizar_usuario(usuario, nome, perfil, senha=None, ativo="Sim", e
         ativo = str(ativo).strip()
         expira_em = str(expira_em).strip()
         forcar_reset = str(forcar_reset).strip()
+        empresa_id = str(empresa_id).strip() or "1"
 
         if not usuario or not nome or not perfil:
             return False, "Usuário, nome e perfil são obrigatórios."
@@ -2656,6 +2852,7 @@ def criar_ou_atualizar_usuario(usuario, nome, perfil, senha=None, ativo="Sim", e
             base.loc[idx, "Ativo"] = ativo
             base.loc[idx, "Expira_Em"] = expira_em
             base.loc[idx, "Forcar_Reset"] = forcar_reset
+            base.loc[idx, "EmpresaID"] = empresa_id
             base.loc[idx, "Atualizado_Em"] = agora
 
             if senha:
@@ -2692,6 +2889,7 @@ def criar_ou_atualizar_usuario(usuario, nome, perfil, senha=None, ativo="Sim", e
             "Ativo": ativo,
             "Expira_Em": expira_em,
             "Forcar_Reset": forcar_reset,
+            "EmpresaID": empresa_id,
             "Criado_Em": agora,
             "Atualizado_Em": agora
         }
@@ -3214,6 +3412,8 @@ def tela_login():
             st.session_state["usuario"] = usuario_key
             st.session_state["nome_usuario"] = dados_login.get("Nome", usuario_key) if dados_login else usuario_key
             st.session_state["perfil_usuario"] = dados_login.get("Perfil", "Consulta") if dados_login else "Consulta"
+            st.session_state["empresa_id_usuario"] = dados_login.get("EmpresaID", "1") if dados_login else "1"
+            st.session_state["empresa_id_contexto"] = st.session_state["empresa_id_usuario"]
 
             salvar_log_acesso(
                 "Login",
@@ -3287,6 +3487,18 @@ nome_usuario = st.session_state.get(
     "nome_usuario",
     ""
 )
+
+# Contexto Multiempresa
+preparar_base_usuarios_multiempresa()
+
+if "empresa_id_usuario" not in st.session_state:
+    st.session_state["empresa_id_usuario"] = "1"
+
+if "empresa_id_contexto" not in st.session_state:
+    st.session_state["empresa_id_contexto"] = st.session_state.get("empresa_id_usuario", "1")
+
+empresa_id_contexto = empresa_contexto_atual()
+nome_empresa_contexto = obter_nome_empresa(empresa_id_contexto)
 
 pode_exportar = perfil_usuario in [
     "Diretoria",
@@ -3645,6 +3857,47 @@ st.sidebar.caption(
     f"Versão: {VERSAO_APP}"
 )
 
+# Seletor Multiempresa no local correto do menu lateral.
+if usuario_master():
+    empresas_ctx = carregar_empresas_sistema()
+    empresas_ctx = empresas_ctx[
+        empresas_ctx["Ativa"].astype(str).str.lower().eq("sim")
+    ].copy()
+
+    if not empresas_ctx.empty:
+        mapa_empresas_ctx = {
+            f'{row["EmpresaID"]} - {row["Empresa"]}': str(row["EmpresaID"])
+            for _, row in empresas_ctx.iterrows()
+        }
+
+        empresa_atual_id = st.session_state.get(
+            "empresa_id_contexto",
+            st.session_state.get("empresa_id_usuario", "1")
+        )
+
+        labels_empresas = list(mapa_empresas_ctx.keys())
+        index_empresa = 0
+
+        for i, label in enumerate(labels_empresas):
+            if mapa_empresas_ctx[label] == str(empresa_atual_id):
+                index_empresa = i
+                break
+
+        empresa_label_sel = st.sidebar.selectbox(
+            "🏢 Empresa em contexto",
+            labels_empresas,
+            index=index_empresa,
+            key="select_empresa_contexto_master_menu"
+        )
+
+        st.session_state["empresa_id_contexto"] = mapa_empresas_ctx[empresa_label_sel]
+        empresa_id_contexto = empresa_contexto_atual()
+        nome_empresa_contexto = obter_nome_empresa(empresa_id_contexto)
+
+st.sidebar.caption(
+    f"Empresa: {nome_empresa_contexto}"
+)
+
 
 paginas_liberadas = PERMISSOES_TELAS.get(
     perfil_usuario,
@@ -3662,6 +3915,9 @@ if usuario_pode_ver_auditoria() and "🟢 Saúde do Sistema" not in paginas_libe
 
 if usuario_pode_ver_auditoria() and "📦 Backup Center" not in paginas_liberadas:
     paginas_liberadas = paginas_liberadas + ["📦 Backup Center"]
+
+if usuario_pode_ver_multiempresa() and "🏢 Multiempresa" not in paginas_liberadas:
+    paginas_liberadas = paginas_liberadas + ["🏢 Multiempresa"]
 
 if usuario_pode_ver_auditoria() and "🔐 Central de Auditoria" not in paginas_liberadas:
     paginas_liberadas = paginas_liberadas + ["🔐 Central de Auditoria"]
@@ -4087,6 +4343,186 @@ if pagina == "👥 Controle de Usuários":
     st.stop()
 
 
+
+
+
+
+# --------------------------------------------------
+# MULTIEMPRESA
+# --------------------------------------------------
+
+if pagina == "🏢 Multiempresa":
+
+    if not usuario_pode_ver_multiempresa():
+        st.error("Acesso não autorizado.")
+        st.stop()
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">SaaS Enterprise</div>
+            <h1>🏢 Multiempresa</h1>
+            <p>Cadastro de empresas, vínculo de usuários, contexto master e preparação para isolamento de dados por cliente.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    empresas = carregar_empresas_sistema()
+    usuarios_multi = carregar_usuarios_sistema() if "carregar_usuarios_sistema" in globals() else pd.DataFrame()
+
+    if "EmpresaID" not in usuarios_multi.columns and not usuarios_multi.empty:
+        usuarios_multi["EmpresaID"] = "1"
+
+    m1, m2, m3, m4 = st.columns(4)
+
+    total_empresas = len(empresas)
+    empresas_ativas = int((empresas["Ativa"].astype(str).str.lower() == "sim").sum()) if not empresas.empty and "Ativa" in empresas.columns else 0
+    usuarios_vinculados = int(usuarios_multi["Usuario"].nunique()) if not usuarios_multi.empty and "Usuario" in usuarios_multi.columns else 0
+    empresa_contexto_nome = obter_nome_empresa(empresa_contexto_atual())
+
+    m1.metric("Empresas", total_empresas)
+    m2.metric("Empresas ativas", empresas_ativas)
+    m3.metric("Usuários vinculados", usuarios_vinculados)
+    m4.metric("Contexto atual", empresa_contexto_nome)
+
+    aba_empresas, aba_vinculos, aba_isolamento = st.tabs(
+        [
+            "🏢 Empresas",
+            "👥 Usuários por empresa",
+            "🔒 Isolamento de dados"
+        ]
+    )
+
+    with aba_empresas:
+
+        st.markdown("### 🏢 Cadastro de empresas")
+
+        empresas_opcoes = ["Nova empresa"]
+
+        if not empresas.empty:
+            empresas_opcoes += [
+                f'{row["EmpresaID"]} - {row["Empresa"]}'
+                for _, row in empresas.iterrows()
+            ]
+
+        empresa_sel = st.selectbox("Selecionar empresa", empresas_opcoes, key="multiempresa_empresa_sel")
+        dados_empresa = {}
+
+        if empresa_sel != "Nova empresa":
+            empresa_id_sel = empresa_sel.split(" - ")[0].strip()
+            linha_emp = empresas[empresas["EmpresaID"].astype(str).str.strip() == empresa_id_sel]
+            if not linha_emp.empty:
+                dados_empresa = linha_emp.iloc[0].to_dict()
+
+        with st.form("form_multiempresa_empresa"):
+
+            empresa_id_form = st.text_input("EmpresaID", value=dados_empresa.get("EmpresaID", "") if dados_empresa else "")
+            empresa_nome_form = st.text_input("Nome da empresa", value=dados_empresa.get("Empresa", "") if dados_empresa else "")
+            empresa_ativa_form = st.selectbox("Ativa", ["Sim", "Não"], index=0 if dados_empresa.get("Ativa", "Sim") == "Sim" else 1)
+
+            salvar_empresa = st.form_submit_button("💾 Salvar empresa", use_container_width=True)
+
+        if salvar_empresa:
+            ok, msg = criar_ou_atualizar_empresa(empresa_id_form, empresa_nome_form, empresa_ativa_form)
+            if ok:
+                st.success(msg)
+                st.rerun()
+            else:
+                st.error(msg)
+
+        st.markdown("### 📋 Empresas cadastradas")
+        st.dataframe(empresas, use_container_width=True, hide_index=True)
+
+    with aba_vinculos:
+
+        st.markdown("### 👥 Usuários vinculados por empresa")
+
+        if usuarios_multi.empty:
+            st.info("Nenhum usuário encontrado.")
+        else:
+            usuarios_view = usuarios_multi.copy()
+            usuarios_view["Empresa"] = usuarios_view["EmpresaID"].apply(obter_nome_empresa)
+
+            colunas_usuarios = ["Usuario", "Nome", "Perfil", "EmpresaID", "Empresa", "Ativo", "Expira_Em", "Forcar_Reset"]
+            colunas_usuarios = [c for c in colunas_usuarios if c in usuarios_view.columns]
+
+            st.dataframe(usuarios_view[colunas_usuarios], use_container_width=True, hide_index=True)
+
+        st.markdown("### 🔁 Alterar empresa de um usuário")
+
+        if not usuarios_multi.empty and not empresas.empty:
+
+            usuario_vinculo = st.selectbox("Usuário", sorted(usuarios_multi["Usuario"].dropna().astype(str).unique().tolist()), key="multi_usuario_vinculo")
+
+            empresas_labels = [
+                f'{row["EmpresaID"]} - {row["Empresa"]}'
+                for _, row in empresas.iterrows()
+                if str(row.get("Ativa", "Sim")).lower() == "sim"
+            ]
+
+            empresa_vinculo_label = st.selectbox("Empresa", empresas_labels, key="multi_empresa_vinculo")
+
+            if st.button("🔗 Vincular usuário à empresa", use_container_width=True):
+
+                empresa_vinculo_id = empresa_vinculo_label.split(" - ")[0].strip()
+                base_u = carregar_usuarios_sistema()
+
+                if "EmpresaID" not in base_u.columns:
+                    base_u["EmpresaID"] = "1"
+
+                idxs = base_u.index[base_u["Usuario"].astype(str).str.lower() == str(usuario_vinculo).lower()]
+
+                if len(idxs) == 0:
+                    st.error("Usuário não encontrado.")
+                else:
+                    idx = idxs[0]
+                    base_u.loc[idx, "EmpresaID"] = empresa_vinculo_id
+                    salvar_usuarios_sistema(base_u)
+
+                    try:
+                        registrar_log_usuario("Vínculo Multiempresa", usuario_vinculo, f"EmpresaID={empresa_vinculo_id} | Empresa={obter_nome_empresa(empresa_vinculo_id)}")
+                    except Exception:
+                        pass
+
+                    st.success("Usuário vinculado com sucesso.")
+                    st.rerun()
+
+    with aba_isolamento:
+
+        st.markdown("### 🔒 Status de isolamento por EmpresaID")
+
+        st.info(
+            "O isolamento multiempresa já está preparado. Quando as bases possuírem a coluna EmpresaID, "
+            "os dados poderão ser filtrados pelo contexto da empresa do usuário. "
+            "Bases sem EmpresaID continuam funcionando no modelo atual para manter compatibilidade."
+        )
+
+        bases_check = []
+
+        for nome_base, nome_var in [
+            ("Analise_Pricing", "df"),
+            ("VENDA_TESTE", "historico"),
+            ("VENDA_FINAL_TESTE", "venda_rede"),
+            ("COMPRA_TESTE", "compra"),
+            ("ESTOQUE_TESTE", "estoque")
+        ]:
+            try:
+                base_ref = globals().get(nome_var, pd.DataFrame())
+                bases_check.append(
+                    {
+                        "Base": nome_base,
+                        "Possui EmpresaID": "Sim" if isinstance(base_ref, pd.DataFrame) and "EmpresaID" in base_ref.columns else "Não",
+                        "Registros": len(base_ref) if isinstance(base_ref, pd.DataFrame) else 0,
+                        "Status": "🟢 Isolável" if isinstance(base_ref, pd.DataFrame) and "EmpresaID" in base_ref.columns else "🟡 Compatibilidade"
+                    }
+                )
+            except Exception:
+                pass
+
+        st.dataframe(pd.DataFrame(bases_check), use_container_width=True, hide_index=True)
+
+    st.stop()
 
 
 
