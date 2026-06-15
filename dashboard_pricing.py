@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.36.2-motor-oportunidades"
+VERSAO_APP = "v1.36.3-rc"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -3619,6 +3619,105 @@ def usuario_pode_ver_motor_oportunidades():
 
 
 
+
+# --------------------------------------------------
+# RELEASE CANDIDATE CENTER - v1.36.3 RC
+# --------------------------------------------------
+
+ARQUIVOS_ADMINISTRATIVOS_RC = [
+    "USUARIOS_EIROX.csv",
+    "EMPRESAS_EIROX.csv",
+    "LICENCAS_EIROX.csv",
+    "ALERTAS_EIROX.csv",
+    "OPORTUNIDADES_EIROX.csv",
+    "logs/log_acessos.csv",
+    "logs/log_usuarios.csv"
+]
+
+
+def usuario_pode_ver_release_candidate():
+    try:
+        return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() == "paulomarques"
+    except Exception:
+        return False
+
+
+def _rc_tamanho_formatado(bytes_valor):
+    try:
+        bytes_valor = float(bytes_valor)
+        if bytes_valor >= 1024 ** 3:
+            return f"{bytes_valor / (1024 ** 3):.2f} GB".replace(".", ",")
+        if bytes_valor >= 1024 ** 2:
+            return f"{bytes_valor / (1024 ** 2):.2f} MB".replace(".", ",")
+        if bytes_valor >= 1024:
+            return f"{bytes_valor / 1024:.2f} KB".replace(".", ",")
+        return f"{int(bytes_valor)} B"
+    except Exception:
+        return "0 B"
+
+
+def status_arquivo_rc(caminho):
+    try:
+        p = Path(caminho)
+        if not p.exists():
+            return {"Arquivo": caminho, "Status": "🟡 Não encontrado", "Tamanho": "0 B", "Última Atualização": "-"}
+        return {
+            "Arquivo": caminho,
+            "Status": "🟢 OK",
+            "Tamanho": _rc_tamanho_formatado(p.stat().st_size),
+            "Última Atualização": datetime.fromtimestamp(p.stat().st_mtime).strftime("%d/%m/%Y %H:%M:%S")
+        }
+    except Exception as erro:
+        return {"Arquivo": caminho, "Status": "🔴 Erro", "Tamanho": "0 B", "Última Atualização": str(erro)}
+
+
+def gerar_checklist_rc():
+    checks = []
+
+    def add(item, status, detalhe):
+        checks.append({"Item": item, "Status": status, "Detalhe": detalhe})
+
+    try:
+        add("Versão RC", "🟢 OK" if "rc" in VERSAO_APP.lower() else "🟡 Atenção", VERSAO_APP)
+        add("Controle de Usuários", "🟢 OK" if "carregar_usuarios_sistema" in globals() else "🔴 Erro", "Cadastro, bloqueio, reset e expiração")
+        add("Multiempresa", "🟢 OK" if "carregar_empresas_sistema" in globals() else "🔴 Erro", "Empresas e contexto master")
+        add("Licenciamento Real", "🟢 OK" if "carregar_licencas_sistema" in globals() else "🔴 Erro", "Planos, limites e expiração")
+        add("Auditoria", "🟢 OK" if "carregar_logs_acesso" in globals() else "🔴 Erro", "Histórico de acesso e navegação")
+        add("Saúde do Sistema", "🟢 OK" if "gerar_saude_bases" in globals() else "🔴 Erro", "Monitoramento das bases")
+        add("Backup Center", "🟢 OK" if "gerar_backup_eirox" in globals() else "🔴 Erro", "Backup e download")
+        add("Alertas Inteligentes", "🟢 OK" if "gerar_alertas_inteligentes" in globals() else "🔴 Erro", "Alertas e Telegram")
+        add("Motor de Oportunidades", "🟢 OK" if "gerar_motor_oportunidades" in globals() else "🔴 Erro", "Ranking financeiro")
+        add("Telegram", health_status_telegram() if "health_status_telegram" in globals() else "🟡 Não verificado", "Integração de notificações")
+        try:
+            emp = empresa_contexto_atual() if "empresa_contexto_atual" in globals() else "1"
+            lic = status_licenca_empresa(emp) if "status_licenca_empresa" in globals() else {}
+            add("Licença empresa contexto", lic.get("StatusOperacional", "🟡 Não verificado"), lic.get("Mensagem", ""))
+        except Exception:
+            add("Licença empresa contexto", "🟡 Não verificado", "")
+    except Exception as erro:
+        add("Checklist RC", "🔴 Erro", str(erro))
+
+    return pd.DataFrame(checks)
+
+
+def gerar_status_arquivos_rc():
+    return pd.DataFrame([status_arquivo_rc(c) for c in ARQUIVOS_ADMINISTRATIVOS_RC])
+
+
+def gerar_resumo_release_candidate():
+    try:
+        checklist = gerar_checklist_rc()
+        arquivos = gerar_status_arquivos_rc()
+        total_checks = len(checklist)
+        ok_checks = int(checklist["Status"].astype(str).str.contains("OK|Ativa|Trial|Protegido|Configurado", regex=True, na=False).sum()) if not checklist.empty else 0
+        arquivos_ok = int(arquivos["Status"].astype(str).str.contains("OK", na=False).sum()) if not arquivos.empty else 0
+        status_final = "🟢 RC pronta para homologação final" if ok_checks >= max(total_checks - 2, 1) else "🟡 RC com pendências"
+        return {"Status": status_final, "ChecksOK": ok_checks, "TotalChecks": total_checks, "ArquivosOK": arquivos_ok, "TotalArquivos": len(arquivos)}
+    except Exception:
+        return {"Status": "🔴 Erro no resumo RC", "ChecksOK": 0, "TotalChecks": 0, "ArquivosOK": 0, "TotalArquivos": 0}
+
+
+
 # --------------------------------------------------
 # LOGIN E CONTROLE DE ACESSO
 # --------------------------------------------------
@@ -5016,6 +5115,10 @@ if usuario_pode_ver_multiempresa():
 if usuario_pode_ver_auditoria() and "🔐 Central de Auditoria" not in paginas_liberadas:
     paginas_liberadas = paginas_liberadas + ["🔐 Central de Auditoria"]
 
+
+if usuario_pode_ver_release_candidate() and "🏁 Release Candidate" not in paginas_liberadas:
+    paginas_liberadas = paginas_liberadas + ["🏁 Release Candidate"]
+
 pagina = st.sidebar.radio(
     "Escolha a visão",
     paginas_liberadas,
@@ -5157,6 +5260,96 @@ df_filtrado = propagar_ganho_potencial(df_filtrado)
 
 # --------------------------------------------------
 # CONTROLE DE USUÁRIOS
+
+# --------------------------------------------------
+# RELEASE CANDIDATE
+# --------------------------------------------------
+
+if pagina == "🏁 Release Candidate":
+
+    if not usuario_pode_ver_release_candidate():
+        st.error("Acesso não autorizado.")
+        st.stop()
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">Release Governance</div>
+            <h1>🏁 Release Candidate</h1>
+            <p>Checklist de estabilização, prontidão comercial, arquivos críticos e preparação para produção.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    if "legenda_tela" in globals():
+        legenda_tela("🏁 Release Candidate")
+
+    resumo_rc = gerar_resumo_release_candidate()
+
+    st.markdown("### 🧭 Status Executivo da RC")
+
+    r1, r2, r3, r4 = st.columns(4)
+    r1.metric("Status", resumo_rc.get("Status", "-"))
+    r2.metric("Checks OK", f'{resumo_rc.get("ChecksOK", 0)} / {resumo_rc.get("TotalChecks", 0)}')
+    r3.metric("Arquivos OK", f'{resumo_rc.get("ArquivosOK", 0)} / {resumo_rc.get("TotalArquivos", 0)}')
+    r4.metric("Versão", f"Enterprise {VERSAO_APP.split('-')[0]}")
+
+    st.markdown("### ✅ Checklist de Prontidão")
+    checklist = gerar_checklist_rc()
+    st.dataframe(checklist, use_container_width=True, hide_index=True)
+
+    st.markdown("### 📁 Arquivos Administrativos Críticos")
+    arquivos_rc = gerar_status_arquivos_rc()
+    st.dataframe(arquivos_rc, use_container_width=True, hide_index=True)
+
+    st.markdown("### 🧩 Política de Release")
+    politica = pd.DataFrame(
+        [
+            {"Regra": "Produção congelada", "Descrição": "v1.34.0 permanece como base de produção estável."},
+            {"Regra": "Homologação RC", "Descrição": "v1.36.3 RC concentra recursos comerciais antes da versão final."},
+            {"Regra": "Acesso master", "Descrição": "Módulos administrativos permanecem restritos ao usuário paulomarques."},
+            {"Regra": "Backup obrigatório", "Descrição": "Gerar backup completo antes de promover qualquer versão."},
+            {"Regra": "Teste de cliente", "Descrição": "Validar login, menus, dados, backup, alertas e licenciamento antes de venda piloto."},
+            {"Regra": "Rollback", "Descrição": "Manter backup e arquivo anterior para retorno imediato em caso de erro."}
+        ]
+    )
+    st.dataframe(politica, use_container_width=True, hide_index=True)
+
+    st.markdown("### 📤 Exportação da RC")
+    checklist_export = checklist.copy()
+    checklist_export["Grupo"] = "Checklist"
+    arquivos_export = arquivos_rc.rename(columns={"Arquivo": "Item", "Última Atualização": "Detalhe"}).copy()
+    arquivos_export["Grupo"] = "Arquivos"
+
+    for col in ["Item", "Status", "Detalhe"]:
+        if col not in arquivos_export.columns:
+            arquivos_export[col] = ""
+
+    rc_export = pd.concat(
+        [
+            checklist_export[["Grupo", "Item", "Status", "Detalhe"]],
+            arquivos_export[["Grupo", "Item", "Status", "Detalhe"]]
+        ],
+        ignore_index=True
+    )
+
+    csv_rc = rc_export.to_csv(index=False, sep=";", encoding="utf-8-sig")
+
+    st.download_button(
+        "📥 Exportar Checklist RC",
+        data=csv_rc,
+        file_name="release_candidate_eirox_v1363.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+
+    st.info("Após validar esta RC, gere um backup completo e congele a v1.36.3 como candidata comercial.")
+
+    st.stop()
+
+
+
 # --------------------------------------------------
 
 if pagina == "👥 Controle de Usuários":
