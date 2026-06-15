@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.36.1-alertas-inteligentes"
+VERSAO_APP = "v1.36.2-motor-oportunidades"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -2565,7 +2565,8 @@ DESCRICOES_TELAS_ENTERPRISE = {
     "🧭 Roadmap do Produto": "Plano evolutivo da plataforma, módulos concluídos, próximos ciclos e prioridades.",
     "💼 Licenciamento Multiempresa": "Modelo comercial, planos de uso, governança de clientes e expansão SaaS.",
     "💼 Licenciamento Real": "Controle real de planos, expiração, limites de usuários, lojas e bloqueio de licença.",
-    "🚨 Alertas Inteligentes": "Monitoramento automático de riscos e oportunidades comerciais com envio via Telegram."
+    "🚨 Alertas Inteligentes": "Monitoramento automático de riscos e oportunidades comerciais com envio via Telegram.",
+    "💰 Motor de Oportunidades": "Ranking financeiro das maiores oportunidades de ganho por produto, laboratório, categoria e loja."
 }
 
 
@@ -3379,6 +3380,238 @@ def enviar_alertas_telegram(alertas_df, limite_envio=10):
 
 
 def usuario_pode_ver_alertas_inteligentes():
+    try:
+        return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() == "paulomarques"
+    except Exception:
+        return False
+
+
+
+
+# --------------------------------------------------
+# MOTOR DE OPORTUNIDADES - v1.36.2
+# --------------------------------------------------
+
+OPORTUNIDADES_ARQUIVO = Path("OPORTUNIDADES_EIROX.csv")
+
+
+def _oport_numero_br(valor, casas=2):
+    try:
+        return f"{float(valor):,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return "0,00"
+
+
+def _oport_data_hora():
+    try:
+        return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S")
+    except Exception:
+        return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+def _oport_coluna(base, possibilidades):
+    try:
+        cols = list(base.columns)
+        for alvo in possibilidades:
+            alvo_norm = str(alvo).strip().lower()
+            for c in cols:
+                if str(c).strip().lower() == alvo_norm:
+                    return c
+        for alvo in possibilidades:
+            alvo_norm = str(alvo).strip().lower()
+            for c in cols:
+                if alvo_norm in str(c).strip().lower():
+                    return c
+        return None
+    except Exception:
+        return None
+
+
+def _oport_converter_numero(serie):
+    try:
+        if "converter_numero_brasil" in globals():
+            return converter_numero_brasil(serie)
+        return pd.to_numeric(serie.astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False), errors="coerce")
+    except Exception:
+        return pd.to_numeric(serie, errors="coerce")
+
+
+def carregar_historico_oportunidades():
+    try:
+        if not OPORTUNIDADES_ARQUIVO.exists():
+            return pd.DataFrame()
+        return pd.read_csv(OPORTUNIDADES_ARQUIVO, sep=";", encoding="utf-8-sig", dtype=str).fillna("")
+    except Exception:
+        return pd.DataFrame()
+
+
+def salvar_oportunidades(oportunidades_df):
+    try:
+        if oportunidades_df is None or oportunidades_df.empty:
+            return
+        salvar = oportunidades_df.copy()
+        salvar["Data_Hora"] = _oport_data_hora()
+        if OPORTUNIDADES_ARQUIVO.exists():
+            antigo = pd.read_csv(OPORTUNIDADES_ARQUIVO, sep=";", encoding="utf-8-sig", dtype=str).fillna("")
+            final = pd.concat([antigo, salvar], ignore_index=True)
+        else:
+            final = salvar
+        final.to_csv(OPORTUNIDADES_ARQUIVO, index=False, sep=";", encoding="utf-8-sig")
+    except Exception:
+        pass
+
+
+def gerar_motor_oportunidades(top_n=100, margem_minima=20, apenas_oportunidade_positiva=True):
+    try:
+        base = globals().get("df", pd.DataFrame())
+        if not isinstance(base, pd.DataFrame) or base.empty:
+            base = globals().get("base_pesquisa", pd.DataFrame())
+        if not isinstance(base, pd.DataFrame) or base.empty:
+            return pd.DataFrame()
+
+        base = base.copy()
+        try:
+            if "aplicar_filtro_empresa" in globals():
+                base = aplicar_filtro_empresa(base)
+        except Exception:
+            pass
+
+        empresa_id = empresa_contexto_atual() if "empresa_contexto_atual" in globals() else "1"
+        empresa_nome = obter_nome_empresa(empresa_id) if "obter_nome_empresa" in globals() else ""
+
+        col_ean = _oport_coluna(base, ["EAN", "EAN (GTIN)", "GTIN", "Código de Barras"])
+        col_prod = _oport_coluna(base, ["Produto", "Produto_Base_SIM", "Descrição", "Descricao"])
+        col_lab = _oport_coluna(base, ["Laboratório", "Laboratorio", "Fabricante", "Fornecedor"])
+        col_cat = _oport_coluna(base, ["Categoria", "Família", "Familia", "Departamento", "Classe"])
+        col_ganho = _oport_coluna(base, ["Ganho_Potencial", "Ganho Potencial", "Oportunidade", "Potencial"])
+        col_fat = _oport_coluna(base, ["Faturamento", "Venda", "Receita", "Faturamento_Total"])
+        col_margem = _oport_coluna(base, ["Margem_%", "Margem", "Margem %"])
+        col_preco = _oport_coluna(base, ["Preco_Rede", "Preço Rede", "Preco_Venda", "Preço (R$)", "Preço"])
+        col_custo = _oport_coluna(base, ["Custo", "Custo Médio", "Custo_Medio", "Custo Atual"])
+        col_qtd = _oport_coluna(base, ["Quantidade", "Qtd", "Qtde", "Unidades", "Volume"])
+        col_estoque = _oport_coluna(base, ["Estoque", "Estoque Atual", "Qtde Estoque"])
+        col_conc = _oport_coluna(base, ["Menor_Preco_Concorrente", "Menor Concorrente", "Preco_Concorrente", "Preço Concorrente", "Menor_Preco"])
+
+        trabalho = pd.DataFrame(index=base.index)
+        trabalho["EmpresaID"] = empresa_id
+        trabalho["Empresa"] = empresa_nome
+        trabalho["EAN"] = base[col_ean].astype(str) if col_ean else ""
+        trabalho["Produto"] = base[col_prod].astype(str) if col_prod else ""
+        trabalho["Laboratório"] = base[col_lab].astype(str) if col_lab else "Não informado"
+        trabalho["Categoria"] = base[col_cat].astype(str) if col_cat else "Não informado"
+
+        if col_ganho:
+            trabalho["Ganho_Potencial"] = _oport_converter_numero(base[col_ganho]).fillna(0)
+        else:
+            preco = _oport_converter_numero(base[col_preco]).fillna(0) if col_preco else pd.Series([0] * len(base), index=base.index)
+            qtd = _oport_converter_numero(base[col_qtd]).fillna(1) if col_qtd else pd.Series([1] * len(base), index=base.index)
+            margem = _oport_converter_numero(base[col_margem]).fillna(0) if col_margem else pd.Series([0] * len(base), index=base.index)
+            fator = 0.03
+            ajuste_margem = (float(margem_minima) - margem).clip(lower=0) / 100
+            trabalho["Ganho_Potencial"] = (preco * qtd * (fator + ajuste_margem)).fillna(0)
+
+        trabalho["Faturamento"] = _oport_converter_numero(base[col_fat]).fillna(0) if col_fat else 0
+        trabalho["Margem_%"] = _oport_converter_numero(base[col_margem]).fillna(0) if col_margem else 0
+        trabalho["Preço_Rede"] = _oport_converter_numero(base[col_preco]).fillna(0) if col_preco else 0
+        trabalho["Custo"] = _oport_converter_numero(base[col_custo]).fillna(0) if col_custo else 0
+        trabalho["Estoque"] = _oport_converter_numero(base[col_estoque]).fillna(0) if col_estoque else 0
+        trabalho["Preço_Concorrente"] = _oport_converter_numero(base[col_conc]).fillna(0) if col_conc else 0
+
+        def classificar(row):
+            ganho = float(row.get("Ganho_Potencial", 0) or 0)
+            margem = float(row.get("Margem_%", 0) or 0)
+            estoque = float(row.get("Estoque", 0) or 0)
+            preco = float(row.get("Preço_Rede", 0) or 0)
+            conc = float(row.get("Preço_Concorrente", 0) or 0)
+            if ganho > 0 and margem < float(margem_minima):
+                return "Recuperar margem"
+            if ganho > 0 and conc > 0 and preco > conc:
+                return "Revisar competitividade"
+            if ganho > 0 and estoque > 50:
+                return "Giro de estoque"
+            if ganho > 0:
+                return "Ganho potencial"
+            return "Monitorar"
+
+        trabalho["Tipo_Oportunidade"] = trabalho.apply(classificar, axis=1)
+
+        def acao(row):
+            tipo = row.get("Tipo_Oportunidade", "")
+            if tipo == "Recuperar margem":
+                return "Avaliar preço, custo e negociação com fornecedor."
+            if tipo == "Revisar competitividade":
+                return "Simular ajuste de preço com base no concorrente."
+            if tipo == "Giro de estoque":
+                return "Avaliar ação comercial para acelerar giro."
+            if tipo == "Ganho potencial":
+                return "Priorizar análise no simulador inteligente."
+            return "Manter acompanhamento."
+
+        trabalho["Ação_Sugerida"] = trabalho.apply(acao, axis=1)
+
+        agrup_cols = ["EmpresaID", "Empresa", "EAN", "Produto", "Laboratório", "Categoria"]
+        trabalho = (
+            trabalho.groupby(agrup_cols, dropna=False)
+            .agg(
+                Ganho_Potencial=("Ganho_Potencial", "sum"),
+                Faturamento=("Faturamento", "sum"),
+                Margem_Media=("Margem_%", "mean"),
+                Estoque_Total=("Estoque", "sum"),
+                Preco_Medio=("Preço_Rede", "mean"),
+                Concorrente_Medio=("Preço_Concorrente", "mean"),
+                Tipo_Oportunidade=("Tipo_Oportunidade", "first"),
+                Ação_Sugerida=("Ação_Sugerida", "first")
+            )
+            .reset_index()
+        )
+
+        if apenas_oportunidade_positiva:
+            trabalho = trabalho[trabalho["Ganho_Potencial"] > 0]
+
+        trabalho = trabalho.sort_values("Ganho_Potencial", ascending=False).head(int(top_n))
+        trabalho["Ranking"] = range(1, len(trabalho) + 1)
+
+        cols = ["Ranking", "EmpresaID", "Empresa", "EAN", "Produto", "Laboratório", "Categoria", "Ganho_Potencial", "Faturamento", "Margem_Media", "Estoque_Total", "Preco_Medio", "Concorrente_Medio", "Tipo_Oportunidade", "Ação_Sugerida"]
+        return trabalho[cols].copy()
+
+    except Exception as erro:
+        return pd.DataFrame([{
+            "Ranking": 1, "EmpresaID": empresa_contexto_atual() if "empresa_contexto_atual" in globals() else "1",
+            "Empresa": "", "EAN": "", "Produto": "", "Laboratório": "", "Categoria": "",
+            "Ganho_Potencial": 0, "Faturamento": 0, "Margem_Media": 0, "Estoque_Total": 0,
+            "Preco_Medio": 0, "Concorrente_Medio": 0, "Tipo_Oportunidade": "Erro", "Ação_Sugerida": str(erro)
+        }])
+
+
+def enviar_oportunidades_telegram(oportunidades_df, limite_envio=10):
+    try:
+        if oportunidades_df is None or oportunidades_df.empty:
+            return False, "Nenhuma oportunidade para enviar."
+
+        top = oportunidades_df.head(int(limite_envio))
+        ganho_total = oportunidades_df["Ganho_Potencial"].sum() if "Ganho_Potencial" in oportunidades_df.columns else 0
+
+        linhas = []
+        for _, row in top.iterrows():
+            linhas.append(f"• <b>{row.get('Produto', '')}</b> | R$ {_oport_numero_br(row.get('Ganho_Potencial', 0))}")
+
+        mensagem = (
+            "💰 <b>Motor de Oportunidades Eirox</b>\n\n"
+            f"🏢 <b>Empresa:</b> {top.iloc[0].get('Empresa', '')}\n"
+            f"🎯 <b>Oportunidades:</b> {len(oportunidades_df)}\n"
+            f"💵 <b>Ganho potencial:</b> R$ {_oport_numero_br(ganho_total)}\n"
+            f"🕒 <b>Horário:</b> {_oport_data_hora()}\n\n"
+            + "\n".join(linhas)
+            + f"\n\n🏷️ <b>Versão:</b> {VERSAO_APP}"
+        )
+
+        ok = enviar_alerta_telegram(mensagem) if "enviar_alerta_telegram" in globals() else False
+        return bool(ok), "Oportunidades enviadas ao Telegram." if ok else "Não foi possível enviar ao Telegram."
+    except Exception as erro:
+        return False, str(erro)
+
+
+def usuario_pode_ver_motor_oportunidades():
     try:
         return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() == "paulomarques"
     except Exception:
@@ -4774,7 +5007,8 @@ if usuario_pode_ver_multiempresa():
         "🧭 Roadmap do Produto",
         "💼 Licenciamento Multiempresa",
         "💼 Licenciamento Real",
-        "🚨 Alertas Inteligentes"
+        "🚨 Alertas Inteligentes",
+        "💰 Motor de Oportunidades"
     ]:
         if pagina_enterprise not in paginas_liberadas:
             paginas_liberadas = paginas_liberadas + [pagina_enterprise]
@@ -5341,6 +5575,126 @@ if pagina == "🧭 Roadmap do Produto":
 
     st.stop()
 
+
+
+
+
+# --------------------------------------------------
+# MOTOR DE OPORTUNIDADES
+# --------------------------------------------------
+
+if pagina == "💰 Motor de Oportunidades":
+
+    if not usuario_pode_ver_motor_oportunidades():
+        st.error("Acesso não autorizado.")
+        st.stop()
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">Opportunity Engine</div>
+            <h1>💰 Motor de Oportunidades</h1>
+            <p>Ranking financeiro das maiores oportunidades de ganho por produto, laboratório, categoria e loja.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    legenda_tela("💰 Motor de Oportunidades")
+
+    st.markdown("### ⚙️ Parâmetros do motor")
+
+    p1, p2, p3 = st.columns(3)
+    top_n = p1.number_input("Top oportunidades", min_value=10, max_value=1000, value=100, step=10)
+    margem_minima = p2.number_input("Margem mínima desejada (%)", min_value=0, max_value=100, value=20, step=1)
+    apenas_positivo = p3.selectbox("Exibir apenas ganho positivo", ["Sim", "Não"], index=0)
+
+    col_gerar, col_enviar = st.columns(2)
+
+    if "motor_oportunidades_df" not in st.session_state:
+        st.session_state["motor_oportunidades_df"] = pd.DataFrame()
+
+    if col_gerar.button("💰 Gerar Motor de Oportunidades", use_container_width=True):
+        with st.spinner("Calculando oportunidades financeiras..."):
+            oportunidades_df = gerar_motor_oportunidades(
+                top_n=top_n,
+                margem_minima=margem_minima,
+                apenas_oportunidade_positiva=apenas_positivo == "Sim"
+            )
+        st.session_state["motor_oportunidades_df"] = oportunidades_df
+
+        if oportunidades_df.empty:
+            st.info("Nenhuma oportunidade encontrada com os parâmetros atuais.")
+        else:
+            salvar_oportunidades(oportunidades_df)
+            st.success(f"💰 {len(oportunidades_df)} oportunidades geradas.")
+
+    oportunidades_df = st.session_state.get("motor_oportunidades_df", pd.DataFrame())
+
+    if col_enviar.button("📨 Enviar Top 10 ao Telegram", use_container_width=True):
+        if oportunidades_df.empty:
+            st.info("Gere as oportunidades antes de enviar.")
+        else:
+            ok, msg = enviar_oportunidades_telegram(oportunidades_df, limite_envio=10)
+            if ok:
+                st.success(msg)
+            else:
+                st.error(msg)
+
+    if not oportunidades_df.empty:
+        ganho_total = oportunidades_df["Ganho_Potencial"].sum() if "Ganho_Potencial" in oportunidades_df.columns else 0
+        ticket_medio = oportunidades_df["Ganho_Potencial"].mean() if "Ganho_Potencial" in oportunidades_df.columns else 0
+        produtos = oportunidades_df["Produto"].nunique() if "Produto" in oportunidades_df.columns else len(oportunidades_df)
+        labs = oportunidades_df["Laboratório"].nunique() if "Laboratório" in oportunidades_df.columns else 0
+
+        st.markdown("### 🧭 Painel Executivo de Oportunidades")
+        k1, k2, k3, k4, k5 = st.columns(5)
+        k1.metric("Ganho potencial total", f"R$ {_oport_numero_br(ganho_total)}")
+        k2.metric("Oportunidades", len(oportunidades_df))
+        k3.metric("Ganho médio", f"R$ {_oport_numero_br(ticket_medio)}")
+        k4.metric("Produtos únicos", produtos)
+        k5.metric("Laboratórios", labs)
+
+        st.markdown("### 🏆 Top oportunidades")
+        view = oportunidades_df.copy()
+
+        tipo_filtro = st.multiselect("Filtrar tipo de oportunidade", sorted(view["Tipo_Oportunidade"].dropna().astype(str).unique().tolist()) if "Tipo_Oportunidade" in view.columns else [])
+        lab_filtro = st.multiselect("Filtrar laboratório", sorted(view["Laboratório"].dropna().astype(str).unique().tolist()) if "Laboratório" in view.columns else [])
+
+        if tipo_filtro and "Tipo_Oportunidade" in view.columns:
+            view = view[view["Tipo_Oportunidade"].astype(str).isin(tipo_filtro)]
+        if lab_filtro and "Laboratório" in view.columns:
+            view = view[view["Laboratório"].astype(str).isin(lab_filtro)]
+
+        st.dataframe(view, use_container_width=True, hide_index=True)
+
+        st.markdown("### 📊 Ganho por laboratório e categoria")
+        g1, g2 = st.columns(2)
+
+        if "Laboratório" in oportunidades_df.columns:
+            ganho_lab = oportunidades_df.groupby("Laboratório", dropna=False).agg(Ganho_Potencial=("Ganho_Potencial", "sum")).reset_index().sort_values("Ganho_Potencial", ascending=False).head(15)
+            fig_lab = px.bar(ganho_lab, x="Ganho_Potencial", y="Laboratório", orientation="h", title="Top laboratórios por ganho potencial")
+            fig_lab.update_layout(height=420, margin=dict(l=10, r=10, t=60, b=10), yaxis=dict(autorange="reversed"))
+            g1.plotly_chart(fig_lab, use_container_width=True)
+
+        if "Categoria" in oportunidades_df.columns:
+            ganho_cat = oportunidades_df.groupby("Categoria", dropna=False).agg(Ganho_Potencial=("Ganho_Potencial", "sum")).reset_index().sort_values("Ganho_Potencial", ascending=False).head(15)
+            fig_cat = px.bar(ganho_cat, x="Ganho_Potencial", y="Categoria", orientation="h", title="Top categorias por ganho potencial")
+            fig_cat.update_layout(height=420, margin=dict(l=10, r=10, t=60, b=10), yaxis=dict(autorange="reversed"))
+            g2.plotly_chart(fig_cat, use_container_width=True)
+
+        st.markdown("### 📤 Exportação")
+        csv_oport = view.to_csv(index=False, sep=";", encoding="utf-8-sig")
+        st.download_button("📥 Exportar Oportunidades CSV", data=csv_oport, file_name="motor_oportunidades_eirox.csv", mime="text/csv", use_container_width=True)
+
+    st.markdown("### 📜 Histórico de oportunidades")
+    hist_oport = carregar_historico_oportunidades()
+    if hist_oport.empty:
+        st.info("Nenhum histórico registrado ainda.")
+    else:
+        st.dataframe(hist_oport.tail(300), use_container_width=True, hide_index=True)
+
+    st.stop()
 
 
 
