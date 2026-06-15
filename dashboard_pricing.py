@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.39.1-portal-cliente-enterprise"
+VERSAO_APP = "v1.39.1-portal-cliente-menu-fix"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -4359,51 +4359,48 @@ def metricas_crm_enterprise():
 
 TELAS_CLIENTE_POR_PLANO = {
     "Starter": [
-        "📊 Dashboard Geral",
-        "📊 Painel Geral",
+        "🏢 Dashboard Executivo",
         "🔎 Rede/Loja vs Concorrentes",
-        "🔍 Rede/Loja vs Concorrentes",
-        "📈 Evolução Histórica",
+        "🎯 Sugestão de Pesquisa",
         "🏢 Portal do Cliente"
     ],
     "Professional": [
-        "📊 Dashboard Geral",
-        "📊 Painel Geral",
+        "🏢 Dashboard Executivo",
         "🔎 Rede/Loja vs Concorrentes",
-        "🔍 Rede/Loja vs Concorrentes",
-        "📈 Evolução Histórica",
-        "🗺️ Mapa Farmácias",
-        "🧠 Simulador Inteligente",
+        "🎯 Sugestão de Pesquisa",
+        "📈 Simulador Inteligente",
+        "🌎 Mapa Geográfico de Concorrência",
+        "🚨 Central de Alertas",
         "🚨 Alertas Inteligentes",
         "💰 Motor de Oportunidades",
         "🏢 Portal do Cliente"
     ],
     "Enterprise": [
-        "📊 Dashboard Geral",
-        "📊 Painel Geral",
+        "🏢 Dashboard Executivo",
         "🔎 Rede/Loja vs Concorrentes",
-        "🔍 Rede/Loja vs Concorrentes",
-        "📈 Evolução Histórica",
-        "🗺️ Mapa Farmácias",
-        "🧠 Simulador Inteligente",
+        "🎯 Sugestão de Pesquisa",
+        "📈 Simulador Inteligente",
+        "🌎 Mapa Geográfico de Concorrência",
+        "🚨 Central de Alertas",
         "🚨 Alertas Inteligentes",
         "💰 Motor de Oportunidades",
         "🤖 IA Pricing Enterprise",
         "📋 Workflow Comercial",
+        "🛒 Negociação Compras",
         "🏢 Portal do Cliente"
     ],
     "Enterprise Plus": [
-        "📊 Dashboard Geral",
-        "📊 Painel Geral",
+        "🏢 Dashboard Executivo",
         "🔎 Rede/Loja vs Concorrentes",
-        "🔍 Rede/Loja vs Concorrentes",
-        "📈 Evolução Histórica",
-        "🗺️ Mapa Farmácias",
-        "🧠 Simulador Inteligente",
+        "🎯 Sugestão de Pesquisa",
+        "📈 Simulador Inteligente",
+        "🌎 Mapa Geográfico de Concorrência",
+        "🚨 Central de Alertas",
         "🚨 Alertas Inteligentes",
         "💰 Motor de Oportunidades",
         "🤖 IA Pricing Enterprise",
         "📋 Workflow Comercial",
+        "🛒 Negociação Compras",
         "🏢 Portal do Cliente"
     ]
 }
@@ -4420,7 +4417,8 @@ TELAS_ADMIN_EIROX = [
     "🏢 CRM Enterprise",
     "🏁 Release Candidate",
     "📌 Sobre o Eirox",
-    "🧭 Roadmap do Produto"
+    "🧭 Roadmap do Produto",
+    "🧪 Diagnóstico"
 ]
 
 
