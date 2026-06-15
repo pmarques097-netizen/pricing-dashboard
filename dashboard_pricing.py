@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.40.0-billing-enterprise"
+VERSAO_APP = "v1.40.1-menu-enterprise-fix"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -4362,46 +4362,47 @@ TELAS_CLIENTE_POR_PLANO = {
         "🏢 Dashboard Executivo",
         "🔎 Rede/Loja vs Concorrentes",
         "🎯 Sugestão de Pesquisa",
-        "🏢 Portal do Cliente"
+        "🏢 Portal do Cliente",
     ],
     "Professional": [
         "🏢 Dashboard Executivo",
         "🔎 Rede/Loja vs Concorrentes",
         "🎯 Sugestão de Pesquisa",
+        "🏢 Portal do Cliente",
         "📈 Simulador Inteligente",
         "🌎 Mapa Geográfico de Concorrência",
-        "🚨 Central de Alertas",
         "🚨 Alertas Inteligentes",
+        "🚨 Central de Alertas",
         "💰 Motor de Oportunidades",
-        "🏢 Portal do Cliente"
+        "🛒 Negociação Compras",
     ],
     "Enterprise": [
         "🏢 Dashboard Executivo",
         "🔎 Rede/Loja vs Concorrentes",
         "🎯 Sugestão de Pesquisa",
+        "🏢 Portal do Cliente",
         "📈 Simulador Inteligente",
         "🌎 Mapa Geográfico de Concorrência",
-        "🚨 Central de Alertas",
         "🚨 Alertas Inteligentes",
+        "🚨 Central de Alertas",
         "💰 Motor de Oportunidades",
+        "🛒 Negociação Compras",
         "🤖 IA Pricing Enterprise",
         "📋 Workflow Comercial",
-        "🛒 Negociação Compras",
-        "🏢 Portal do Cliente"
     ],
     "Enterprise Plus": [
         "🏢 Dashboard Executivo",
         "🔎 Rede/Loja vs Concorrentes",
         "🎯 Sugestão de Pesquisa",
+        "🏢 Portal do Cliente",
         "📈 Simulador Inteligente",
         "🌎 Mapa Geográfico de Concorrência",
-        "🚨 Central de Alertas",
         "🚨 Alertas Inteligentes",
+        "🚨 Central de Alertas",
         "💰 Motor de Oportunidades",
+        "🛒 Negociação Compras",
         "🤖 IA Pricing Enterprise",
         "📋 Workflow Comercial",
-        "🛒 Negociação Compras",
-        "🏢 Portal do Cliente"
     ]
 }
 
@@ -4441,7 +4442,47 @@ def tela_liberada_por_plano(pagina_nome):
         plano = plano_empresa_contexto()
         telas = TELAS_CLIENTE_POR_PLANO.get(plano, TELAS_CLIENTE_POR_PLANO["Starter"])
 
-        return str(pagina_nome) in telas
+        pagina_txt = str(pagina_nome).strip()
+        pagina_norm = pagina_txt.lower()
+
+        if pagina_txt in telas:
+            return True
+
+        # Compatibilidade por palavras-chave para evitar sumiço de módulos por pequenas mudanças no nome da tela.
+        grupos = {
+            "dashboard": ["dashboard", "painel"],
+            "rede": ["rede/loja", "concorrente"],
+            "sugestao": ["sugestão", "sugestao", "pesquisa"],
+            "simulador": ["simulador"],
+            "mapa": ["mapa", "geográfico", "geografico"],
+            "alertas": ["alerta"],
+            "motor": ["motor", "oportunidade"],
+            "ia": ["ia pricing", "pricing enterprise"],
+            "workflow": ["workflow"],
+            "negociacao": ["negociação", "negociacao", "compras"],
+            "portal": ["portal do cliente"]
+        }
+
+        def grupo_da_pagina(nome):
+            nome = str(nome).lower()
+            for grupo, palavras in grupos.items():
+                if any(p in nome for p in palavras):
+                    return grupo
+            return None
+
+        grupo_pagina = grupo_da_pagina(pagina_norm)
+
+        if not grupo_pagina:
+            return False
+
+        grupos_liberados = set()
+
+        for tela in telas:
+            g = grupo_da_pagina(tela)
+            if g:
+                grupos_liberados.add(g)
+
+        return grupo_pagina in grupos_liberados
 
     except Exception:
         return False
@@ -4454,10 +4495,13 @@ def filtrar_paginas_por_plano(paginas):
         if usuario_master():
             return paginas
 
-        return [
-            p for p in paginas
-            if tela_liberada_por_plano(p)
-        ]
+        liberadas = []
+
+        for p in paginas:
+            if tela_liberada_por_plano(p):
+                liberadas.append(p)
+
+        return liberadas
 
     except Exception:
         return paginas
@@ -4471,16 +4515,10 @@ def dividir_menu_cliente_admin(paginas):
 
     try:
         paginas = list(paginas)
-        plano = plano_empresa_contexto()
-
-        telas_cliente_plano = TELAS_CLIENTE_POR_PLANO.get(
-            plano,
-            TELAS_CLIENTE_POR_PLANO["Starter"]
-        )
 
         cliente = [
             p for p in paginas
-            if p in telas_cliente_plano
+            if tela_liberada_por_plano(p) and p not in TELAS_ADMIN_EIROX
         ]
 
         admin = [
@@ -4500,9 +4538,6 @@ def dividir_menu_cliente_admin(paginas):
 
     except Exception:
         return paginas, []
-
-
-
 
 # --------------------------------------------------
 # PORTAL DO CLIENTE ENTERPRISE - v1.39.1
