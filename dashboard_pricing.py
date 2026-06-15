@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.36.3-rc"
+VERSAO_APP = "v1.37.0-ia-pricing-enterprise"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -3718,6 +3718,187 @@ def gerar_resumo_release_candidate():
 
 
 
+
+# --------------------------------------------------
+# IA PRICING ENTERPRISE - v1.37.0
+# --------------------------------------------------
+
+IA_PRICING_ARQUIVO = Path("IA_PRICING_EIROX.csv")
+
+
+def usuario_pode_ver_ia_pricing():
+    try:
+        return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() == "paulomarques"
+    except Exception:
+        return False
+
+
+def _ia_numero_br(valor, casas=2):
+    try:
+        return f"{float(valor):,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return "0,00"
+
+
+def _ia_coluna(base, possibilidades):
+    try:
+        cols = list(base.columns)
+        for alvo in possibilidades:
+            alvo_norm = str(alvo).strip().lower()
+            for c in cols:
+                if str(c).strip().lower() == alvo_norm:
+                    return c
+        for alvo in possibilidades:
+            alvo_norm = str(alvo).strip().lower()
+            for c in cols:
+                if alvo_norm in str(c).strip().lower():
+                    return c
+    except Exception:
+        pass
+    return None
+
+
+def _ia_num(serie):
+    try:
+        if "converter_numero_brasil" in globals():
+            return converter_numero_brasil(serie)
+        return pd.to_numeric(serie.astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False), errors="coerce")
+    except Exception:
+        return pd.to_numeric(serie, errors="coerce")
+
+
+def carregar_historico_ia_pricing():
+    try:
+        if not IA_PRICING_ARQUIVO.exists():
+            return pd.DataFrame()
+        return pd.read_csv(IA_PRICING_ARQUIVO, sep=";", encoding="utf-8-sig", dtype=str).fillna("")
+    except Exception:
+        return pd.DataFrame()
+
+
+def salvar_recomendacoes_ia(ia_df):
+    try:
+        if ia_df is None or ia_df.empty:
+            return
+        out = ia_df.copy()
+        out["Data_Hora"] = datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S") if "ZoneInfo" in globals() else datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        if IA_PRICING_ARQUIVO.exists():
+            old = pd.read_csv(IA_PRICING_ARQUIVO, sep=";", encoding="utf-8-sig", dtype=str).fillna("")
+            out = pd.concat([old, out], ignore_index=True)
+        out.to_csv(IA_PRICING_ARQUIVO, index=False, sep=";", encoding="utf-8-sig")
+    except Exception:
+        pass
+
+
+def gerar_ia_pricing_enterprise(margem_minima=25, margem_alvo=35, limite_reducao=8, limite_aumento=12, top_n=150):
+    try:
+        base = globals().get("df", pd.DataFrame())
+        if not isinstance(base, pd.DataFrame) or base.empty:
+            base = globals().get("base_pesquisa", pd.DataFrame())
+        if not isinstance(base, pd.DataFrame) or base.empty:
+            return pd.DataFrame()
+        base = base.copy()
+        try:
+            if "aplicar_filtro_empresa" in globals():
+                base = aplicar_filtro_empresa(base)
+        except Exception:
+            pass
+        empresa_id = empresa_contexto_atual() if "empresa_contexto_atual" in globals() else "1"
+        empresa_nome = obter_nome_empresa(empresa_id) if "obter_nome_empresa" in globals() else ""
+        col_ean = _ia_coluna(base, ["EAN", "EAN (GTIN)", "GTIN", "Código de Barras"])
+        col_prod = _ia_coluna(base, ["Produto", "Produto_Base_SIM", "Descrição", "Descricao"])
+        col_lab = _ia_coluna(base, ["Laboratório", "Laboratorio", "Fabricante", "Fornecedor"])
+        col_cat = _ia_coluna(base, ["Categoria", "Família", "Familia", "Departamento", "Classe"])
+        col_curva = _ia_coluna(base, ["CURVA", "Curva", "ABC", "Curva ABC"])
+        col_preco = _ia_coluna(base, ["Preco_Rede", "Preço Rede", "Preco_Venda", "Preço (R$)", "Preço", "Preco"])
+        col_custo = _ia_coluna(base, ["Custo", "Custo Médio", "Custo_Medio", "Custo Atual"])
+        col_margem = _ia_coluna(base, ["Margem_%", "Margem", "Margem %"])
+        col_conc = _ia_coluna(base, ["Menor_Preco_Concorrente", "Menor Concorrente", "Preco_Concorrente", "Preço Concorrente", "Menor_Preco"])
+        col_ganho = _ia_coluna(base, ["Ganho_Potencial", "Ganho Potencial", "Oportunidade", "Potencial"])
+        col_estoque = _ia_coluna(base, ["Estoque", "Estoque Atual", "Qtde Estoque"])
+        col_qtd = _ia_coluna(base, ["Quantidade", "Qtd", "Qtde", "Unidades", "Volume"])
+        n=len(base)
+        idx=base.index
+        preco = _ia_num(base[col_preco]).fillna(0) if col_preco else pd.Series([0]*n,index=idx)
+        custo = _ia_num(base[col_custo]).fillna(0) if col_custo else pd.Series([0]*n,index=idx)
+        margem = _ia_num(base[col_margem]).fillna(0) if col_margem else pd.Series([0]*n,index=idx)
+        conc = _ia_num(base[col_conc]).fillna(0) if col_conc else pd.Series([0]*n,index=idx)
+        ganho = _ia_num(base[col_ganho]).fillna(0) if col_ganho else pd.Series([0]*n,index=idx)
+        estoque = _ia_num(base[col_estoque]).fillna(0) if col_estoque else pd.Series([0]*n,index=idx)
+        qtd = _ia_num(base[col_qtd]).fillna(1) if col_qtd else pd.Series([1]*n,index=idx)
+        margem_calc=margem.copy()
+        mask=(margem_calc<=0)&(preco>0)&(custo>0)
+        margem_calc.loc[mask]=((preco.loc[mask]-custo.loc[mask])/preco.loc[mask])*100
+        preco_rec=preco.copy()
+        preco_alvo = custo / max((1-float(margem_alvo)/100),0.01)
+        mask_subir=(preco>0)&(custo>0)&(margem_calc<float(margem_minima))&(preco_alvo>preco)
+        preco_rec.loc[mask_subir]=preco_alvo.loc[mask_subir]
+        dif=pd.Series([0]*n,index=idx,dtype='float')
+        mask_conc=(preco>0)&(conc>0)
+        dif.loc[mask_conc]=((preco.loc[mask_conc]-conc.loc[mask_conc])/preco.loc[mask_conc])*100
+        mask_red=(dif>float(limite_reducao))&(margem_calc>=float(margem_minima))
+        preco_rec.loc[mask_red]=preco.loc[mask_red]*(1-float(limite_reducao)/100)
+        max_aum=preco*(1+float(limite_aumento)/100)
+        mask_lim=(preco>0)&(preco_rec>max_aum)
+        preco_rec.loc[mask_lim]=max_aum.loc[mask_lim]
+        var=pd.Series([0]*n,index=idx,dtype='float')
+        mask_preco=preco>0
+        var.loc[mask_preco]=((preco_rec.loc[mask_preco]-preco.loc[mask_preco])/preco.loc[mask_preco])*100
+        margem_rec=pd.Series([0]*n,index=idx,dtype='float')
+        mask_pr=preco_rec>0
+        margem_rec.loc[mask_pr]=((preco_rec.loc[mask_pr]-custo.loc[mask_pr])/preco_rec.loc[mask_pr])*100
+        ganho_est=((preco_rec-preco)*qtd).fillna(0)
+        ganho_est=ganho_est.where(ganho_est.abs()>0, ganho)
+        out=pd.DataFrame(index=idx)
+        out["EmpresaID"]=empresa_id; out["Empresa"]=empresa_nome
+        out["EAN"]=base[col_ean].astype(str) if col_ean else ""
+        out["Produto"]=base[col_prod].astype(str) if col_prod else ""
+        out["Laboratório"]=base[col_lab].astype(str) if col_lab else "Não informado"
+        out["Categoria"]=base[col_cat].astype(str) if col_cat else "Não informado"
+        out["Curva"]=base[col_curva].astype(str) if col_curva else "Não informado"
+        out["Preço_Atual"]=preco; out["Preço_Recomendado"]=preco_rec; out["Variação_Pct"]=var
+        out["Margem_Atual"]=margem_calc; out["Margem_Recomendada"]=margem_rec; out["Preço_Concorrente"]=conc
+        out["Estoque"]=estoque; out["Ganho_Estimado"]=ganho_est
+        def acao(row):
+            v=float(row.get("Variação_Pct",0) or 0); m=float(row.get("Margem_Atual",0) or 0); c=float(row.get("Preço_Concorrente",0) or 0); p=float(row.get("Preço_Atual",0) or 0); e=float(row.get("Estoque",0) or 0)
+            if v>1: return "Aumentar preço"
+            if v<-1: return "Reduzir preço"
+            if m<float(margem_minima): return "Revisar margem"
+            if c>0 and p>c: return "Monitorar concorrência"
+            if e>50: return "Avaliar giro"
+            return "Manter"
+        out["Ação"]=out.apply(acao,axis=1)
+        out["Motivo"]=out["Ação"].map({
+            "Aumentar preço":"Margem abaixo da meta ou oportunidade de recuperação de rentabilidade.",
+            "Reduzir preço":"Concorrência mais agressiva com margem suficiente para ajuste controlado.",
+            "Revisar margem":"Margem abaixo do limite mínimo configurado.",
+            "Monitorar concorrência":"Preço atual acima do concorrente identificado.",
+            "Avaliar giro":"Estoque elevado exige acompanhamento comercial.",
+            "Manter":"Preço dentro dos parâmetros configurados."
+        }).fillna("Analisar produto.")
+        out["Score_IA"]=(out["Ganho_Estimado"].abs().rank(pct=True).fillna(0)*40+(100-out["Margem_Atual"].clip(0,100))*0.25+out["Variação_Pct"].abs().clip(upper=50)*0.7+out["Estoque"].rank(pct=True).fillna(0)*10).round(2)
+        cols_group=["EmpresaID","Empresa","EAN","Produto","Laboratório","Categoria","Curva","Ação","Motivo"]
+        agg=out.groupby(cols_group,dropna=False).agg(Score_IA=("Score_IA","max"),Preço_Atual=("Preço_Atual","mean"),Preço_Recomendado=("Preço_Recomendado","mean"),Variação_Pct=("Variação_Pct","mean"),Margem_Atual=("Margem_Atual","mean"),Margem_Recomendada=("Margem_Recomendada","mean"),Preço_Concorrente=("Preço_Concorrente","mean"),Estoque=("Estoque","sum"),Ganho_Estimado=("Ganho_Estimado","sum")).reset_index()
+        agg=agg.sort_values(["Score_IA","Ganho_Estimado"],ascending=False).head(int(top_n))
+        agg["Ranking"]=range(1,len(agg)+1)
+        return agg[["Ranking","EmpresaID","Empresa","EAN","Produto","Laboratório","Categoria","Curva","Ação","Preço_Atual","Preço_Recomendado","Variação_Pct","Margem_Atual","Margem_Recomendada","Preço_Concorrente","Estoque","Ganho_Estimado","Score_IA","Motivo"]]
+    except Exception as erro:
+        return pd.DataFrame([{"Ranking":1,"EmpresaID":"1","Empresa":"","EAN":"","Produto":"","Laboratório":"","Categoria":"","Curva":"","Ação":"Erro","Preço_Atual":0,"Preço_Recomendado":0,"Variação_Pct":0,"Margem_Atual":0,"Margem_Recomendada":0,"Preço_Concorrente":0,"Estoque":0,"Ganho_Estimado":0,"Score_IA":0,"Motivo":str(erro)}])
+
+
+def enviar_ia_pricing_telegram(ia_df, limite_envio=10):
+    try:
+        if ia_df is None or ia_df.empty:
+            return False, "Nenhuma recomendação para enviar."
+        top=ia_df.head(int(limite_envio)); ganho_total=ia_df["Ganho_Estimado"].sum() if "Ganho_Estimado" in ia_df.columns else 0
+        linhas=[f"• <b>{r.get('Produto','')}</b> | {r.get('Ação','')} | R$ {_ia_numero_br(r.get('Preço_Recomendado',0))}" for _,r in top.iterrows()]
+        mensagem=("🤖 <b>IA Pricing Enterprise</b>\n\n"+f"🏢 <b>Empresa:</b> {top.iloc[0].get('Empresa','')}\n"+f"🎯 <b>Recomendações:</b> {len(ia_df)}\n"+f"💵 <b>Ganho estimado:</b> R$ {_ia_numero_br(ganho_total)}\n\n"+"\n".join(linhas)+f"\n\n🏷️ <b>Versão:</b> {VERSAO_APP}")
+        ok=enviar_alerta_telegram(mensagem) if "enviar_alerta_telegram" in globals() else False
+        return bool(ok), "Recomendações enviadas ao Telegram." if ok else "Não foi possível enviar ao Telegram."
+    except Exception as erro:
+        return False, str(erro)
+
+
 # --------------------------------------------------
 # LOGIN E CONTROLE DE ACESSO
 # --------------------------------------------------
@@ -5119,6 +5300,10 @@ if usuario_pode_ver_auditoria() and "🔐 Central de Auditoria" not in paginas_l
 if usuario_pode_ver_release_candidate() and "🏁 Release Candidate" not in paginas_liberadas:
     paginas_liberadas = paginas_liberadas + ["🏁 Release Candidate"]
 
+
+if usuario_pode_ver_ia_pricing() and "🤖 IA Pricing Enterprise" not in paginas_liberadas:
+    paginas_liberadas = paginas_liberadas + ["🤖 IA Pricing Enterprise"]
+
 pagina = st.sidebar.radio(
     "Escolha a visão",
     paginas_liberadas,
@@ -5263,6 +5448,112 @@ df_filtrado = propagar_ganho_potencial(df_filtrado)
 
 # --------------------------------------------------
 # RELEASE CANDIDATE
+
+# --------------------------------------------------
+# IA PRICING ENTERPRISE
+# --------------------------------------------------
+
+if pagina == "🤖 IA Pricing Enterprise":
+
+    if not usuario_pode_ver_ia_pricing():
+        st.error("Acesso não autorizado.")
+        st.stop()
+
+    st.markdown(
+        """
+        <div class="eirox-hero">
+            <div class="eirox-section-title">AI Pricing Decision Engine</div>
+            <h1>🤖 IA Pricing Enterprise</h1>
+            <p>Recomendações automáticas de preço com base em margem, concorrência, custo, estoque e oportunidade financeira.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    if "legenda_tela" in globals():
+        legenda_tela("🤖 IA Pricing Enterprise")
+
+    st.markdown("### ⚙️ Parâmetros da IA")
+    p1, p2, p3, p4, p5 = st.columns(5)
+    margem_minima = p1.number_input("Margem mínima (%)", min_value=0, max_value=100, value=25, step=1)
+    margem_alvo = p2.number_input("Margem alvo (%)", min_value=1, max_value=90, value=35, step=1)
+    limite_reducao = p3.number_input("Limite redução (%)", min_value=0, max_value=50, value=8, step=1)
+    limite_aumento = p4.number_input("Limite aumento (%)", min_value=0, max_value=50, value=12, step=1)
+    top_n = p5.number_input("Top recomendações", min_value=10, max_value=1000, value=150, step=10)
+
+    col_gerar, col_enviar = st.columns(2)
+    if "ia_pricing_df" not in st.session_state:
+        st.session_state["ia_pricing_df"] = pd.DataFrame()
+
+    if col_gerar.button("🤖 Gerar Recomendações IA", use_container_width=True):
+        with st.spinner("IA Pricing analisando margem, custo, estoque e concorrência..."):
+            ia_df = gerar_ia_pricing_enterprise(margem_minima, margem_alvo, limite_reducao, limite_aumento, top_n)
+        st.session_state["ia_pricing_df"] = ia_df
+        if ia_df.empty:
+            st.info("Nenhuma recomendação encontrada com os parâmetros atuais.")
+        else:
+            salvar_recomendacoes_ia(ia_df)
+            st.success(f"🤖 {len(ia_df)} recomendações geradas pela IA Pricing.")
+
+    ia_df = st.session_state.get("ia_pricing_df", pd.DataFrame())
+
+    if col_enviar.button("📨 Enviar Top 10 ao Telegram", use_container_width=True):
+        if ia_df.empty:
+            st.info("Gere as recomendações antes de enviar.")
+        else:
+            ok, msg = enviar_ia_pricing_telegram(ia_df, limite_envio=10)
+            st.success(msg) if ok else st.error(msg)
+
+    if not ia_df.empty:
+        ganho_total = ia_df["Ganho_Estimado"].sum() if "Ganho_Estimado" in ia_df.columns else 0
+        aumentar = int((ia_df["Ação"].astype(str) == "Aumentar preço").sum()) if "Ação" in ia_df.columns else 0
+        reduzir = int((ia_df["Ação"].astype(str) == "Reduzir preço").sum()) if "Ação" in ia_df.columns else 0
+        manter = int((ia_df["Ação"].astype(str) == "Manter").sum()) if "Ação" in ia_df.columns else 0
+
+        st.markdown("### 🧭 Painel Executivo IA")
+        k1, k2, k3, k4, k5 = st.columns(5)
+        k1.metric("Ganho estimado", f"R$ {_ia_numero_br(ganho_total)}")
+        k2.metric("Aumentar preço", aumentar)
+        k3.metric("Reduzir preço", reduzir)
+        k4.metric("Manter", manter)
+        k5.metric("Recomendações", len(ia_df))
+
+        st.markdown("### 🎯 Recomendações automáticas")
+        view = ia_df.copy()
+        filtro_acao = st.multiselect("Filtrar ação", sorted(view["Ação"].dropna().astype(str).unique().tolist()) if "Ação" in view.columns else [])
+        filtro_curva = st.multiselect("Filtrar curva", sorted(view["Curva"].dropna().astype(str).unique().tolist()) if "Curva" in view.columns else [])
+        if filtro_acao and "Ação" in view.columns:
+            view = view[view["Ação"].astype(str).isin(filtro_acao)]
+        if filtro_curva and "Curva" in view.columns:
+            view = view[view["Curva"].astype(str).isin(filtro_curva)]
+        st.dataframe(view, use_container_width=True, hide_index=True)
+
+        st.markdown("### 📊 Distribuição de recomendações")
+        c1, c2 = st.columns(2)
+        if "Ação" in ia_df.columns:
+            dist = ia_df.groupby("Ação", dropna=False).size().reset_index(name="Quantidade")
+            fig_dist = px.bar(dist, x="Ação", y="Quantidade", title="Recomendações por ação")
+            fig_dist.update_layout(height=360, margin=dict(l=10, r=10, t=60, b=10))
+            c1.plotly_chart(fig_dist, use_container_width=True)
+        if "Laboratório" in ia_df.columns:
+            ganho_lab = ia_df.groupby("Laboratório", dropna=False).agg(Ganho_Estimado=("Ganho_Estimado", "sum")).reset_index().sort_values("Ganho_Estimado", ascending=False).head(15)
+            fig_lab = px.bar(ganho_lab, x="Ganho_Estimado", y="Laboratório", orientation="h", title="Ganho estimado por laboratório")
+            fig_lab.update_layout(height=420, margin=dict(l=10, r=10, t=60, b=10), yaxis=dict(autorange="reversed"))
+            c2.plotly_chart(fig_lab, use_container_width=True)
+
+        csv_ia = view.to_csv(index=False, sep=";", encoding="utf-8-sig")
+        st.download_button("📥 Exportar Recomendações IA CSV", data=csv_ia, file_name="ia_pricing_enterprise_eirox.csv", mime="text/csv", use_container_width=True)
+
+    st.markdown("### 📜 Histórico IA Pricing")
+    hist_ia = carregar_historico_ia_pricing()
+    if hist_ia.empty:
+        st.info("Nenhum histórico registrado ainda.")
+    else:
+        st.dataframe(hist_ia.tail(300), use_container_width=True, hide_index=True)
+
+    st.stop()
+
+
 # --------------------------------------------------
 
 if pagina == "🏁 Release Candidate":
