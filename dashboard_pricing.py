@@ -10842,6 +10842,11 @@ if pagina == "🎯 Sugestão de Pesquisa":
     )
 
     fig.update_traces(textposition="outside")
+    fig = adicionar_valores_verticais_heatmap(
+        fig,
+        heat_pivot
+    )
+
     fig.update_layout(
         height=420,
         paper_bgcolor="rgba(0,0,0,0)",
@@ -15892,6 +15897,58 @@ st.dataframe(
     width="stretch"
 )
 
+
+# --------------------------------------------------
+# AJUSTE VISUAL - VALORES VERTICAIS NO MAPA DE CALOR
+# --------------------------------------------------
+
+def adicionar_valores_verticais_heatmap(fig, matriz):
+    """
+    Coloca os valores dentro das barras/células do mapa de calor,
+    na mesma orientação vertical dos nomes do eixo inferior.
+    Evita sobreposição quando existem muitas marcas ou bairros.
+    """
+
+    try:
+        if not isinstance(matriz, pd.DataFrame) or matriz.empty:
+            return fig
+
+        # Remove texto automático do heatmap para evitar duplicidade/sobreposição.
+        fig.update_traces(
+            text=None,
+            texttemplate=None,
+            hovertemplate="%{y}<br>%{x}<br>Quantidade: %{z}<extra></extra>"
+        )
+
+        for y_valor in matriz.index:
+            for x_valor in matriz.columns:
+                valor = matriz.loc[y_valor, x_valor]
+
+                try:
+                    texto = inteiro_br(valor)
+                except Exception:
+                    texto = str(valor)
+
+                fig.add_annotation(
+                    x=x_valor,
+                    y=y_valor,
+                    text=texto,
+                    showarrow=False,
+                    textangle=-90,
+                    font=dict(
+                        size=12,
+                        color="#FFFFFF"
+                    ),
+                    xanchor="center",
+                    yanchor="middle",
+                    align="center"
+                )
+
+        return fig
+
+    except Exception:
+        return fig
+
 # --------------------------------------------------
 # MAPA DE CALOR - MARCAS E BAIRROS POR QUANTIDADE DE PESQUISAS
 # --------------------------------------------------
@@ -15940,7 +15997,7 @@ if "Família" in df_filtrado.columns:
     fig = px.imshow(
         heat_pivot,
         aspect="auto",
-        text_auto=True,
+        text_auto=False,
         labels={
             "x": "Marca",
             "y": "",
@@ -16011,13 +16068,18 @@ if (
     fig_bairro = px.imshow(
         heat_bairros_pivot,
         aspect="auto",
-        text_auto=True,
+        text_auto=False,
         labels={
             "x": "Bairro",
             "y": "",
             "color": "Quantidade de Pesquisas"
         },
         title="Top 40 Bairros por Quantidade de Pesquisas"
+    )
+
+    fig_bairro = adicionar_valores_verticais_heatmap(
+        fig_bairro,
+        heat_bairros_pivot
     )
 
     fig_bairro.update_layout(
