@@ -511,6 +511,101 @@ curva_abc
 )
 
 
+# --------------------------------------------------
+# PADRONIZAÇÃO DO NOME DA REDE
+# --------------------------------------------------
+
+def limpar_nome_rede_eirox(valor_rede="", valor_loja=""):
+    """
+    Retorna somente o nome comercial da rede.
+    Usa a coluna Rede quando existir; se estiver vazia, identifica pela loja/razão social.
+    """
+
+    def _texto_valido(valor):
+        texto = str(valor).strip() if valor is not None else ""
+        if texto.lower() in ["", "nan", "none", "nat"]:
+            return ""
+        return texto
+
+    rede = _texto_valido(valor_rede)
+    loja = _texto_valido(valor_loja)
+    texto_base = rede if rede else loja
+
+    if not texto_base:
+        return ""
+
+    texto_upper = texto_base.upper()
+
+    # Mapeamentos principais encontrados nas pesquisas de mercado.
+    mapa = [
+        ("TRIANGULO", "Triângulo"),
+        ("TRIÂNGULO", "Triângulo"),
+        ("RAIADROGASIL", "Drogasil"),
+        ("DROGASIL", "Drogasil"),
+        ("DROGA RAIA", "Droga Raia"),
+        (" ZANOL", "Zanol e Thomaz"),
+        ("ZANOL", "Zanol e Thomaz"),
+        ("BRASIFARMA", "Brasifarma"),
+        ("PAGUE MENOS", "Pague Menos"),
+        ("MARCOPHARMA", "Marcopharma"),
+        ("BARBOSA", "Barbosa"),
+        ("ADRI", "Adriele"),
+        ("IR BRANDAO", "IR Brandão"),
+        ("IR BRANDÃO", "IR Brandão"),
+        ("PG COMERCIO", "PG Varejista"),
+        ("PG COMÉRCIO", "PG Varejista"),
+        ("PG - VAREJISTA", "PG Varejista"),
+        ("MATEUS", "Mateus"),
+    ]
+
+    for termo, nome in mapa:
+        if termo in texto_upper:
+            return nome
+
+    # Tenta usar a função padrão do projeto, caso reconheça a rede.
+    try:
+        rede_identificada = identificar_rede(texto_base)
+        rede_identificada = _texto_valido(rede_identificada)
+        if rede_identificada and rede_identificada.upper() not in ["OUTRAS", "OUTROS", "NÃO IDENTIFICADO", "NAO IDENTIFICADO"]:
+            return rede_identificada
+    except Exception:
+        pass
+
+    # Se veio no padrão "Rede - Razão Social", mantém só a rede.
+    if " - " in texto_base:
+        partes = [p.strip() for p in texto_base.split(" - ") if p.strip()]
+        if len(partes) >= 2 and partes[0].upper() == "PG":
+            return "PG Varejista"
+        if partes:
+            return partes[0]
+
+    # Último fallback: remove termos jurídicos mais comuns.
+    texto = re.sub(r"\b(COMERCIO|COMÉRCIO|DE|DO|DA|DOS|DAS|MEDICAMENTOS|PRODUTOS|FARMACEUTICOS|FARMACÊUTICOS|LTDA|S\.?A\.?|SA|EIRELI|ME|S/A)\b", "", texto_base, flags=re.IGNORECASE)
+    texto = re.sub(r"\s+", " ", texto).strip(" -")
+    return texto.title() if texto else texto_base
+
+
+def serie_nome_rede_eirox(df_temp, coluna_rede=None, coluna_loja=None):
+    """Cria uma Série com o nome limpo da rede a partir de Rede e/ou Loja."""
+    if not isinstance(df_temp, pd.DataFrame) or df_temp.empty:
+        return pd.Series(dtype="object")
+
+    if coluna_rede and coluna_rede in df_temp.columns:
+        serie_rede = df_temp[coluna_rede]
+    else:
+        serie_rede = pd.Series([""] * len(df_temp), index=df_temp.index)
+
+    if coluna_loja and coluna_loja in df_temp.columns:
+        serie_loja = df_temp[coluna_loja]
+    else:
+        serie_loja = pd.Series([""] * len(df_temp), index=df_temp.index)
+
+    return pd.Series(
+        [limpar_nome_rede_eirox(r, l) for r, l in zip(serie_rede, serie_loja)],
+        index=df_temp.index
+    )
+
+
 
 
 # --------------------------------------------------
@@ -1132,7 +1227,7 @@ def recalcular_ganho_inteligente(df_base, venda_rede_base, historico_base):
 
         meta_max = pd.DataFrame({
             "EAN": ref_max["EAN"].astype(str),
-            "Rede_Preco_Maximo_Competitivo": _col_ou_vazio(ref_max, col_rede_hist),
+            "Rede_Preco_Maximo_Competitivo": serie_nome_rede_eirox(ref_max, col_rede_hist, col_loja_hist),
             "Loja_Preco_Maximo_Competitivo": _col_ou_vazio(ref_max, col_loja_hist),
             "Data_Preco_Maximo_Competitivo": ref_max[col_data_hist] if col_data_hist and col_data_hist in ref_max.columns else ""
         })
@@ -1140,7 +1235,7 @@ def recalcular_ganho_inteligente(df_base, venda_rede_base, historico_base):
         meta_min = pd.DataFrame({
             "EAN": ref_min["EAN"].astype(str),
             "Menor_Preco": ref_min["Preco_Historico_Ref"],
-            "Rede_Menor_Preco": _col_ou_vazio(ref_min, col_rede_hist),
+            "Rede_Menor_Preco": serie_nome_rede_eirox(ref_min, col_rede_hist, col_loja_hist),
             "Loja_Menor_Preco": _col_ou_vazio(ref_min, col_loja_hist),
             "Data_Menor_Preco": ref_min[col_data_hist] if col_data_hist and col_data_hist in ref_min.columns else ""
         })
@@ -1459,14 +1554,14 @@ def criar_simulacao_por_historico(historico_base):
 
         meta = pd.DataFrame({
             "EAN": ref_max["EAN"].astype(str),
-            "Rede_Preco_Maximo_Competitivo": _col_ou_vazio(ref_max, col_rede),
+            "Rede_Preco_Maximo_Competitivo": serie_nome_rede_eirox(ref_max, col_rede, col_loja),
             "Loja_Preco_Maximo_Competitivo": _col_ou_vazio(ref_max, col_loja),
             "Data_Preco_Maximo_Competitivo": ref_max[col_data] if col_data and col_data in ref_max.columns else ""
         }).merge(
             pd.DataFrame({
                 "EAN": ref_min["EAN"].astype(str),
                 "Menor_Preco": ref_min["Preco_Base"],
-                "Rede_Menor_Preco": _col_ou_vazio(ref_min, col_rede),
+                "Rede_Menor_Preco": serie_nome_rede_eirox(ref_min, col_rede, col_loja),
                 "Loja_Menor_Preco": _col_ou_vazio(ref_min, col_loja),
                 "Data_Menor_Preco": ref_min[col_data] if col_data and col_data in ref_min.columns else ""
             }),
@@ -17131,6 +17226,23 @@ if not simulacao_global.empty:
     for coluna_data in ["Data_Preco_Maximo_Competitivo", "Data_Menor_Preco"]:
         if coluna_data in simulacao_exibir.columns:
             simulacao_exibir[coluna_data] = simulacao_exibir[coluna_data].apply(data_br)
+
+    simulacao_exibir = simulacao_exibir.rename(columns={
+        "Qtd_Vendida_Mes_Anterior": "Qtd Vendida Mês Anterior",
+        "Venda_Preco_Antigo": "Venda Preço Antigo",
+        "Preco_Atual": "Preço Atual",
+        "Preco_Sugerido_Mercado": "Preço Máximo Competitivo",
+        "Rede_Preco_Maximo_Competitivo": "Rede Preço Máximo Competitivo",
+        "Loja_Preco_Maximo_Competitivo": "Loja Preço Máximo Competitivo",
+        "Data_Preco_Maximo_Competitivo": "Data Preço Máximo Competitivo",
+        "Menor_Preco": "Menor Preço",
+        "Rede_Menor_Preco": "Rede Menor Preço",
+        "Loja_Menor_Preco": "Loja Menor Preço",
+        "Data_Menor_Preco": "Data Menor Preço",
+        "Venda_Projetada_Preco_Sugerido": "Venda Projetada Preço Sugerido",
+        "Ganho_Unitario": "Ganho Unitário",
+        "Ganho_Potencial_Simulador": "Ganho Produto"
+    })
 
     st.dataframe(
         simulacao_exibir,
