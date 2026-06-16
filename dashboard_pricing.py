@@ -17186,18 +17186,32 @@ if (
         "📋 Produtos Filtrados"
     )
 
+    col_data_pesquisa = None
+    for _c in ["Data Pesquisa", "Data", "Data da Pesquisa"]:
+        if _c in comp_df.columns:
+            col_data_pesquisa = _c
+            break
+
+    colunas_pf = [
+        "Descricao_Unica",
+        "Produto",
+        "Rede"
+    ]
+
+    if col_data_pesquisa:
+        colunas_pf.append(col_data_pesquisa)
+
+    colunas_pf.append("Preço (R$)")
+
     produtos_filtrados = (
-        comp_df[
-            [
-                "Descricao_Unica",
-                "Produto",
-                "Rede",
-                "Farmácia",
-                "Preço (R$)"
-            ]
-        ]
+        comp_df[colunas_pf]
         .copy()
     )
+
+    if col_data_pesquisa:
+        produtos_filtrados = produtos_filtrados.rename(
+            columns={col_data_pesquisa: "Data Pesquisa"}
+        )
 
     produtos_filtrados["Preço (R$)"] = pd.to_numeric(
         produtos_filtrados["Preço (R$)"],
