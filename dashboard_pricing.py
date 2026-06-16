@@ -16006,6 +16006,11 @@ if "Família" in df_filtrado.columns:
         title="Top 40 Marcas por Quantidade de Pesquisas"
     )
 
+    fig = adicionar_valores_verticais_heatmap(
+        fig,
+        heat_pivot
+    )
+
     fig.update_layout(
         height=420,
         xaxis_tickangle=-90,
