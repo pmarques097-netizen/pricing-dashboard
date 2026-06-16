@@ -17187,7 +17187,7 @@ if (
     )
 
     col_data_pesquisa = None
-    for _c in ["Data Pesquisa", "Data", "Data da Pesquisa"]:
+    for _c in ["Data Emissão", "Data Emissao", "Data Pesquisa", "Data", "Data da Pesquisa", "Dt Pesquisa", "DATA_EMISSAO", "DATA_EMISSÃO"]:
         if _c in comp_df.columns:
             col_data_pesquisa = _c
             break
@@ -17211,6 +17211,16 @@ if (
     if col_data_pesquisa:
         produtos_filtrados = produtos_filtrados.rename(
             columns={col_data_pesquisa: "Data Pesquisa"}
+        )
+
+        produtos_filtrados["Data Pesquisa"] = (
+            pd.to_datetime(
+                produtos_filtrados["Data Pesquisa"],
+                errors="coerce",
+                dayfirst=True
+            )
+            .dt.strftime("%d/%m/%Y")
+            .fillna(produtos_filtrados["Data Pesquisa"].astype(str))
         )
 
     produtos_filtrados["Preço (R$)"] = pd.to_numeric(
