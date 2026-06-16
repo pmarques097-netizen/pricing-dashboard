@@ -293,11 +293,9 @@ def formatar_dataframe_br(base):
         "Preco_Atual": "Preço Atual",
         "Preco_Sugerido_Mercado": "Preço Máximo Competitivo",
         "Rede_Preco_Maximo_Competitivo": "Rede Preço Máximo Competitivo",
-        "Loja_Preco_Maximo_Competitivo": "Loja Preço Máximo Competitivo",
         "Data_Preco_Maximo_Competitivo": "Data Preço Máximo Competitivo",
         "Menor_Preco": "Menor Preço",
         "Rede_Menor_Preco": "Rede Menor Preço",
-        "Loja_Menor_Preco": "Loja Menor Preço",
         "Data_Menor_Preco": "Data Menor Preço",
         "Preco_Recomendado": "Preço Recomendado",
         "Qtd_Vendida_Mes_Anterior": "Qtd Vendida Mês Anterior"
@@ -17176,6 +17174,25 @@ if not simulacao_global.empty:
         moeda_br(simulacao["Ganho_Potencial_Simulador"].sum())
     )
 
+    # Garante que a tela mostre somente o nome comercial da rede.
+    # Se a coluna Rede vier vazia, identifica a rede pela razão social/loja,
+    # mas NÃO exibe a coluna de loja na tabela.
+    for col_rede_tmp, col_loja_tmp in [
+        ("Rede_Preco_Maximo_Competitivo", "Loja_Preco_Maximo_Competitivo"),
+        ("Rede_Menor_Preco", "Loja_Menor_Preco"),
+    ]:
+        if col_rede_tmp in simulacao.columns:
+            if col_loja_tmp in simulacao.columns:
+                simulacao[col_rede_tmp] = [
+                    limpar_nome_rede_eirox(rede, loja)
+                    for rede, loja in zip(simulacao[col_rede_tmp], simulacao[col_loja_tmp])
+                ]
+            else:
+                simulacao[col_rede_tmp] = [
+                    limpar_nome_rede_eirox(rede, "")
+                    for rede in simulacao[col_rede_tmp]
+                ]
+
     colunas_exibir = [
         "EAN"
     ]
@@ -17189,11 +17206,9 @@ if not simulacao_global.empty:
         "Preco_Atual",
         "Preco_Sugerido_Mercado",
         "Rede_Preco_Maximo_Competitivo",
-        "Loja_Preco_Maximo_Competitivo",
         "Data_Preco_Maximo_Competitivo",
         "Menor_Preco",
         "Rede_Menor_Preco",
-        "Loja_Menor_Preco",
         "Data_Menor_Preco",
         "Venda_Projetada_Preco_Sugerido",
         "Ganho_Unitario",
@@ -17233,11 +17248,9 @@ if not simulacao_global.empty:
         "Preco_Atual": "Preço Atual",
         "Preco_Sugerido_Mercado": "Preço Máximo Competitivo",
         "Rede_Preco_Maximo_Competitivo": "Rede Preço Máximo Competitivo",
-        "Loja_Preco_Maximo_Competitivo": "Loja Preço Máximo Competitivo",
         "Data_Preco_Maximo_Competitivo": "Data Preço Máximo Competitivo",
         "Menor_Preco": "Menor Preço",
         "Rede_Menor_Preco": "Rede Menor Preço",
-        "Loja_Menor_Preco": "Loja Menor Preço",
         "Data_Menor_Preco": "Data Menor Preço",
         "Venda_Projetada_Preco_Sugerido": "Venda Projetada Preço Sugerido",
         "Ganho_Unitario": "Ganho Unitário",
