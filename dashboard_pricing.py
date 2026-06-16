@@ -174,6 +174,33 @@ def moeda_br(valor):
         return ""
 
 
+def moeda_br_kpi(valor):
+
+    """
+    Formata moeda para KPI sem cortar o valor no card.
+    Mantém o padrão brasileiro e usa MM quando o valor passa de 1 milhão.
+    """
+
+    try:
+        if pd.isna(valor):
+            return ""
+
+        valor = float(valor)
+
+        if abs(valor) >= 1_000_000:
+            return (
+                f"R$ {valor / 1_000_000:,.2f} MM"
+                .replace(",", "X")
+                .replace(".", ",")
+                .replace("X", ".")
+            )
+
+        return moeda_br(valor)
+
+    except Exception:
+        return moeda_br(valor)
+
+
 def numero_br(valor):
 
     try:
@@ -12326,7 +12353,7 @@ if pagina == "🏢 Dashboard Executivo":
 
     k2.metric(
         "Potencial de Captura",
-        moeda_br(ganho_total)
+        moeda_br_kpi(ganho_total)
     )
 
     k3.metric(
@@ -14838,7 +14865,8 @@ else:
 # KPIS
 # --------------------------------------------------
 
-k1,k2,k3,k4,k5,k6 = st.columns(6)
+# Card Potencial de Captura ampliado para evitar corte do valor.
+k1,k2,k3,k4,k5,k6 = st.columns([1, 1, 1, 1.65, 1, 1])
 
 k1.metric(
     "Produtos",
@@ -14857,7 +14885,7 @@ k3.metric(
 
 k4.metric(
     "Potencial de Captura",
-    moeda_br(df_filtrado["Ganho_Potencial"].sum())
+    moeda_br_kpi(df_filtrado["Ganho_Potencial"].sum())
 )
 
 k5.metric(
