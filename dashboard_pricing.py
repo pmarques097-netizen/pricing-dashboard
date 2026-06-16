@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.40.2-menu-enterprise-full-fix"
+VERSAO_APP = "v1.40.2-br-valores-score-claro-colunas-v1"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -208,6 +208,190 @@ def percentual_br(valor):
 
     except Exception:
         return ""
+
+
+# --------------------------------------------------
+# FORMATAÇÃO BRASILEIRA GLOBAL PARA EXIBIÇÃO
+# --------------------------------------------------
+
+def inteiro_br(valor):
+
+    try:
+        if pd.isna(valor):
+            return ""
+        return f"{float(valor):,.0f}".replace(",", ".")
+    except Exception:
+        return ""
+
+
+def data_br(valor):
+
+    try:
+        if pd.isna(valor):
+            return ""
+        data = pd.to_datetime(valor, errors="coerce")
+        if pd.isna(data):
+            return str(valor)
+        return data.strftime("%d/%m/%Y")
+    except Exception:
+        return str(valor) if valor is not None else ""
+
+
+def _eirox_tipo_coluna_br(nome_coluna):
+    nome = str(nome_coluna).lower().strip()
+
+    if any(t in nome for t in [
+        "margem", "percent", "particip", "%", "variação", "variacao",
+        "rentabilidade", "share", "taxa"
+    ]):
+        return "percentual"
+
+    if any(t in nome for t in [
+        "preço", "preco", "custo", "valor", "faturamento", "venda",
+        "receita", "lucro", "ganho", "potencial", "captura", "ticket",
+        "despesa", "saldo", "total r$", "r$", "recomendado", "sugerido"
+    ]):
+        return "moeda"
+
+    if any(t in nome for t in [
+        "data", "dt ", "dt_", "modificado", "criado", "atualização", "atualizacao"
+    ]):
+        return "data"
+
+    if any(t in nome for t in [
+        "qtd", "qtde", "quantidade", "unidades", "estoque", "itens",
+        "produtos", "skus", "ranking", "posição", "posicao", "arquivos", "registros"
+    ]):
+        return "inteiro"
+
+    if "score" in nome or "índice" in nome or "indice" in nome:
+        return "numero"
+
+    return "texto"
+
+
+def formatar_dataframe_br(base):
+    """
+    Formata uma cópia do DataFrame apenas para exibição no padrão brasileiro.
+    Não altera a base original usada nos cálculos.
+    """
+
+    if not isinstance(base, pd.DataFrame) or base.empty:
+        return base
+
+    df_view = base.copy()
+
+    # Nomes mais claros para o usuário final.
+    renomear = {
+        "Ganho_Potencial": "Potencial de Captura",
+        "Ganho_Potencial_Final": "Potencial de Captura Final",
+        "Ganho_Potencial_Atualizado": "Potencial de Captura Atualizado",
+        "Ganho_Potencial_Simulador": "Potencial de Captura Simulado",
+        "Margem_%": "Rentabilidade Atual",
+        "Margem_Media": "Rentabilidade Atual",
+        "Score_Eirox": "Índice de Oportunidade Eirox",
+        "Preco_Atual": "Preço Atual",
+        "Preco_Sugerido_Mercado": "Preço Máximo Competitivo",
+        "Preco_Recomendado": "Preço Recomendado",
+        "Qtd_Vendida_Mes_Anterior": "Qtd Vendida Mês Anterior"
+    }
+
+    df_view = df_view.rename(columns={c: renomear.get(c, c) for c in df_view.columns})
+
+    for coluna in df_view.columns:
+        tipo = _eirox_tipo_coluna_br(coluna)
+
+        if tipo == "moeda":
+            s_num = pd.to_numeric(df_view[coluna], errors="coerce")
+            if s_num.notna().any():
+                df_view[coluna] = s_num.apply(moeda_br)
+
+        elif tipo == "percentual":
+            s_num = pd.to_numeric(df_view[coluna], errors="coerce")
+            if s_num.notna().any():
+                df_view[coluna] = s_num.apply(percentual_br)
+
+        elif tipo == "inteiro":
+            s_num = pd.to_numeric(df_view[coluna], errors="coerce")
+            if s_num.notna().any():
+                df_view[coluna] = s_num.apply(inteiro_br)
+
+        elif tipo == "numero":
+            s_num = pd.to_numeric(df_view[coluna], errors="coerce")
+            if s_num.notna().any():
+                df_view[coluna] = s_num.apply(numero_br)
+
+        elif tipo == "data":
+            # Só formata quando parecer data de verdade.
+            convertido = pd.to_datetime(df_view[coluna], errors="coerce")
+            if convertido.notna().any():
+                df_view[coluna] = convertido.dt.strftime("%d/%m/%Y")
+
+    return df_view
+
+
+def valor_metrica_br(label, valor):
+    """Padroniza KPIs no formato brasileiro conforme o tipo do indicador."""
+
+    if isinstance(valor, str):
+        return valor
+
+    try:
+        nome = str(label).lower()
+
+        if any(t in nome for t in ["preço", "preco", "custo", "valor", "faturamento", "venda", "lucro", "ganho", "potencial", "captura", "ticket", "receita", "despesa", "saldo"]):
+            return moeda_br(valor)
+
+        if any(t in nome for t in ["margem", "rentabilidade", "particip", "%", "percent", "taxa"]):
+            return percentual_br(valor)
+
+        if any(t in nome for t in ["produtos", "itens", "qtd", "quantidade", "estoque", "arquivos", "registros", "usuários", "usuarios"]):
+            return inteiro_br(valor)
+
+        if "score" in nome or "índice" in nome or "indice" in nome:
+            return numero_br(valor)
+
+        return numero_br(valor) if isinstance(valor, (int, float, np.integer, np.floating)) else valor
+
+    except Exception:
+        return valor
+
+
+def aplicar_formatacao_brasileira_streamlit():
+    """
+    Intercepta st.dataframe e st.metric para exibir números, dinheiro,
+    percentuais e datas no padrão brasileiro em todo o dashboard.
+    """
+
+    if getattr(st, "_eirox_formatacao_br_aplicada", False):
+        return
+
+    st._eirox_dataframe_original = st.dataframe
+    st._eirox_metric_original = st.metric
+
+    def dataframe_br(data=None, *args, **kwargs):
+        try:
+            if isinstance(data, pd.DataFrame):
+                data = formatar_dataframe_br(data)
+        except Exception:
+            pass
+        return st._eirox_dataframe_original(data, *args, **kwargs)
+
+    def metric_br(label, value, delta=None, *args, **kwargs):
+        try:
+            value = valor_metrica_br(label, value)
+            if delta is not None and not isinstance(delta, str):
+                delta = valor_metrica_br(label, delta)
+        except Exception:
+            pass
+        return st._eirox_metric_original(label, value, delta, *args, **kwargs)
+
+    st.dataframe = dataframe_br
+    st.metric = metric_br
+    st._eirox_formatacao_br_aplicada = True
+
+
+aplicar_formatacao_brasileira_streamlit()
 
 
 
@@ -3263,7 +3447,7 @@ def gerar_alertas_inteligentes(limite_margem=20, limite_diferenca_concorrente=10
         col_preco_conc = _alerta_coluna(base, ["Menor_Preco_Concorrente", "Menor Concorrente", "Preco_Concorrente", "Preço Concorrente", "Menor_Preco"])
         col_estoque = _alerta_coluna(base, ["Estoque", "Estoque Atual", "Qtde Estoque", "Quantidade Estoque"])
         col_data = _alerta_coluna(base, ["Data", "Data Pesquisa", "Data_Pesquisa", "Última Pesquisa", "Ultima Pesquisa"])
-        col_ganho = _alerta_coluna(base, ["Ganho_Potencial", "Ganho Potencial", "Oportunidade"])
+        col_ganho = _alerta_coluna(base, ["Ganho_Potencial", "Potencial de Captura", "Oportunidade"])
 
         if col_margem:
             margem = _alerta_converter_numero(base[col_margem])
@@ -3524,7 +3708,7 @@ def gerar_motor_oportunidades(top_n=100, margem_minima=20, apenas_oportunidade_p
         col_prod = _oport_coluna(base, ["Produto", "Produto_Base_SIM", "Descrição", "Descricao"])
         col_lab = _oport_coluna(base, ["Laboratório", "Laboratorio", "Fabricante", "Fornecedor"])
         col_cat = _oport_coluna(base, ["Categoria", "Família", "Familia", "Departamento", "Classe"])
-        col_ganho = _oport_coluna(base, ["Ganho_Potencial", "Ganho Potencial", "Oportunidade", "Potencial"])
+        col_ganho = _oport_coluna(base, ["Ganho_Potencial", "Potencial de Captura", "Oportunidade", "Potencial"])
         col_fat = _oport_coluna(base, ["Faturamento", "Venda", "Receita", "Faturamento_Total"])
         col_margem = _oport_coluna(base, ["Margem_%", "Margem", "Margem %"])
         col_preco = _oport_coluna(base, ["Preco_Rede", "Preço Rede", "Preco_Venda", "Preço (R$)", "Preço"])
@@ -3852,7 +4036,7 @@ def gerar_ia_pricing_enterprise(margem_minima=25, margem_alvo=35, limite_reducao
         col_custo = _ia_coluna(base, ["Custo", "Custo Médio", "Custo_Medio", "Custo Atual"])
         col_margem = _ia_coluna(base, ["Margem_%", "Margem", "Margem %"])
         col_conc = _ia_coluna(base, ["Menor_Preco_Concorrente", "Menor Concorrente", "Preco_Concorrente", "Preço Concorrente", "Menor_Preco"])
-        col_ganho = _ia_coluna(base, ["Ganho_Potencial", "Ganho Potencial", "Oportunidade", "Potencial"])
+        col_ganho = _ia_coluna(base, ["Ganho_Potencial", "Potencial de Captura", "Oportunidade", "Potencial"])
         col_estoque = _ia_coluna(base, ["Estoque", "Estoque Atual", "Qtde Estoque"])
         col_qtd = _ia_coluna(base, ["Quantidade", "Qtd", "Qtde", "Unidades", "Volume"])
         n=len(base)
@@ -8636,13 +8820,13 @@ if pagina == "💰 Motor de Oportunidades":
 
         if "Laboratório" in oportunidades_df.columns:
             ganho_lab = oportunidades_df.groupby("Laboratório", dropna=False).agg(Ganho_Potencial=("Ganho_Potencial", "sum")).reset_index().sort_values("Ganho_Potencial", ascending=False).head(15)
-            fig_lab = px.bar(ganho_lab, x="Ganho_Potencial", y="Laboratório", orientation="h", title="Top laboratórios por ganho potencial")
+            fig_lab = px.bar(ganho_lab, x="Ganho_Potencial", y="Laboratório", orientation="h", title="Top laboratórios por potencial de captura")
             fig_lab.update_layout(height=420, margin=dict(l=10, r=10, t=60, b=10), yaxis=dict(autorange="reversed"))
             g1.plotly_chart(fig_lab, use_container_width=True)
 
         if "Categoria" in oportunidades_df.columns:
             ganho_cat = oportunidades_df.groupby("Categoria", dropna=False).agg(Ganho_Potencial=("Ganho_Potencial", "sum")).reset_index().sort_values("Ganho_Potencial", ascending=False).head(15)
-            fig_cat = px.bar(ganho_cat, x="Ganho_Potencial", y="Categoria", orientation="h", title="Top categorias por ganho potencial")
+            fig_cat = px.bar(ganho_cat, x="Ganho_Potencial", y="Categoria", orientation="h", title="Top categorias por potencial de captura")
             fig_cat.update_layout(height=420, margin=dict(l=10, r=10, t=60, b=10), yaxis=dict(autorange="reversed"))
             g2.plotly_chart(fig_cat, use_container_width=True)
 
@@ -11876,7 +12060,7 @@ if pagina == "🏢 Dashboard Executivo":
         <div class="eirox-hero">
             <div class="eirox-section-title">Diretoria</div>
             <h1>🏢 Dashboard Executivo Premium</h1>
-            <p>Resumo estratégico para tomada de decisão: riscos, oportunidades, margem e ganho potencial.</p>
+            <p>Resumo estratégico para tomada de decisão: riscos, oportunidades, margem e potencial de captura.</p>
         </div>
         """,
         unsafe_allow_html=True
@@ -11929,12 +12113,12 @@ if pagina == "🏢 Dashboard Executivo":
     )
 
     k2.metric(
-        "Ganho Potencial",
+        "Potencial de Captura",
         moeda_br(ganho_total)
     )
 
     k3.metric(
-        "Margem Média",
+        "Rentabilidade Atual",
         percentual_br(margem_media)
     )
 
@@ -12751,7 +12935,7 @@ if pagina == "🔎 Rede/Loja vs Concorrentes":
                     "Venda_Projetada_Preco_Sugerido": "Venda Projetada Preço Sugerido",
                     "Ganho_Unitario": "Ganho Unitário",
                     "Ganho_Potencial_Simulador": "Ganho Produto",
-                    "Ganho_Potencial": "Ganho Potencial",
+                    "Ganho_Potencial": "Potencial de Captura",
                     "Margem_%": "Margem %",
                     "Lucro_Unitario": "Lucro Unitário",
                     "Preco_Medio": "Preço Médio"
@@ -14450,7 +14634,7 @@ k1.metric(
 )
 
 k2.metric(
-    "Margem Média",
+    "Rentabilidade Atual",
     percentual_br(df_filtrado["Margem_%"].mean())
 )
 
@@ -14460,7 +14644,7 @@ k3.metric(
 )
 
 k4.metric(
-    "Ganho Potencial",
+    "Potencial de Captura",
     moeda_br(df_filtrado["Ganho_Potencial"].sum())
 )
 
@@ -14718,6 +14902,119 @@ if (
     )
 
     # --------------------------------------------------
+    # CUSTO UNITÁRIO PELA VENDA_FINAL_TESTE
+    # --------------------------------------------------
+    # Regra solicitada:
+    # Custo unitário = soma da coluna "Custo" / soma da coluna "Itens"
+    # A origem é a base venda_rede, carregada da pasta VENDA_FINAL_TESTE.
+
+    try:
+
+        if "Custo" not in produtos_detalhe.columns and isinstance(venda_rede, pd.DataFrame) and not venda_rede.empty:
+
+            base_custo_venda = venda_rede.copy()
+            base_custo_venda.columns = base_custo_venda.columns.astype(str).str.strip()
+
+            col_ean_custo = achar_coluna(
+                base_custo_venda,
+                [
+                    "EAN",
+                    "EAN (GTIN)",
+                    "GTIN",
+                    "Código de Barras",
+                    "Codigo de Barras",
+                    "Cód. Barras/Etiq.",
+                    "Cod. Barras/Etiq."
+                ],
+                [
+                    "ean",
+                    "gtin",
+                    "barras"
+                ]
+            )
+
+            col_custo_venda = achar_coluna(
+                base_custo_venda,
+                [
+                    "Custo",
+                    "CUSTO",
+                    "Valor Custo",
+                    "Custo Total",
+                    "CMV"
+                ],
+                [
+                    "custo",
+                    "cmv"
+                ]
+            )
+
+            col_itens_venda = achar_coluna(
+                base_custo_venda,
+                [
+                    "Itens",
+                    "Item",
+                    "Quantidade",
+                    "Qtd",
+                    "QTD",
+                    "Qtde",
+                    "Unidades"
+                ],
+                [
+                    "itens",
+                    "item",
+                    "qtd",
+                    "quant",
+                    "qtde",
+                    "unid"
+                ]
+            )
+
+            if col_ean_custo and col_custo_venda and col_itens_venda:
+
+                base_custo_venda["EAN"] = (
+                    base_custo_venda[col_ean_custo]
+                    .astype(str)
+                    .str.replace(".0", "", regex=False)
+                    .str.strip()
+                )
+
+                base_custo_venda["Custo_Total_Venda_Final"] = converter_numero_brasil(
+                    base_custo_venda[col_custo_venda]
+                )
+
+                base_custo_venda["Itens_Venda_Final"] = converter_numero_brasil(
+                    base_custo_venda[col_itens_venda]
+                )
+
+                custo_por_ean = (
+                    base_custo_venda
+                    .dropna(subset=["EAN", "Custo_Total_Venda_Final", "Itens_Venda_Final"])
+                    .groupby("EAN", as_index=False)
+                    .agg(
+                        Custo_Total_Venda_Final=("Custo_Total_Venda_Final", "sum"),
+                        Itens_Venda_Final=("Itens_Venda_Final", "sum")
+                    )
+                )
+
+                custo_por_ean = custo_por_ean[
+                    custo_por_ean["Itens_Venda_Final"] > 0
+                ].copy()
+
+                custo_por_ean["Custo"] = (
+                    custo_por_ean["Custo_Total_Venda_Final"]
+                    / custo_por_ean["Itens_Venda_Final"]
+                )
+
+                produtos_detalhe = produtos_detalhe.merge(
+                    custo_por_ean[["EAN", "Custo"]],
+                    on="EAN",
+                    how="left"
+                )
+
+    except Exception:
+        pass
+
+    # --------------------------------------------------
     # MENOR PREÇO E LOJA COM MENOR PREÇO
     # --------------------------------------------------
 
@@ -14879,9 +15176,10 @@ if not produtos_detalhe.empty:
         "Recomendacao",
         "Qtd_Vendida_Mes_Anterior",
         "Venda_Preco_Antigo",
+        "Venda_Projetada_Preco_Sugerido",
+        "Custo",
         "Preco_Atual",
         "Preco_Sugerido_Mercado",
-        "Venda_Projetada_Preco_Sugerido",
         "Ganho_Unitario",
         "Ganho_Potencial_Simulador",
         "Menor_Preco",
@@ -14896,15 +15194,28 @@ if not produtos_detalhe.empty:
 
     produtos_exibir = produtos_detalhe[colunas_exibir].copy()
 
+    # Nova coluna: Margem considerando seguir o menor preço do mercado.
+    # IMPORTANTE: mantém a coluna original Margem_% sem alteração.
+    # Fórmula: (Menor Preço - Custo) / Menor Preço * 100
+    if "Custo" in produtos_exibir.columns and "Menor_Preco" in produtos_exibir.columns:
+        custo_num = pd.to_numeric(produtos_exibir["Custo"], errors="coerce")
+        menor_preco_num = pd.to_numeric(produtos_exibir["Menor_Preco"], errors="coerce")
+        produtos_exibir["Margem_%_Menor_Preco"] = np.where(
+            menor_preco_num > 0,
+            ((menor_preco_num - custo_num) / menor_preco_num) * 100,
+            np.nan
+        )
+
     # --------------------------------------------------
     # FORMATAR PADRÃO BRASIL
     # --------------------------------------------------
 
     for coluna in [
         "Venda_Preco_Antigo",
+        "Venda_Projetada_Preco_Sugerido",
+        "Custo",
         "Preco_Atual",
         "Preco_Sugerido_Mercado",
-        "Venda_Projetada_Preco_Sugerido",
         "Ganho_Unitario",
         "Ganho_Potencial_Simulador",
         "Menor_Preco",
@@ -14917,6 +15228,9 @@ if not produtos_detalhe.empty:
 
     if "Margem_%" in produtos_exibir.columns:
         produtos_exibir["Margem_%"] = produtos_exibir["Margem_%"].apply(percentual_br)
+
+    if "Margem_%_Menor_Preco" in produtos_exibir.columns:
+        produtos_exibir["Margem_%_Menor_Preco"] = produtos_exibir["Margem_%_Menor_Preco"].apply(percentual_br)
 
     if "Qtd_Vendida_Mes_Anterior" in produtos_exibir.columns:
         produtos_exibir["Qtd_Vendida_Mes_Anterior"] = (
@@ -14952,13 +15266,43 @@ if not produtos_detalhe.empty:
             "Qtd_Vendida_Mes_Anterior": "Qtd Vendida Mês Anterior",
             "Preco_Medio": "Preço Médio",
             "Margem_%": "Margem %",
+            "Margem_%_Menor_Preco": "Margem % Menor Preço",
             "Lucro_Unitario": "Lucro Unitário"
         }
     )
 
+    # Ordem oficial das colunas na tabela de produtos da recomendação
+    colunas_exibicao = [
+        "EAN",
+        "Produto",
+        "Laboratório",
+        "Família",
+        "CURVA",
+        "Recomendacao",
+        "Qtd Vendida Mês Anterior",
+        "Venda Preço Antigo",
+        "Venda Projetada Preço Sugerido",
+        "Custo",
+        "Preço Atual",
+        "Preço Sugerido Mercado",
+        "Preço Médio",
+        "Menor Preço",
+        "Margem % Menor Preço",
+        "Margem %",
+        "Loja Menor Preço Concorrente",
+        "Lucro Unitário",
+        "Ganho Unitário",
+        "Ganho Produto"
+    ]
+
+    produtos_exibir = produtos_exibir[
+        [c for c in colunas_exibicao if c in produtos_exibir.columns]
+    ]
+
     st.dataframe(
         produtos_exibir,
         use_container_width=True,
+        hide_index=True,
         height=420
     )
 
@@ -14968,11 +15312,23 @@ if not produtos_detalhe.empty:
 
     exportar_recomendacao = produtos_detalhe[colunas_exibir].copy()
 
+    # Nova coluna na exportação: Margem considerando seguir o menor preço do mercado.
+    # IMPORTANTE: mantém a coluna original Margem_% sem alteração.
+    if "Custo" in exportar_recomendacao.columns and "Menor_Preco" in exportar_recomendacao.columns:
+        custo_num = pd.to_numeric(exportar_recomendacao["Custo"], errors="coerce")
+        menor_preco_num = pd.to_numeric(exportar_recomendacao["Menor_Preco"], errors="coerce")
+        exportar_recomendacao["Margem_%_Menor_Preco"] = np.where(
+            menor_preco_num > 0,
+            ((menor_preco_num - custo_num) / menor_preco_num) * 100,
+            np.nan
+        )
+
     for coluna in [
         "Venda_Preco_Antigo",
+        "Venda_Projetada_Preco_Sugerido",
+        "Custo",
         "Preco_Atual",
         "Preco_Sugerido_Mercado",
-        "Venda_Projetada_Preco_Sugerido",
         "Ganho_Unitario",
         "Ganho_Potencial_Simulador",
         "Menor_Preco",
@@ -14985,6 +15341,9 @@ if not produtos_detalhe.empty:
 
     if "Margem_%" in exportar_recomendacao.columns:
         exportar_recomendacao["Margem_%"] = exportar_recomendacao["Margem_%"].apply(percentual_br)
+
+    if "Margem_%_Menor_Preco" in exportar_recomendacao.columns:
+        exportar_recomendacao["Margem_%_Menor_Preco"] = exportar_recomendacao["Margem_%_Menor_Preco"].apply(percentual_br)
 
     if "Qtd_Vendida_Mes_Anterior" in exportar_recomendacao.columns:
         exportar_recomendacao["Qtd_Vendida_Mes_Anterior"] = (
@@ -15019,9 +15378,15 @@ if not produtos_detalhe.empty:
             "Qtd_Vendida_Mes_Anterior": "Qtd Vendida Mês Anterior",
             "Preco_Medio": "Preço Médio",
             "Margem_%": "Margem %",
+            "Margem_%_Menor_Preco": "Margem % Menor Preço",
             "Lucro_Unitario": "Lucro Unitário"
         }
     )
+
+    # Exportação na mesma ordem oficial da tela
+    exportar_recomendacao = exportar_recomendacao[
+        [c for c in colunas_exibicao if c in exportar_recomendacao.columns]
+    ]
 
     csv_recomendacao = (
         exportar_recomendacao
@@ -15967,7 +16332,7 @@ explicacao_calculo(
     "Famílias",
     [
         "O gráfico soma o Ganho_Potencial por Família.",
-        "As famílias são ordenadas do maior para o menor ganho potencial.",
+        "As famílias são ordenadas do maior para o menor potencial de captura.",
         "A visão ajuda a identificar quais categorias concentram maior oportunidade financeira."
     ]
 )
@@ -16186,35 +16551,110 @@ if not compra.empty:
 # --------------------------------------------------
 
 st.subheader(
-"🤖 Score Eirox"
+    "🤖 Índice de Oportunidade Eirox"
 )
 
-explicacao_calculo(
-    "Score Eirox",
-    [
-        "Score = Margem média x 60% + Ganho_Potencial total dividido por 1.000 x 40%.",
-        "A margem representa qualidade da rentabilidade.",
-        "O ganho potencial representa o tamanho financeiro da oportunidade."
-    ]
-)
+# Cálculo do índice com tratamento seguro para evitar erro caso alguma coluna não exista.
+margem_media_score = 0
+if "Margem_%" in df_filtrado.columns:
+    margem_media_score = pd.to_numeric(
+        df_filtrado["Margem_%"],
+        errors="coerce"
+    ).dropna().mean()
+
+ganho_potencial_score = 0
+if "Ganho_Potencial" in df_filtrado.columns:
+    ganho_potencial_score = pd.to_numeric(
+        df_filtrado["Ganho_Potencial"],
+        errors="coerce"
+    ).fillna(0).sum()
 
 score = round(
-(
-df_filtrado["Margem_%"].mean()
-* 0.6
-)
-+
-(
-df_filtrado["Ganho_Potencial"].sum()
-/ 1000
-)
-* 0.4
+    (margem_media_score * 0.6)
+    +
+    ((ganho_potencial_score / 1000) * 0.4)
 )
 
 st.metric(
-"Score Pricing",
-score
+    "Índice Eirox",
+    score
 )
+
+with st.expander("🎯 Entenda o Índice de Oportunidade Eirox", expanded=False):
+
+    st.markdown("""
+### Como funciona o Índice de Oportunidade Eirox?
+
+O Índice Eirox identifica os produtos com maior potencial de geração de resultado através de ações de Pricing.
+
+---
+
+### 💰 Potencial de Captura
+
+Representa o valor adicional que a empresa poderia faturar ao ajustar o preço do produto até o limite competitivo do mercado, sem ficar mais cara que a concorrência.
+
+#### Como calculamos?
+
+**Espaço para aumento = Preço Máximo Competitivo - Preço Atual**
+
+**Potencial de Captura = Espaço para aumento × Quantidade vendida no mês anterior**
+
+#### Exemplo
+
+- Preço Atual: R$ 10,00
+- Concorrência: R$ 12,00
+- Espaço para aumento: R$ 2,00
+- Quantidade vendida no mês anterior: 1.000 unidades
+
+**Potencial de Captura = R$ 2,00 × 1.000 = R$ 2.000**
+
+Ou seja, existe uma oportunidade de gerar aproximadamente **R$ 2.000 adicionais** sem ultrapassar o preço da concorrência.
+
+---
+
+### 📈 Composição do Índice Eirox
+
+**60% → Rentabilidade Atual**
+
+Representa a qualidade da margem do produto.
+
+**40% → Potencial de Captura**
+
+Representa o tamanho financeiro da oportunidade.
+
+#### Fórmula
+
+**Índice Eirox = (Rentabilidade Atual × 60%) + ((Potencial de Captura ÷ 1.000) × 40%)**
+
+---
+
+### Como interpretar?
+
+🟢 **Acima de 70 pontos**
+
+- Produto altamente rentável.
+- Grande oportunidade de captura de resultado.
+
+🟡 **Entre 40 e 70 pontos**
+
+- Produto com potencial relevante de otimização.
+
+🔴 **Abaixo de 40 pontos**
+
+- Baixo impacto financeiro para ações de Pricing.
+
+---
+
+### Resumo
+
+Quanto maior o Índice Eirox, maior a combinação entre:
+
+✔ Rentabilidade atual
+
+✔ Espaço para aumento de preço
+
+✔ Potencial financeiro de captura de resultado
+""")
 
 
 # --------------------------------------------------
