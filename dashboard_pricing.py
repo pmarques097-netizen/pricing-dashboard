@@ -16807,10 +16807,13 @@ if (
         else "ACIMA MERCADO"
     )
 
+    # Exibição limpa no gráfico: manter somente o nome da rede,
+    # sem concatenar o nome jurídico/farmácia.
     ranking["Loja"] = (
-        ranking["Rede"].astype(str)
-        + " - "
-        + ranking["Farmácia"].astype(str)
+        ranking["Rede"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
     )
 
     ranking = ranking.sort_values(
@@ -16862,7 +16865,7 @@ if (
     )
 
     fig.update_layout(
-        xaxis_title="Loja",
+        xaxis_title="Rede",
         yaxis_title="Preço (R$)"
     )
 
