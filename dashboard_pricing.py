@@ -292,6 +292,13 @@ def formatar_dataframe_br(base):
         "Score_Eirox": "Índice de Oportunidade Eirox",
         "Preco_Atual": "Preço Atual",
         "Preco_Sugerido_Mercado": "Preço Máximo Competitivo",
+        "Rede_Preco_Maximo_Competitivo": "Rede Preço Máximo Competitivo",
+        "Loja_Preco_Maximo_Competitivo": "Loja Preço Máximo Competitivo",
+        "Data_Preco_Maximo_Competitivo": "Data Preço Máximo Competitivo",
+        "Menor_Preco": "Menor Preço",
+        "Rede_Menor_Preco": "Rede Menor Preço",
+        "Loja_Menor_Preco": "Loja Menor Preço",
+        "Data_Menor_Preco": "Data Menor Preço",
         "Preco_Recomendado": "Preço Recomendado",
         "Qtd_Vendida_Mes_Anterior": "Qtd Vendida Mês Anterior"
     }
@@ -1018,6 +1025,24 @@ def recalcular_ganho_inteligente(df_base, venda_rede_base, historico_base):
         ["preço", "preco", "valor"]
     )
 
+    col_rede_hist = achar_coluna(
+        hist,
+        ["Rede", "Rede Concorrente", "Bandeira", "Grupo", "Concorrente"],
+        ["rede", "bandeira", "grupo", "concorr"]
+    )
+
+    col_loja_hist = achar_coluna(
+        hist,
+        ["Farmácia", "Farmacia", "Loja", "Estabelecimento", "Razão Social", "Razao Social"],
+        ["farm", "loja", "estabelec", "razão", "razao", "social"]
+    )
+
+    col_data_hist = achar_coluna(
+        hist,
+        ["Data", "Data Pesquisa", "Data da Pesquisa", "Dt Pesquisa", "Data_Hora", "Data Hora"],
+        ["data", "dt"]
+    )
+
     # Em bases tipo VENDA_FINAL_TESTE, a coluna "Venda" é total e "Itens" é quantidade.
     # Quando existir Venda + Itens, usar essa combinação para preço atual.
     if col_valor_total and col_qtd:
@@ -1086,6 +1111,46 @@ def recalcular_ganho_inteligente(df_base, venda_rede_base, historico_base):
         .rename(columns={col_preco_hist: "Preco_Sugerido_Mercado"})
     )
 
+    # Identifica a rede/loja/data que mais se aproxima do preço máximo competitivo
+    # e também a rede/loja/data do menor preço encontrado no mercado.
+    hist_ref = hist.dropna(subset=["EAN", col_preco_hist]).copy()
+    hist_ref["Preco_Historico_Ref"] = pd.to_numeric(hist_ref[col_preco_hist], errors="coerce")
+    hist_ref = hist_ref[(hist_ref["Preco_Historico_Ref"] > 0) & (hist_ref["Preco_Historico_Ref"] <= 5000)].copy()
+
+    if not hist_ref.empty and not mercado.empty:
+        hist_ref = hist_ref.merge(mercado, on="EAN", how="left")
+        hist_ref["Dif_Preco_Maximo"] = (hist_ref["Preco_Historico_Ref"] - hist_ref["Preco_Sugerido_Mercado"]).abs()
+
+        idx_max = hist_ref.groupby("EAN")["Dif_Preco_Maximo"].idxmin()
+        ref_max = hist_ref.loc[idx_max].copy()
+
+        idx_min = hist_ref.groupby("EAN")["Preco_Historico_Ref"].idxmin()
+        ref_min = hist_ref.loc[idx_min].copy()
+
+        def _col_ou_vazio(df_temp, coluna):
+            return df_temp[coluna].astype(str).str.strip() if coluna and coluna in df_temp.columns else ""
+
+        meta_max = pd.DataFrame({
+            "EAN": ref_max["EAN"].astype(str),
+            "Rede_Preco_Maximo_Competitivo": _col_ou_vazio(ref_max, col_rede_hist),
+            "Loja_Preco_Maximo_Competitivo": _col_ou_vazio(ref_max, col_loja_hist),
+            "Data_Preco_Maximo_Competitivo": ref_max[col_data_hist] if col_data_hist and col_data_hist in ref_max.columns else ""
+        })
+
+        meta_min = pd.DataFrame({
+            "EAN": ref_min["EAN"].astype(str),
+            "Menor_Preco": ref_min["Preco_Historico_Ref"],
+            "Rede_Menor_Preco": _col_ou_vazio(ref_min, col_rede_hist),
+            "Loja_Menor_Preco": _col_ou_vazio(ref_min, col_loja_hist),
+            "Data_Menor_Preco": ref_min[col_data_hist] if col_data_hist and col_data_hist in ref_min.columns else ""
+        })
+
+        mercado = (
+            mercado
+            .merge(meta_max, on="EAN", how="left")
+            .merge(meta_min, on="EAN", how="left")
+        )
+
     simulacao = vendas.merge(mercado, on="EAN", how="inner")
 
     simulacao["Preco_Atual"] = pd.to_numeric(simulacao["Preco_Atual"], errors="coerce")
@@ -1120,6 +1185,7 @@ def recalcular_ganho_inteligente(df_base, venda_rede_base, historico_base):
     for c in [
         "Preco_Atual",
         "Preco_Sugerido_Mercado",
+        "Menor_Preco",
         "Ganho_Unitario",
         "Venda_Preco_Antigo",
         "Venda_Projetada_Preco_Sugerido",
@@ -1317,6 +1383,24 @@ def criar_simulacao_por_historico(historico_base):
         ["preço", "preco", "valor"]
     )
 
+    col_rede = encontrar_coluna_flexivel(
+        base,
+        ["Rede", "Rede Concorrente", "Bandeira", "Grupo", "Concorrente"],
+        ["rede", "bandeira", "grupo", "concorr"]
+    )
+
+    col_loja = encontrar_coluna_flexivel(
+        base,
+        ["Farmácia", "Farmacia", "Loja", "Estabelecimento", "Razão Social", "Razao Social"],
+        ["farm", "loja", "estabelec", "razão", "razao", "social"]
+    )
+
+    col_data = encontrar_coluna_flexivel(
+        base,
+        ["Data", "Data Pesquisa", "Data da Pesquisa", "Dt Pesquisa", "Data_Hora", "Data Hora"],
+        ["data", "dt"]
+    )
+
     if not col_ean or not col_preco:
         return pd.DataFrame()
 
@@ -1357,6 +1441,41 @@ def criar_simulacao_por_historico(historico_base):
         & (simulacao["Preco_Sugerido_Mercado"] <= simulacao["Preco_Atual"] * 3)
     ].copy()
 
+    # Complementa o simulador com rede/loja/data do preço máximo competitivo
+    # e do menor preço encontrado no histórico de pesquisa.
+    base_ref = base[[c for c in ["EAN", "Preco_Base", col_rede, col_loja, col_data] if c and c in base.columns]].copy()
+    if not base_ref.empty and not simulacao.empty:
+        base_ref = base_ref.merge(simulacao[["EAN", "Preco_Sugerido_Mercado"]], on="EAN", how="left")
+        base_ref["Dif_Preco_Maximo"] = (base_ref["Preco_Base"] - base_ref["Preco_Sugerido_Mercado"]).abs()
+
+        idx_max = base_ref.groupby("EAN")["Dif_Preco_Maximo"].idxmin()
+        ref_max = base_ref.loc[idx_max].copy()
+
+        idx_min = base_ref.groupby("EAN")["Preco_Base"].idxmin()
+        ref_min = base_ref.loc[idx_min].copy()
+
+        def _col_ou_vazio(df_temp, coluna):
+            return df_temp[coluna].astype(str).str.strip() if coluna and coluna in df_temp.columns else ""
+
+        meta = pd.DataFrame({
+            "EAN": ref_max["EAN"].astype(str),
+            "Rede_Preco_Maximo_Competitivo": _col_ou_vazio(ref_max, col_rede),
+            "Loja_Preco_Maximo_Competitivo": _col_ou_vazio(ref_max, col_loja),
+            "Data_Preco_Maximo_Competitivo": ref_max[col_data] if col_data and col_data in ref_max.columns else ""
+        }).merge(
+            pd.DataFrame({
+                "EAN": ref_min["EAN"].astype(str),
+                "Menor_Preco": ref_min["Preco_Base"],
+                "Rede_Menor_Preco": _col_ou_vazio(ref_min, col_rede),
+                "Loja_Menor_Preco": _col_ou_vazio(ref_min, col_loja),
+                "Data_Menor_Preco": ref_min[col_data] if col_data and col_data in ref_min.columns else ""
+            }),
+            on="EAN",
+            how="left"
+        )
+
+        simulacao = simulacao.merge(meta, on="EAN", how="left")
+
     simulacao["Venda_Preco_Antigo"] = simulacao["Qtd_Vendida_Mes_Anterior"] * simulacao["Preco_Atual"]
     simulacao["Venda_Projetada_Preco_Sugerido"] = simulacao["Qtd_Vendida_Mes_Anterior"] * simulacao["Preco_Sugerido_Mercado"]
     simulacao["Ganho_Unitario"] = simulacao["Preco_Sugerido_Mercado"] - simulacao["Preco_Atual"]
@@ -1365,7 +1484,7 @@ def criar_simulacao_por_historico(historico_base):
     simulacao = simulacao[simulacao["Ganho_Potencial_Simulador"] > 0].copy()
 
     for c in [
-        "Preco_Atual", "Preco_Sugerido_Mercado", "Ganho_Unitario",
+        "Preco_Atual", "Preco_Sugerido_Mercado", "Menor_Preco", "Ganho_Unitario",
         "Venda_Preco_Antigo", "Venda_Projetada_Preco_Sugerido",
         "Ganho_Potencial_Simulador", "Qtd_Vendida_Mes_Anterior"
     ]:
@@ -16974,10 +17093,19 @@ if not simulacao_global.empty:
         "Venda_Preco_Antigo",
         "Preco_Atual",
         "Preco_Sugerido_Mercado",
+        "Rede_Preco_Maximo_Competitivo",
+        "Loja_Preco_Maximo_Competitivo",
+        "Data_Preco_Maximo_Competitivo",
+        "Menor_Preco",
+        "Rede_Menor_Preco",
+        "Loja_Menor_Preco",
+        "Data_Menor_Preco",
         "Venda_Projetada_Preco_Sugerido",
         "Ganho_Unitario",
         "Ganho_Potencial_Simulador"
     ]
+
+    colunas_exibir = [c for c in colunas_exibir if c in simulacao.columns]
 
     simulacao_exibir = simulacao[colunas_exibir].copy()
 
@@ -16985,6 +17113,7 @@ if not simulacao_global.empty:
         "Venda_Preco_Antigo",
         "Preco_Atual",
         "Preco_Sugerido_Mercado",
+        "Menor_Preco",
         "Venda_Projetada_Preco_Sugerido",
         "Ganho_Unitario",
         "Ganho_Potencial_Simulador"
@@ -16998,6 +17127,10 @@ if not simulacao_global.empty:
             simulacao_exibir["Qtd_Vendida_Mes_Anterior"]
             .apply(numero_br)
         )
+
+    for coluna_data in ["Data_Preco_Maximo_Competitivo", "Data_Menor_Preco"]:
+        if coluna_data in simulacao_exibir.columns:
+            simulacao_exibir[coluna_data] = simulacao_exibir[coluna_data].apply(data_br)
 
     st.dataframe(
         simulacao_exibir,
