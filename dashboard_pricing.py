@@ -105,6 +105,10 @@ def carregar():
 # PADRONIZAR COLUNAS
 # --------------------------------------------------
 
+if callable(df):
+    df = df()
+if not isinstance(df, pd.DataFrame):
+    df = pd.DataFrame()
 df.columns = df.columns.astype(str).str.strip()
 
 if not historico.empty:
