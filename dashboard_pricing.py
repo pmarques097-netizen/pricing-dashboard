@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.40.8-lts-margem-seguir-concorrencia"
+VERSAO_APP = "v1.40.9-lts-margem-menor-concorrencia"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -5646,6 +5646,81 @@ def formatar_margem_seguir_concorrencia(base):
         return base
 
 
+
+# --------------------------------------------------
+# MARGEM MENOR PREÇO CONCORRÊNCIA - v1.40.9 LTS
+# --------------------------------------------------
+
+def adicionar_margem_menor_preco_concorrencia(base):
+    try:
+        if not isinstance(base, pd.DataFrame) or base.empty:
+            return base
+
+        base = base.copy()
+
+        col_preco_conc = None
+        for col in [
+            "Menor Preço Concorrente",
+            "Menor_Preco_Concorrente",
+            "Menor Preço Concorrência",
+            "Menor_Preco_Concorrencia",
+            "Preço Menor Concorrente",
+            "Preco_Menor_Concorrente",
+            "Preço Concorrente",
+            "Preco_Concorrente",
+            "Preço Médio",
+            "Preco Medio",
+            "Preco_Medio",
+            "Preço Sugerido Mercado",
+            "Preco_Sugerido_Mercado"
+        ]:
+            if col in base.columns:
+                col_preco_conc = col
+                break
+
+        col_custo = None
+        for col in ["Custo", "Custo Médio", "Custo_Medio", "Custo Atual"]:
+            if col in base.columns:
+                col_custo = col
+                break
+
+        if not col_preco_conc or not col_custo:
+            return base
+
+        preco_conc = converter_numero_brasil(base[col_preco_conc]) if "converter_numero_brasil" in globals() else pd.to_numeric(base[col_preco_conc], errors="coerce")
+        custo = converter_numero_brasil(base[col_custo]) if "converter_numero_brasil" in globals() else pd.to_numeric(base[col_custo], errors="coerce")
+
+        margem_nominal = (preco_conc - custo).fillna(0)
+        margem_pct = ((margem_nominal / preco_conc.replace(0, np.nan)) * 100).fillna(0)
+
+        base["Margem % Menor Preço Concorrência"] = margem_pct
+        base["Margem Nominal Menor Preço Concorrência"] = margem_nominal
+
+        return base
+
+    except Exception:
+        return base
+
+
+def formatar_margem_menor_preco_concorrencia(base):
+    try:
+        if not isinstance(base, pd.DataFrame) or base.empty:
+            return base
+
+        base = base.copy()
+
+        if "Margem % Menor Preço Concorrência" in base.columns:
+            base["Margem % Menor Preço Concorrência"] = base["Margem % Menor Preço Concorrência"].apply(percentual_br)
+
+        if "Margem Nominal Menor Preço Concorrência" in base.columns:
+            base["Margem Nominal Menor Preço Concorrência"] = base["Margem Nominal Menor Preço Concorrência"].apply(moeda_br)
+
+        return base
+
+    except Exception:
+        return base
+
+
 # --------------------------------------------------
 # LOGIN E CONTROLE DE ACESSO
 # --------------------------------------------------
@@ -6697,7 +6772,7 @@ st.markdown(
     """
     <div class="eirox-hero">
         <div class="eirox-section-title">Eirox Pricing Enterprise</div>
-mostrar_explicacao_visao_eirox("🏢 Dashboard Executivo")
+
         <h1>📊 Inteligência de Pricing & Competitividade</h1>
         <p>Monitoramento executivo de preços, concorrência, margem, alertas e oportunidades comerciais.</p>
     </div>
@@ -12289,7 +12364,7 @@ if pagina == "📈 Simulador Inteligente":
 
 if pagina == "🏢 Dashboard Executivo":
 
-    mostrar_explicacao_visao_eirox("🏢 Dashboard Executivo")
+    
 
     st.markdown(
         """
@@ -13194,6 +13269,9 @@ if pagina == "🔎 Rede/Loja vs Concorrentes":
 
             analise_exibir = adicionar_margem_seguir_concorrencia(analise_exibir)
             analise_exibir = formatar_margem_seguir_concorrencia(analise_exibir)
+
+            analise_exibir = adicionar_margem_menor_preco_concorrencia(analise_exibir)
+            analise_exibir = formatar_margem_menor_preco_concorrencia(analise_exibir)
 
             st.dataframe(
                 analise_exibir,
@@ -15376,6 +15454,8 @@ if not produtos_detalhe.empty:
         }
     )
 
+    produtos_exibir = adicionar_margem_menor_preco_concorrencia(produtos_exibir)
+    produtos_exibir = formatar_margem_menor_preco_concorrencia(produtos_exibir)
     st.dataframe(
         produtos_exibir,
         use_container_width=True,
