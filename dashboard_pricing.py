@@ -31,109 +31,75 @@ st.caption("Monitoramento executivo de preços, concorrência, margem, alertas e
 # --------------------------------------------------
 
 @st.cache_data
+@st.cache_data(show_spinner=False)
 def carregar():
+    """
+    Leitura segura da base principal.
+    Compatível com Excel e CSV, evitando argumentos inválidos no pd.read_excel.
+    """
 
-    return pd.read_excel(
-        "Analise_Pricing.xlsx"
-    , unsafe_allow_html=True)
-
-df = carregar()
-
-historico = carregar_historico()
-compra = carregar_compra()
-venda_rede = carregar_venda_rede()
-estoque = carregar_estoque()
-
-if historico.empty:
-    historico = ler_base_pasta_ou_zip(
-        ["VENDA_TESTE"],
-        ["VENDA_TESTE.zip"]
-    )
-
-if compra.empty:
-    compra = ler_base_pasta_ou_zip(
-        ["COMPRA_TESTE", "COMPRA", "COMPRAS_TESTE"],
-        ["COMPRA_TESTE.zip", "COMPRA.zip"]
-    )
-
-if venda_rede.empty:
-    venda_rede = ler_base_pasta_ou_zip(
-        ["VENDA_FINAL_TESTE", "VENDA_TESTE_FINAL", "VENDA_FINAL", "VENDA_REDE"],
-        ["VENDA_FINAL_TESTE.zip", "VENDA_TESTE_FINAL.zip", "VENDA_FINAL.zip"]
-    )
-
-if estoque.empty:
-    estoque = ler_base_pasta_ou_zip(
-        ["ESTOQUE_TESTE", "ESTOQUE"],
-        ["ESTOQUE_TESTE.zip", "ESTOQUE.zip"]
-    )
-
-# Fallback final compatível com .xls, .xlsx e .xlsm
-# Necessário para Streamlit Cloud quando a pasta contém arquivos .xls.
-if historico.empty:
-    historico = carregar_pasta_excel_compat(
-        ["VENDA_TESTE"],
-        "VENDA_TESTE"
-    )
-
-if compra.empty:
-    compra = carregar_pasta_excel_compat(
-        ["COMPRA_TESTE", "COMPRA", "COMPRAS_TESTE"],
-        "COMPRA_TESTE"
-    )
-
-if venda_rede.empty:
-    venda_rede = carregar_pasta_excel_compat(
-        ["VENDA_FINAL_TESTE", "VENDA_TESTE_FINAL", "VENDA_FINAL", "VENDA_REDE"],
-        "VENDA_FINAL_TESTE"
-    )
-
-# Última tentativa: procurar a venda final em qualquer pasta do projeto
-# identificando automaticamente arquivos com Cód. Barras/Etiq., Itens e Venda.
-if venda_rede.empty:
-    venda_rede = carregar_base_recursiva_por_colunas(
-        "VENDA_FINAL_TESTE",
-        [
-            "Cód. Barras/Etiq.",
-            "Itens",
-            "Venda"
+    try:
+        caminhos = [
+            Path("Analise_Pricing.xlsx"),
+            Path("ANALISE_PRICING.xlsx"),
+            Path("analise_pricing.xlsx"),
+            Path("Analise_Pricing.csv"),
+            Path("ANALISE_PRICING.csv"),
+            Path("analise_pricing.csv")
         ]
-    )
 
-if estoque.empty:
-    estoque = carregar_pasta_excel_compat(
-        ["ESTOQUE_TESTE", "ESTOQUE"],
-        "ESTOQUE_TESTE"
-    )
+        arquivo = None
 
-# Fallback robusto para Streamlit Cloud / GitHub
-if historico.empty:
-    historico = carregar_base_robusta(
-        "VENDA_TESTE",
-        ["VENDA_TESTE"],
-        ["VENDA_TESTE.zip"]
-    )
+        for caminho in caminhos:
+            if caminho.exists():
+                arquivo = caminho
+                break
 
-if compra.empty:
-    compra = carregar_base_robusta(
-        "COMPRA_TESTE",
-        ["COMPRA_TESTE", "COMPRA", "COMPRAS_TESTE"],
-        ["COMPRA_TESTE.zip", "COMPRA.zip"]
-    )
+        if arquivo is None:
+            candidatos = []
+            candidatos.extend(list(Path(".").rglob("Analise_Pricing.xlsx")))
+            candidatos.extend(list(Path(".").rglob("ANALISE_PRICING.xlsx")))
+            candidatos.extend(list(Path(".").rglob("analise_pricing.xlsx")))
+            candidatos.extend(list(Path(".").rglob("Analise_Pricing.csv")))
+            candidatos.extend(list(Path(".").rglob("ANALISE_PRICING.csv")))
+            candidatos.extend(list(Path(".").rglob("analise_pricing.csv")))
 
-if venda_rede.empty:
-    venda_rede = carregar_base_robusta(
-        "VENDA_FINAL_TESTE",
-        ["VENDA_FINAL_TESTE", "VENDA_TESTE_FINAL", "VENDA_FINAL", "VENDA_REDE"],
-        ["VENDA_FINAL_TESTE.zip", "VENDA_TESTE_FINAL.zip", "VENDA_FINAL.zip"]
-    )
+            candidatos = [
+                c for c in candidatos
+                if ".git" not in c.parts
+                and "__pycache__" not in c.parts
+                and ".venv" not in c.parts
+                and "venv" not in c.parts
+            ]
 
-if estoque.empty:
-    estoque = carregar_base_robusta(
-        "ESTOQUE_TESTE",
-        ["ESTOQUE_TESTE", "ESTOQUE"],
-        ["ESTOQUE_TESTE.zip", "ESTOQUE.zip"]
-    )
+            if candidatos:
+                arquivo = candidatos[0]
+
+        if arquivo is None:
+            st.error("Base Analise_Pricing não encontrada.")
+            return pd.DataFrame()
+
+        if arquivo.suffix.lower() == ".csv":
+            try:
+                base = pd.read_csv(arquivo)
+            except Exception:
+                base = pd.read_csv(arquivo)
+        else:
+            base = pd.read_excel(arquivo, engine="openpyxl")
+
+        base.columns = base.columns.astype(str).str.strip()
+
+        if "Ganho_Potencial" in base.columns:
+            base["Ganho_Potencial"] = pd.to_numeric(
+                base["Ganho_Potencial"],
+                errors="coerce"
+            ).fillna(0)
+
+        return base
+
+    except Exception as erro:
+        st.error(f"Erro ao carregar Analise_Pricing: {erro}")
+        return pd.DataFrame()
 
 # --------------------------------------------------
 # PADRONIZAR COLUNAS
@@ -676,9 +642,7 @@ if pagina == "💳 Billing Enterprise":
             )
 
             csv_billing = view.to_csv(
-                index=False,
-                sep=";",
-                encoding="utf-8-sig"
+                index=False
             )
 
             st.download_button(
@@ -1401,9 +1365,7 @@ if pagina == "🏢 CRM Enterprise":
             )
 
             csv_clientes = view.to_csv(
-                index=False,
-                sep=";",
-                encoding="utf-8-sig"
+                index=False
             )
 
             st.download_button(
@@ -1620,7 +1582,7 @@ if pagina == "📋 Workflow Comercial":
 
     st.markdown("### 📤 Exportação")
 
-    csv_workflow = view.to_csv(index=False, sep=";", encoding="utf-8-sig")
+    csv_workflow = view.to_csv(index=False)
 
     st.download_button(
         "📥 Exportar Workflow CSV",
@@ -1726,7 +1688,7 @@ if pagina == "🤖 IA Pricing Enterprise":
             fig_lab.update_layout(height=420, margin=dict(l=10, r=10, t=60, b=10), yaxis=dict(autorange="reversed"))
             c2.plotly_chart(fig_lab, use_container_width=True)
 
-        csv_ia = view.to_csv(index=False, sep=";", encoding="utf-8-sig")
+        csv_ia = view.to_csv(index=False)
         st.download_button("📥 Exportar Recomendações IA CSV", data=csv_ia, file_name="ia_pricing_enterprise_eirox.csv", mime="text/csv", use_container_width=True)
 
     st.markdown("### 📜 Histórico IA Pricing")
@@ -1812,7 +1774,7 @@ if pagina == "🏁 Release Candidate":
         ignore_index=True
     )
 
-    csv_rc = rc_export.to_csv(index=False, sep=";", encoding="utf-8-sig")
+    csv_rc = rc_export.to_csv(index=False)
 
     st.download_button(
         "📥 Exportar Checklist RC",
@@ -2094,9 +2056,7 @@ if pagina == "👥 Controle de Usuários":
             )
 
             csv_logs = logs_usuarios.to_csv(
-                index=False,
-                sep=";",
-                encoding="utf-8-sig"
+                index=False
             )
 
             st.download_button(
@@ -2363,7 +2323,7 @@ if pagina == "💰 Motor de Oportunidades":
             g2.plotly_chart(fig_cat, use_container_width=True)
 
         st.markdown("### 📤 Exportação")
-        csv_oport = view.to_csv(index=False, sep=";", encoding="utf-8-sig")
+        csv_oport = view.to_csv(index=False)
         st.download_button("📥 Exportar Oportunidades CSV", data=csv_oport, file_name="motor_oportunidades_eirox.csv", mime="text/csv", use_container_width=True)
 
     st.markdown("### 📜 Histórico de oportunidades")
@@ -2482,7 +2442,7 @@ if pagina == "🚨 Alertas Inteligentes":
 
         st.dataframe(view, use_container_width=True, hide_index=True)
 
-        csv_alertas = view.to_csv(index=False, sep=";", encoding="utf-8-sig")
+        csv_alertas = view.to_csv(index=False)
 
         st.download_button(
             "📥 Exportar Alertas CSV",
@@ -3203,13 +3163,13 @@ if pagina == "🟢 Saúde do Sistema":
 
             st.dataframe(diag, use_container_width=True, hide_index=True)
 
-            csv_diag = diag.to_csv(index=False, sep=";", encoding="utf-8-sig")
+            csv_diag = diag.to_csv(index=False)
             st.download_button("📥 Exportar Diagnóstico CSV", data=csv_diag, file_name="diagnostico_saude_sistema.csv", mime="text/csv", use_container_width=True)
 
     st.markdown("### 📊 Histórico de atualização das bases")
     st.dataframe(saude_bases, use_container_width=True, hide_index=True)
 
-    csv_health = saude_bases.to_csv(index=False, sep=";", encoding="utf-8-sig")
+    csv_health = saude_bases.to_csv(index=False)
     st.download_button("📥 Exportar Saúde do Sistema CSV", data=csv_health, file_name="saude_sistema_eirox.csv", mime="text/csv", use_container_width=True)
 
     st.stop()
@@ -3577,9 +3537,7 @@ if pagina == "🔐 Central de Auditoria":
     st.markdown("### 📤 Exportação")
 
     csv_export = logs_detalhe[colunas_exibir].to_csv(
-        index=False,
-        sep=";",
-        encoding="utf-8-sig"
+        index=False
     )
 
     col_exp1, col_exp2 = st.columns(2)
@@ -3703,7 +3661,7 @@ if pagina == "🔐 Central de Auditoria":
 
     st.dataframe(logs_view[colunas], use_container_width=True, hide_index=True)
 
-    csv_export = logs_view[colunas].to_csv(index=False, sep=";", encoding="utf-8-sig")
+    csv_export = logs_view[colunas].to_csv(index=False)
 
     st.download_button(
         "📥 Exportar Auditoria CSV",
@@ -4211,7 +4169,7 @@ if pagina == "🎯 Sugestão de Pesquisa":
 
     csv_pesquisa = (
         tabela_exibir
-        .to_csv(index=False, sep=";")
+        .to_csv(index=False)
         .encode("utf-8-sig")
     )
 
@@ -5581,7 +5539,7 @@ if pagina == "📈 Simulador Inteligente":
 
             csv_sim = (
                 resumo_sim
-                .to_csv(index=False, sep=";")
+                .to_csv(index=False)
                 .encode("utf-8-sig")
             )
 
@@ -6021,7 +5979,7 @@ paper_bgcolor="rgba(0,0,0,0)"
 
     st.dataframe(ranking_exibir, use_container_width=True, height=420)
 
-    csv_mapa = ranking_exibir.to_csv(index=False, sep=";").encode("utf-8-sig")
+    csv_mapa = ranking_exibir.to_csv(index=False).encode("utf-8-sig")
 
     st.download_button(
         "📥 Exportar ranking geográfico",
@@ -6527,8 +6485,7 @@ if pagina == "🔎 Rede/Loja vs Concorrentes":
             csv_analise = (
                 analise_exibir
                 .to_csv(
-                    index=False,
-                    sep=";"
+                    index=False
                 )
                 .encode("utf-8-sig")
             )
@@ -7251,8 +7208,7 @@ if pagina == "🛒 Negociação Compras":
             csv_compras = (
                 compras_exibir
                 .to_csv(
-                    index=False,
-                    sep=";"
+                    index=False
                 )
                 .encode("utf-8-sig")
             )
@@ -8149,8 +8105,7 @@ if pagina == "🚨 Central de Alertas":
             csv_alertas = (
                 alertas_exibir
                 .to_csv(
-                    index=False,
-                    sep=";"
+                    index=False
                 )
                 .encode("utf-8-sig")
             )
@@ -8771,8 +8726,7 @@ if not produtos_detalhe.empty:
     csv_recomendacao = (
         exportar_recomendacao
         .to_csv(
-            index=False,
-            sep=";"
+            index=False
         )
         .encode("utf-8-sig")
     )
