@@ -22,8 +22,6735 @@ from zoneinfo import ZoneInfo
 pio.templates.default = "plotly_dark"
 
 
-st.markdown("## 📊 Inteligência de Pricing & Competitividade")
-st.caption("Monitoramento executivo de preços, concorrência, margem, alertas e oportunidades comerciais.")
+st.markdown(
+    """
+    <style>
+        .block-container {
+            max-width: 100% !important;
+            padding-left: 1.5rem !important;
+            padding-right: 1.5rem !important;
+        }
+
+        div[data-testid="stDataFrame"] {
+            width: 100% !important;
+        }
+
+        div[data-testid="stDataFrame"] > div {
+            width: 100% !important;
+        }
+    
+}
+
+</style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+
+st.markdown(
+    """
+    <style>
+        section[data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #0E2A4F 0%, #071A33 100%);
+        }
+
+        section[data-testid="stSidebar"] .block-container {
+            padding-top: 1.5rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+
+        section[data-testid="stSidebar"] h1,
+        section[data-testid="stSidebar"] h2,
+        section[data-testid="stSidebar"] h3,
+        section[data-testid="stSidebar"] label,
+        section[data-testid="stSidebar"] p,
+        section[data-testid="stSidebar"] span {
+            color: #FFFFFF !important;
+        }
+
+        .sidebar-card {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.14);
+            border-radius: 14px;
+            padding: 14px 14px;
+            margin-bottom: 14px;
+        }
+
+        .sidebar-title {
+            font-size: 18px;
+            font-weight: 800;
+            color: #FFFFFF;
+            margin-bottom: 4px;
+        }
+
+        .sidebar-subtitle {
+            font-size: 12px;
+            color: #BFD7FF;
+            margin-bottom: 0px;
+        }
+
+        .sidebar-user {
+            font-size: 13px;
+            color: #FFFFFF;
+            margin: 2px 0px;
+        }
+
+        .sidebar-pill {
+            display: inline-block;
+            background: rgba(44, 160, 255, 0.22);
+            border: 1px solid rgba(44, 160, 255, 0.45);
+            color: #D8ECFF;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-top: 6px;
+        }
+
+        .sidebar-section {
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: #9FC7FF;
+            margin-top: 18px;
+            margin-bottom: 8px;
+        }
+
+        div[data-testid="stSidebarUserContent"] hr {
+            border-color: rgba(255,255,255,0.18);
+        }
+
+        section[data-testid="stSidebar"] div[role="radiogroup"] label {
+            background: rgba(255,255,255,0.06);
+            border-radius: 10px;
+            padding: 7px 9px;
+            margin-bottom: 5px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+            background: rgba(255,255,255,0.12);
+            border-color: rgba(255,255,255,0.20);
+        }
+
+        section[data-testid="stSidebar"] button {
+            border-radius: 10px !important;
+            border: 1px solid rgba(255,255,255,0.20) !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# --------------------------------------------------
+# VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
+# --------------------------------------------------
+
+VERSAO_APP = "v1.40.2-br-valores-score-claro-colunas-v1"
+
+# --------------------------------------------------
+# FORMATACAO BRASIL
+# --------------------------------------------------
+
+def moeda_br(valor):
+
+    try:
+
+        if pd.isna(valor):
+            return ""
+
+        return (
+            f"R$ {float(valor):,.2f}"
+            .replace(",", "X")
+            .replace(".", ",")
+            .replace("X", ".")
+        )
+
+    except Exception:
+        return ""
+
+
+def moeda_br_kpi(valor):
+
+    """
+    Formata moeda para KPI sem cortar o valor no card.
+    Mantém o padrão brasileiro e usa MM quando o valor passa de 1 milhão.
+    """
+
+    try:
+        if pd.isna(valor):
+            return ""
+
+        valor = float(valor)
+
+        if abs(valor) >= 1_000_000:
+            return (
+                f"R$ {valor / 1_000_000:,.2f} MM"
+                .replace(",", "X")
+                .replace(".", ",")
+                .replace("X", ".")
+            )
+
+        return moeda_br(valor)
+
+    except Exception:
+        return moeda_br(valor)
+
+
+def numero_br(valor):
+
+    try:
+
+        if pd.isna(valor):
+            return ""
+
+        return (
+            f"{float(valor):,.2f}"
+            .replace(",", "X")
+            .replace(".", ",")
+            .replace("X", ".")
+        )
+
+    except Exception:
+        return ""
+
+
+def percentual_br(valor):
+
+    try:
+
+        if pd.isna(valor):
+            return ""
+
+        return (
+            f"{float(valor):,.2f}%"
+            .replace(",", "X")
+            .replace(".", ",")
+            .replace("X", ".")
+        )
+
+    except Exception:
+        return ""
+
+
+# --------------------------------------------------
+# FORMATAÇÃO BRASILEIRA GLOBAL PARA EXIBIÇÃO
+# --------------------------------------------------
+
+def inteiro_br(valor):
+
+    try:
+        if pd.isna(valor):
+            return ""
+        return f"{float(valor):,.0f}".replace(",", ".")
+    except Exception:
+        return ""
+
+
+def data_br(valor):
+
+    try:
+        if pd.isna(valor):
+            return ""
+        data = pd.to_datetime(valor, errors="coerce")
+        if pd.isna(data):
+            return str(valor)
+        return data.strftime("%d/%m/%Y")
+    except Exception:
+        return str(valor) if valor is not None else ""
+
+
+def _eirox_tipo_coluna_br(nome_coluna):
+    nome = str(nome_coluna).lower().strip()
+
+    if any(t in nome for t in [
+        "margem", "percent", "particip", "%", "variação", "variacao",
+        "rentabilidade", "share", "taxa"
+    ]):
+        return "percentual"
+
+    if any(t in nome for t in [
+        "preço", "preco", "custo", "valor", "faturamento", "venda",
+        "receita", "lucro", "ganho", "potencial", "captura", "ticket",
+        "despesa", "saldo", "total r$", "r$", "recomendado", "sugerido"
+    ]):
+        return "moeda"
+
+    if any(t in nome for t in [
+        "data", "dt ", "dt_", "modificado", "criado", "atualização", "atualizacao"
+    ]):
+        return "data"
+
+    if any(t in nome for t in [
+        "qtd", "qtde", "quantidade", "unidades", "estoque", "itens",
+        "produtos", "skus", "ranking", "posição", "posicao", "arquivos", "registros"
+    ]):
+        return "inteiro"
+
+    if "score" in nome or "índice" in nome or "indice" in nome:
+        return "numero"
+
+    return "texto"
+
+
+def formatar_dataframe_br(base):
+    """
+    Formata uma cópia do DataFrame apenas para exibição no padrão brasileiro.
+    Não altera a base original usada nos cálculos.
+    """
+
+    if not isinstance(base, pd.DataFrame) or base.empty:
+        return base
+
+    df_view = base.copy()
+
+    # Nomes mais claros para o usuário final.
+    renomear = {
+        "Ganho_Potencial": "Potencial de Captura",
+        "Ganho_Potencial_Final": "Potencial de Captura Final",
+        "Ganho_Potencial_Atualizado": "Potencial de Captura Atualizado",
+        "Ganho_Potencial_Simulador": "Potencial de Captura Simulado",
+        "Margem_%": "Rentabilidade Atual",
+        "Margem_Media": "Rentabilidade Atual",
+        "Score_Eirox": "Índice de Oportunidade Eirox",
+        "Preco_Atual": "Preço Atual",
+        "Preco_Sugerido_Mercado": "Preço Máximo Competitivo",
+        "Rede_Preco_Maximo_Competitivo": "Rede Preço Máximo Competitivo",
+        "Data_Preco_Maximo_Competitivo": "Data Preço Máximo Competitivo",
+        "Menor_Preco": "Menor Preço",
+        "Rede_Menor_Preco": "Rede Menor Preço",
+        "Data_Menor_Preco": "Data Menor Preço",
+        "Preco_Recomendado": "Preço Recomendado",
+        "Qtd_Vendida_Mes_Anterior": "Qtd Vendida Mês Anterior"
+    }
+
+    df_view = df_view.rename(columns={c: renomear.get(c, c) for c in df_view.columns})
+
+    for coluna in df_view.columns:
+        tipo = _eirox_tipo_coluna_br(coluna)
+
+        if tipo == "moeda":
+            s_num = pd.to_numeric(df_view[coluna], errors="coerce")
+            if s_num.notna().any():
+                df_view[coluna] = s_num.apply(moeda_br)
+
+        elif tipo == "percentual":
+            s_num = pd.to_numeric(df_view[coluna], errors="coerce")
+            if s_num.notna().any():
+                df_view[coluna] = s_num.apply(percentual_br)
+
+        elif tipo == "inteiro":
+            s_num = pd.to_numeric(df_view[coluna], errors="coerce")
+            if s_num.notna().any():
+                df_view[coluna] = s_num.apply(inteiro_br)
+
+        elif tipo == "numero":
+            s_num = pd.to_numeric(df_view[coluna], errors="coerce")
+            if s_num.notna().any():
+                df_view[coluna] = s_num.apply(numero_br)
+
+        elif tipo == "data":
+            # Só formata quando parecer data de verdade.
+            convertido = pd.to_datetime(df_view[coluna], errors="coerce")
+            if convertido.notna().any():
+                df_view[coluna] = convertido.dt.strftime("%d/%m/%Y")
+
+    return df_view
+
+
+def valor_metrica_br(label, valor):
+    """Padroniza KPIs no formato brasileiro conforme o tipo do indicador."""
+
+    if isinstance(valor, str):
+        return valor
+
+    try:
+        nome = str(label).lower()
+
+        if any(t in nome for t in ["preço", "preco", "custo", "valor", "faturamento", "venda", "lucro", "ganho", "potencial", "captura", "ticket", "receita", "despesa", "saldo"]):
+            return moeda_br(valor)
+
+        if any(t in nome for t in ["margem", "rentabilidade", "particip", "%", "percent", "taxa"]):
+            return percentual_br(valor)
+
+        if any(t in nome for t in ["produtos", "itens", "qtd", "quantidade", "estoque", "arquivos", "registros", "usuários", "usuarios"]):
+            return inteiro_br(valor)
+
+        if "score" in nome or "índice" in nome or "indice" in nome:
+            return numero_br(valor)
+
+        return numero_br(valor) if isinstance(valor, (int, float, np.integer, np.floating)) else valor
+
+    except Exception:
+        return valor
+
+
+def aplicar_formatacao_brasileira_streamlit():
+    """
+    Intercepta st.dataframe e st.metric para exibir números, dinheiro,
+    percentuais e datas no padrão brasileiro em todo o dashboard.
+    """
+
+    if getattr(st, "_eirox_formatacao_br_aplicada", False):
+        return
+
+    st._eirox_dataframe_original = st.dataframe
+    st._eirox_metric_original = st.metric
+
+    def dataframe_br(data=None, *args, **kwargs):
+        try:
+            if isinstance(data, pd.DataFrame):
+                data = formatar_dataframe_br(data)
+        except Exception:
+            pass
+        return st._eirox_dataframe_original(data, *args, **kwargs)
+
+    def metric_br(label, value, delta=None, *args, **kwargs):
+        try:
+            value = valor_metrica_br(label, value)
+            if delta is not None and not isinstance(delta, str):
+                delta = valor_metrica_br(label, delta)
+        except Exception:
+            pass
+        return st._eirox_metric_original(label, value, delta, *args, **kwargs)
+
+    st.dataframe = dataframe_br
+    st.metric = metric_br
+    st._eirox_formatacao_br_aplicada = True
+
+
+aplicar_formatacao_brasileira_streamlit()
+
+
+
+def explicacao_calculo(titulo, itens):
+    """
+    Exibe, no painel, a explicação visual dos cálculos usados em cada visão.
+    Mantém a regra de negócio transparente para o usuário final.
+    """
+
+    try:
+        if not isinstance(itens, (list, tuple)):
+            itens = [str(itens)]
+
+        lista_html = "".join(
+            f"<li>{str(item)}</li>"
+            for item in itens
+            if str(item).strip()
+        )
+
+        st.markdown(
+            f"""
+            <div class="eirox-card">
+                <div class="eirox-section-title">Como calcular</div>
+                <h4 style="margin-top:0;color:#F6FAFF!important;">{titulo}</h4>
+                <ul style="margin-bottom:0;color:#BFD7FF;line-height:1.55;">
+                    {lista_html}
+                </ul>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    except Exception:
+        pass
+
+
+def propagar_ganho_potencial(base):
+    """
+    Garante que todos os indicadores usem o mesmo Ganho_Potencial.
+    """
+
+    if not isinstance(base, pd.DataFrame) or base.empty:
+        return base
+
+    base = base.copy()
+
+    if "Ganho_Potencial" not in base.columns:
+        base["Ganho_Potencial"] = 0
+
+    base["Ganho_Potencial"] = pd.to_numeric(
+        base["Ganho_Potencial"],
+        errors="coerce"
+    ).fillna(0)
+
+    # Aliases seguros para telas ou exportações que precisem do ganho atualizado.
+    base["Ganho_Potencial_Atualizado"] = base["Ganho_Potencial"]
+    base["Ganho_Potencial_Final"] = base["Ganho_Potencial"]
+
+    return base
+
+
+
+def preparar_ganho_oficial_dashboard(base):
+    """
+    Usa exclusivamente o Ganho_Potencial da Analise_Pricing.xlsx.
+    Não usa simulacao_global, histórico ou fallback.
+    """
+
+    base = base.copy()
+
+    if "Ganho_Potencial" not in base.columns:
+        base["Ganho_Potencial"] = 0
+
+    base["Ganho_Potencial"] = pd.to_numeric(
+        base["Ganho_Potencial"],
+        errors="coerce"
+    ).fillna(0)
+
+    # Remove Total Geral, caso exista
+    for coluna_nome in ["Produto", "Marca", "Laboratório", "Descricao_Unica"]:
+
+        if coluna_nome in base.columns:
+
+            base = base[
+                ~base[coluna_nome]
+                .astype(str)
+                .str.upper()
+                .str.strip()
+                .eq("TOTAL GERAL")
+            ].copy()
+
+    # Remove ganhos absurdos provocados por leitura/fallback indevido
+    base = base[
+        base["Ganho_Potencial"].between(
+            0,
+            10_000_000
+        )
+    ].copy()
+
+    return base
+
+
+
+from pricing_utils import (
+carregar_historico,
+carregar_compra,
+carregar_venda_rede,
+carregar_estoque,
+identificar_rede,
+curva_abc
+)
+
+
+# --------------------------------------------------
+# PADRONIZAÇÃO DO NOME DA REDE
+# --------------------------------------------------
+
+def limpar_nome_rede_eirox(valor_rede="", valor_loja=""):
+    """
+    Retorna somente o nome comercial da rede.
+    Usa a coluna Rede quando existir; se estiver vazia, identifica pela loja/razão social.
+    """
+
+    def _texto_valido(valor):
+        texto = str(valor).strip() if valor is not None else ""
+        if texto.lower() in ["", "nan", "none", "nat"]:
+            return ""
+        return texto
+
+    rede = _texto_valido(valor_rede)
+    loja = _texto_valido(valor_loja)
+    texto_base = rede if rede else loja
+
+    if not texto_base:
+        return ""
+
+    texto_upper = texto_base.upper()
+
+    # Mapeamentos principais encontrados nas pesquisas de mercado.
+    mapa = [
+        ("TRIANGULO", "Triângulo"),
+        ("TRIÂNGULO", "Triângulo"),
+        ("RAIADROGASIL", "Drogasil"),
+        ("DROGASIL", "Drogasil"),
+        ("DROGA RAIA", "Droga Raia"),
+        (" ZANOL", "Zanol e Thomaz"),
+        ("ZANOL", "Zanol e Thomaz"),
+        ("BRASIFARMA", "Brasifarma"),
+        ("PAGUE MENOS", "Pague Menos"),
+        ("MARCOPHARMA", "Marcopharma"),
+        ("BARBOSA", "Barbosa"),
+        ("ADRI", "Adriele"),
+        ("IR BRANDAO", "IR Brandão"),
+        ("IR BRANDÃO", "IR Brandão"),
+        ("PG COMERCIO", "PG Varejista"),
+        ("PG COMÉRCIO", "PG Varejista"),
+        ("PG - VAREJISTA", "PG Varejista"),
+        ("MATEUS", "Mateus"),
+    ]
+
+    for termo, nome in mapa:
+        if termo in texto_upper:
+            return nome
+
+    # Tenta usar a função padrão do projeto, caso reconheça a rede.
+    try:
+        rede_identificada = identificar_rede(texto_base)
+        rede_identificada = _texto_valido(rede_identificada)
+        if rede_identificada and rede_identificada.upper() not in ["OUTRAS", "OUTROS", "NÃO IDENTIFICADO", "NAO IDENTIFICADO"]:
+            return rede_identificada
+    except Exception:
+        pass
+
+    # Se veio no padrão "Rede - Razão Social", mantém só a rede.
+    if " - " in texto_base:
+        partes = [p.strip() for p in texto_base.split(" - ") if p.strip()]
+        if len(partes) >= 2 and partes[0].upper() == "PG":
+            return "PG Varejista"
+        if partes:
+            return partes[0]
+
+    # Último fallback: remove termos jurídicos mais comuns.
+    texto = re.sub(r"\b(COMERCIO|COMÉRCIO|DE|DO|DA|DOS|DAS|MEDICAMENTOS|PRODUTOS|FARMACEUTICOS|FARMACÊUTICOS|LTDA|S\.?A\.?|SA|EIRELI|ME|S/A)\b", "", texto_base, flags=re.IGNORECASE)
+    texto = re.sub(r"\s+", " ", texto).strip(" -")
+    return texto.title() if texto else texto_base
+
+
+def serie_nome_rede_eirox(df_temp, coluna_rede=None, coluna_loja=None):
+    """Cria uma Série com o nome limpo da rede a partir de Rede e/ou Loja."""
+    if not isinstance(df_temp, pd.DataFrame) or df_temp.empty:
+        return pd.Series(dtype="object")
+
+    if coluna_rede and coluna_rede in df_temp.columns:
+        serie_rede = df_temp[coluna_rede]
+    else:
+        serie_rede = pd.Series([""] * len(df_temp), index=df_temp.index)
+
+    if coluna_loja and coluna_loja in df_temp.columns:
+        serie_loja = df_temp[coluna_loja]
+    else:
+        serie_loja = pd.Series([""] * len(df_temp), index=df_temp.index)
+
+    return pd.Series(
+        [limpar_nome_rede_eirox(r, l) for r, l in zip(serie_rede, serie_loja)],
+        index=df_temp.index
+    )
+
+
+
+
+# --------------------------------------------------
+# BUSCA RECURSIVA DE BASES POR COLUNAS
+# --------------------------------------------------
+
+def carregar_base_recursiva_por_colunas(
+    nome_base,
+    colunas_obrigatorias,
+    ignorar_pastas=None
+):
+
+    """
+    Procura arquivos .xls, .xlsx, .xlsm e .csv em todo o projeto,
+    identifica a base pelas colunas obrigatórias e concatena os arquivos encontrados.
+
+    Útil para Streamlit Cloud quando a pasta foi criada fora do local esperado
+    ou quando o GitHub mudou a estrutura de diretórios.
+    """
+
+    ignorar_pastas = ignorar_pastas or [
+        ".git",
+        ".streamlit",
+        "__pycache__",
+        ".venv",
+        "venv"
+    ]
+
+    arquivos = []
+
+    for ext in [
+        "*.xls",
+        "*.xlsx",
+        "*.xlsm",
+        "*.csv"
+    ]:
+
+        arquivos.extend(
+            list(
+                Path(".").rglob(ext)
+            )
+        )
+
+    bases = []
+    erros = []
+
+    obrigatorias_norm = [
+        str(c).strip().lower()
+        for c in colunas_obrigatorias
+    ]
+
+    for arquivo in sorted(arquivos):
+
+        partes = [
+            p.lower()
+            for p in arquivo.parts
+        ]
+
+        if any(p in partes for p in ignorar_pastas):
+            continue
+
+        # Evita reler a planilha principal como venda final.
+        if arquivo.name.lower() == "analise_pricing.xlsx":
+            continue
+
+        try:
+
+            if arquivo.suffix.lower() == ".csv":
+
+                try:
+                    temp = pd.read_csv(
+                        arquivo,
+                        sep=";",
+                        encoding="utf-8-sig"
+                    )
+                except Exception:
+                    temp = pd.read_csv(
+                        arquivo,
+                        encoding="utf-8-sig"
+                    )
+
+            else:
+
+                temp = pd.read_excel(
+                    arquivo
+                )
+
+            if temp.empty:
+                continue
+
+            temp.columns = (
+                temp.columns
+                .astype(str)
+                .str.strip()
+            )
+
+            colunas_norm = [
+                str(c).strip().lower()
+                for c in temp.columns
+            ]
+
+            encontrou = all(
+                col in colunas_norm
+                for col in obrigatorias_norm
+            )
+
+            if encontrou:
+
+                temp["Arquivo_Origem"] = arquivo.name
+                temp["Fonte_Carregamento"] = str(arquivo.parent)
+                bases.append(temp)
+
+        except Exception as erro:
+
+            erros.append(
+                {
+                    "Arquivo": str(arquivo),
+                    "Erro": str(erro)
+                }
+            )
+
+    if bases:
+
+        base = pd.concat(
+            bases,
+            ignore_index=True
+        )
+
+        base.columns = (
+            base.columns
+            .astype(str)
+            .str.strip()
+        )
+
+        return base
+
+    # Guarda erros para diagnóstico se necessário
+    globals()[f"ERROS_CARGA_{nome_base}"] = erros
+
+    return pd.DataFrame()
+
+
+# --------------------------------------------------
+# LEITURA COMPATÍVEL DE EXCEL / CSV
+# --------------------------------------------------
+
+def carregar_pasta_excel_compat(pastas, nome_base="base"):
+
+    bases = []
+
+    for pasta_nome in pastas:
+
+        pasta = Path(pasta_nome)
+
+        if not pasta.exists() or not pasta.is_dir():
+            continue
+
+        arquivos = []
+
+        for ext in [
+            "*.xls",
+            "*.xlsx",
+            "*.xlsm",
+            "*.csv"
+        ]:
+            arquivos.extend(list(pasta.glob(ext)))
+
+        for arquivo in sorted(arquivos):
+
+            try:
+
+                if arquivo.suffix.lower() == ".csv":
+
+                    try:
+                        temp = pd.read_csv(
+                            arquivo,
+                            sep=";",
+                            encoding="utf-8-sig"
+                        )
+                    except Exception:
+                        temp = pd.read_csv(
+                            arquivo,
+                            encoding="utf-8-sig"
+                        )
+
+                else:
+
+                    temp = pd.read_excel(
+                        arquivo
+                    )
+
+                if not temp.empty:
+
+                    temp["Arquivo_Origem"] = arquivo.name
+                    temp["Fonte_Carregamento"] = str(pasta)
+                    bases.append(temp)
+
+            except Exception as erro:
+
+                print(
+                    f"Falha ao ler {nome_base} / {arquivo}: {erro}"
+                )
+
+    if bases:
+
+        base = pd.concat(
+            bases,
+            ignore_index=True
+        )
+
+        base.columns = (
+            base.columns
+            .astype(str)
+            .str.strip()
+        )
+
+        return base
+
+    return pd.DataFrame()
+
+
+# --------------------------------------------------
+# MOTOR INTELIGENTE DE GANHO POTENCIAL
+# --------------------------------------------------
+
+def ler_base_pasta_ou_zip(pastas, zips):
+
+    bases = []
+
+    for pasta_nome in pastas:
+
+        pasta = Path(pasta_nome)
+
+        if pasta.exists() and pasta.is_dir():
+
+            arquivos = []
+
+            for ext in ["*.xlsx", "*.xls", "*.csv"]:
+                arquivos.extend(list(pasta.glob(ext)))
+
+            for arq in arquivos:
+
+                try:
+
+                    if arq.suffix.lower() == ".csv":
+
+                        try:
+                            temp = pd.read_csv(arq, sep=";", encoding="utf-8-sig")
+                        except Exception:
+                            temp = pd.read_csv(arq, encoding="utf-8-sig")
+
+                    else:
+
+                        temp = pd.read_excel(arq)
+
+                    if not temp.empty:
+                        temp["Arquivo_Origem"] = arq.name
+                        bases.append(temp)
+
+                except Exception as erro:
+                    print(f"Falha ao ler {arq}: {erro}")
+
+    if not bases:
+
+        for zip_nome in zips:
+
+            zip_path = Path(zip_nome)
+
+            if not zip_path.exists():
+                continue
+
+            try:
+
+                with zipfile.ZipFile(zip_path, "r") as z:
+
+                    for nome in z.namelist():
+
+                        if not nome.lower().endswith((".xlsx", ".xls", ".csv")):
+                            continue
+
+                        try:
+
+                            with z.open(nome) as f:
+
+                                if nome.lower().endswith(".csv"):
+
+                                    try:
+                                        temp = pd.read_csv(f, sep=";", encoding="utf-8-sig")
+                                    except Exception:
+                                        f.seek(0)
+                                        temp = pd.read_csv(f, encoding="utf-8-sig")
+
+                                else:
+
+                                    temp = pd.read_excel(f)
+
+                            if not temp.empty:
+                                temp["Arquivo_Origem"] = nome
+                                bases.append(temp)
+
+                        except Exception as erro:
+                            print(f"Falha ao ler {nome}: {erro}")
+
+            except Exception as erro:
+                print(f"Falha ao abrir zip {zip_nome}: {erro}")
+
+    if bases:
+
+        base = pd.concat(bases, ignore_index=True)
+        base.columns = base.columns.astype(str).str.strip()
+        return base
+
+    return pd.DataFrame()
+
+
+def achar_coluna(base, exatos, contem):
+
+    if not isinstance(base, pd.DataFrame) or base.empty:
+        return None
+
+    for alvo in exatos:
+
+        for col in base.columns:
+
+            if str(col).strip().lower() == str(alvo).strip().lower():
+                return col
+
+    for termo in contem:
+
+        termo = str(termo).lower()
+
+        for col in base.columns:
+
+            if termo in str(col).lower():
+                return col
+
+    return None
+
+
+def converter_numero_brasil(serie):
+    """
+    Converte números em formatos brasileiros e americanos.
+    Ex.: '1.234,56', '1234,56', '1,234.56', '1234.56'
+    """
+
+    if isinstance(serie, pd.Series):
+
+        s = (
+            serie
+            .astype(str)
+            .str.strip()
+            .str.replace("R$", "", regex=False)
+            .str.replace("%", "", regex=False)
+            .str.replace(" ", "", regex=False)
+        )
+
+        # Se tiver vírgula, assume vírgula como decimal e ponto como milhar.
+        tem_virgula = s.str.contains(",", regex=False)
+
+        s_br = (
+            s[tem_virgula]
+            .str.replace(".", "", regex=False)
+            .str.replace(",", ".", regex=False)
+        )
+
+        s_us = (
+            s[~tem_virgula]
+            .str.replace(",", "", regex=False)
+        )
+
+        out = pd.Series(index=serie.index, dtype="float64")
+        out.loc[s_br.index] = pd.to_numeric(s_br, errors="coerce")
+        out.loc[s_us.index] = pd.to_numeric(s_us, errors="coerce")
+
+        return out
+
+    return pd.to_numeric(serie, errors="coerce")
+
+
+
+def preco_referencia_seguro(valores):
+
+    s = pd.to_numeric(valores, errors="coerce").dropna()
+    s = s[(s > 0) & (s <= 5000)]
+
+    if s.empty:
+        return np.nan
+
+    if len(s) >= 4:
+
+        q1 = s.quantile(0.25)
+        q3 = s.quantile(0.75)
+        iqr = q3 - q1
+
+        s2 = s[
+            (s >= max(q1 - 1.5 * iqr, 0))
+            & (s <= q3 + 1.5 * iqr)
+        ]
+
+        if not s2.empty:
+            s = s2
+
+    # Percentil 75 gera oportunidade sem usar preço extremo.
+    return float(s.quantile(0.75))
+
+
+def recalcular_ganho_inteligente(df_base, venda_rede_base, historico_base):
+
+    if (
+        not isinstance(df_base, pd.DataFrame)
+        or df_base.empty
+        or not isinstance(venda_rede_base, pd.DataFrame)
+        or venda_rede_base.empty
+        or not isinstance(historico_base, pd.DataFrame)
+        or historico_base.empty
+    ):
+        return df_base.copy(), pd.DataFrame(), "sem_base_completa"
+
+    df_calc = df_base.copy()
+    venda = venda_rede_base.copy()
+    hist = historico_base.copy()
+
+    df_calc.columns = df_calc.columns.astype(str).str.strip()
+    venda.columns = venda.columns.astype(str).str.strip()
+    hist.columns = hist.columns.astype(str).str.strip()
+
+    col_ean_venda = achar_coluna(
+        venda,
+        ["EAN", "EAN (GTIN)", "GTIN", "Código de Barras", "Codigo de Barras", "Cód. Barras/Etiq."],
+        ["ean", "gtin", "barras"]
+    )
+
+    col_qtd = achar_coluna(
+        venda,
+        [
+            "Itens",
+            "Item",
+            "Quantidade",
+            "Qtd",
+            "QTD",
+            "Qtde",
+            "Quantidade Vendida",
+            "Qtd Vendida",
+            "Unidades"
+        ],
+        [
+            "itens",
+            "item",
+            "qtd",
+            "quant",
+            "qtde",
+            "unid"
+        ]
+    )
+
+    col_preco_venda = achar_coluna(
+        venda,
+        [
+            "Preço Venda",
+            "Preco Venda",
+            "Preço (R$)",
+            "Preco (R$)",
+            "Valor Unitário",
+            "Valor Unitario",
+            "Preço Médio",
+            "Preco Medio",
+            "Preco_Medio"
+        ],
+        [
+            "preço",
+            "preco",
+            "unit",
+            "medio",
+            "médio"
+        ]
+    )
+
+    col_valor_total = achar_coluna(
+        venda,
+        [
+            "Venda",
+            "Valor Venda",
+            "Faturamento",
+            "Valor Líquido",
+            "Valor Liquido",
+            "Total Venda",
+            "Valor Total"
+        ],
+        [
+            "venda",
+            "fatur",
+            "liquido",
+            "líquido"
+        ]
+    )
+
+    col_prod_venda = achar_coluna(
+        venda,
+        ["Produto", "Descrição", "Descricao", "Nome Produto", "Embalagem"],
+        ["produto", "descr", "embalagem"]
+    )
+
+    col_ean_hist = achar_coluna(
+        hist,
+        ["EAN", "EAN (GTIN)", "GTIN", "Código de Barras", "Codigo de Barras"],
+        ["ean", "gtin", "barras"]
+    )
+
+    col_preco_hist = achar_coluna(
+        hist,
+        ["Preço (R$)", "Preco (R$)", "Preço", "Preco", "Valor"],
+        ["preço", "preco", "valor"]
+    )
+
+    col_rede_hist = achar_coluna(
+        hist,
+        ["Rede", "Rede Concorrente", "Bandeira", "Grupo", "Concorrente"],
+        ["rede", "bandeira", "grupo", "concorr"]
+    )
+
+    col_loja_hist = achar_coluna(
+        hist,
+        ["Farmácia", "Farmacia", "Loja", "Estabelecimento", "Razão Social", "Razao Social"],
+        ["farm", "loja", "estabelec", "razão", "razao", "social"]
+    )
+
+    col_data_hist = achar_coluna(
+        hist,
+        ["Data", "Data Pesquisa", "Data da Pesquisa", "Dt Pesquisa", "Data_Hora", "Data Hora"],
+        ["data", "dt"]
+    )
+
+    # Em bases tipo VENDA_FINAL_TESTE, a coluna "Venda" é total e "Itens" é quantidade.
+    # Quando existir Venda + Itens, usar essa combinação para preço atual.
+    if col_valor_total and col_qtd:
+        col_preco_venda = None
+
+    if (
+        not col_ean_venda
+        or not col_qtd
+        or not col_ean_hist
+        or not col_preco_hist
+        or not (col_preco_venda or col_valor_total)
+        or "EAN" not in df_calc.columns
+    ):
+        return df_calc, pd.DataFrame(), "colunas_incompletas"
+
+    venda["EAN"] = venda[col_ean_venda].astype(str).str.replace(".0", "", regex=False).str.strip()
+    hist["EAN"] = hist[col_ean_hist].astype(str).str.replace(".0", "", regex=False).str.strip()
+    df_calc["EAN"] = df_calc["EAN"].astype(str).str.replace(".0", "", regex=False).str.strip()
+
+    venda[col_qtd] = converter_numero_brasil(venda[col_qtd])
+    hist[col_preco_hist] = converter_numero_brasil(hist[col_preco_hist])
+
+    hist = hist[(hist[col_preco_hist] > 0) & (hist[col_preco_hist] <= 5000)].copy()
+
+    if col_preco_venda:
+
+        venda[col_preco_venda] = converter_numero_brasil(venda[col_preco_venda])
+
+        vendas = (
+            venda
+            .dropna(subset=["EAN", col_qtd, col_preco_venda])
+            .groupby("EAN")
+            .agg(
+                Qtd_Vendida_Mes_Anterior=(col_qtd, "sum"),
+                Preco_Atual=(col_preco_venda, "mean")
+            )
+            .reset_index()
+        )
+
+        vendas["Venda_Preco_Antigo"] = vendas["Qtd_Vendida_Mes_Anterior"] * vendas["Preco_Atual"]
+
+    else:
+
+        venda[col_valor_total] = converter_numero_brasil(venda[col_valor_total])
+
+        vendas = (
+            venda
+            .dropna(subset=["EAN", col_qtd, col_valor_total])
+            .groupby("EAN")
+            .agg(
+                Qtd_Vendida_Mes_Anterior=(col_qtd, "sum"),
+                Venda_Preco_Antigo=(col_valor_total, "sum")
+            )
+            .reset_index()
+        )
+
+        vendas = vendas[vendas["Qtd_Vendida_Mes_Anterior"] > 0].copy()
+        vendas["Preco_Atual"] = vendas["Venda_Preco_Antigo"] / vendas["Qtd_Vendida_Mes_Anterior"]
+
+    mercado = (
+        hist
+        .dropna(subset=["EAN", col_preco_hist])
+        .groupby("EAN")[col_preco_hist]
+        .apply(preco_referencia_seguro)
+        .reset_index()
+        .rename(columns={col_preco_hist: "Preco_Sugerido_Mercado"})
+    )
+
+    # Identifica a rede/loja/data que mais se aproxima do preço máximo competitivo
+    # e também a rede/loja/data do menor preço encontrado no mercado.
+    hist_ref = hist.dropna(subset=["EAN", col_preco_hist]).copy()
+    hist_ref["Preco_Historico_Ref"] = pd.to_numeric(hist_ref[col_preco_hist], errors="coerce")
+    hist_ref = hist_ref[(hist_ref["Preco_Historico_Ref"] > 0) & (hist_ref["Preco_Historico_Ref"] <= 5000)].copy()
+
+    if not hist_ref.empty and not mercado.empty:
+        hist_ref = hist_ref.merge(mercado, on="EAN", how="left")
+        hist_ref["Dif_Preco_Maximo"] = (hist_ref["Preco_Historico_Ref"] - hist_ref["Preco_Sugerido_Mercado"]).abs()
+
+        idx_max = hist_ref.groupby("EAN")["Dif_Preco_Maximo"].idxmin()
+        ref_max = hist_ref.loc[idx_max].copy()
+
+        idx_min = hist_ref.groupby("EAN")["Preco_Historico_Ref"].idxmin()
+        ref_min = hist_ref.loc[idx_min].copy()
+
+        def _col_ou_vazio(df_temp, coluna):
+            return df_temp[coluna].astype(str).str.strip() if coluna and coluna in df_temp.columns else ""
+
+        meta_max = pd.DataFrame({
+            "EAN": ref_max["EAN"].astype(str),
+            "Rede_Preco_Maximo_Competitivo": serie_nome_rede_eirox(ref_max, col_rede_hist, col_loja_hist),
+            "Loja_Preco_Maximo_Competitivo": _col_ou_vazio(ref_max, col_loja_hist),
+            "Data_Preco_Maximo_Competitivo": ref_max[col_data_hist] if col_data_hist and col_data_hist in ref_max.columns else ""
+        })
+
+        meta_min = pd.DataFrame({
+            "EAN": ref_min["EAN"].astype(str),
+            "Menor_Preco": ref_min["Preco_Historico_Ref"],
+            "Rede_Menor_Preco": serie_nome_rede_eirox(ref_min, col_rede_hist, col_loja_hist),
+            "Loja_Menor_Preco": _col_ou_vazio(ref_min, col_loja_hist),
+            "Data_Menor_Preco": ref_min[col_data_hist] if col_data_hist and col_data_hist in ref_min.columns else ""
+        })
+
+        mercado = (
+            mercado
+            .merge(meta_max, on="EAN", how="left")
+            .merge(meta_min, on="EAN", how="left")
+        )
+
+    simulacao = vendas.merge(mercado, on="EAN", how="inner")
+
+    simulacao["Preco_Atual"] = pd.to_numeric(simulacao["Preco_Atual"], errors="coerce")
+    simulacao["Preco_Sugerido_Mercado"] = pd.to_numeric(simulacao["Preco_Sugerido_Mercado"], errors="coerce")
+
+    simulacao = simulacao[
+        (simulacao["Qtd_Vendida_Mes_Anterior"] > 0)
+        & (simulacao["Preco_Atual"] > 0)
+        & (simulacao["Preco_Sugerido_Mercado"] > 0)
+        & (simulacao["Preco_Sugerido_Mercado"] <= simulacao["Preco_Atual"] * 3)
+        & (simulacao["Preco_Sugerido_Mercado"] >= simulacao["Preco_Atual"] * 0.5)
+    ].copy()
+
+    simulacao["Venda_Projetada_Preco_Sugerido"] = simulacao["Qtd_Vendida_Mes_Anterior"] * simulacao["Preco_Sugerido_Mercado"]
+    simulacao["Ganho_Unitario"] = simulacao["Preco_Sugerido_Mercado"] - simulacao["Preco_Atual"]
+    simulacao["Ganho_Potencial_Simulador"] = simulacao["Venda_Projetada_Preco_Sugerido"] - simulacao["Venda_Preco_Antigo"]
+
+    simulacao = simulacao[simulacao["Ganho_Potencial_Simulador"] > 0].copy()
+
+    if col_prod_venda and not simulacao.empty:
+
+        prod_ref = (
+            venda
+            .groupby("EAN")[col_prod_venda]
+            .agg(lambda x: x.mode().iloc[0] if not x.mode().empty else x.iloc[0])
+            .reset_index()
+            .rename(columns={col_prod_venda: "Produto_Simulador"})
+        )
+
+        simulacao = simulacao.merge(prod_ref, on="EAN", how="left")
+
+    for c in [
+        "Preco_Atual",
+        "Preco_Sugerido_Mercado",
+        "Menor_Preco",
+        "Ganho_Unitario",
+        "Venda_Preco_Antigo",
+        "Venda_Projetada_Preco_Sugerido",
+        "Ganho_Potencial_Simulador",
+        "Qtd_Vendida_Mes_Anterior"
+    ]:
+        if c in simulacao.columns:
+            simulacao[c] = pd.to_numeric(simulacao[c], errors="coerce").round(2)
+
+    if "Ganho_Potencial" in df_calc.columns:
+        df_calc["Ganho_Potencial_Oficial"] = pd.to_numeric(df_calc["Ganho_Potencial"], errors="coerce").fillna(0)
+    else:
+        df_calc["Ganho_Potencial_Oficial"] = 0
+
+    if simulacao.empty:
+        df_calc["Ganho_Potencial"] = df_calc["Ganho_Potencial_Oficial"]
+        return df_calc, simulacao, "sem_oportunidade_valida"
+
+    ganho = simulacao[["EAN", "Ganho_Potencial_Simulador"]].rename(
+        columns={"Ganho_Potencial_Simulador": "Ganho_Potencial_Inteligente"}
+    )
+
+    df_calc = df_calc.merge(ganho, on="EAN", how="left")
+
+    df_calc["Ganho_Potencial_Inteligente"] = pd.to_numeric(
+        df_calc["Ganho_Potencial_Inteligente"],
+        errors="coerce"
+    ).fillna(0)
+
+    # Regra premium: usa o maior ganho válido entre o oficial e o recalculado.
+    df_calc["Ganho_Potencial"] = df_calc[
+        ["Ganho_Potencial_Oficial", "Ganho_Potencial_Inteligente"]
+    ].max(axis=1)
+
+    return df_calc, simulacao, "venda_rede_historico_inteligente"
+
+
+
+# --------------------------------------------------
+# LEITURA ROBUSTA DE BASES PARA ONLINE / LOCALHOST
+# --------------------------------------------------
+
+def _ler_excel_csv_pasta(pasta):
+    pasta = Path(pasta)
+    if not pasta.exists() or not pasta.is_dir():
+        return pd.DataFrame()
+
+    arquivos = []
+    for ext in ["*.xlsx", "*.xls", "*.csv"]:
+        arquivos.extend(list(pasta.glob(ext)))
+
+    bases = []
+    for arq in arquivos:
+        try:
+            if arq.suffix.lower() == ".csv":
+                try:
+                    temp = pd.read_csv(arq, sep=";", encoding="utf-8-sig")
+                except Exception:
+                    temp = pd.read_csv(arq, encoding="utf-8-sig")
+            else:
+                temp = pd.read_excel(arq)
+
+            if not temp.empty:
+                temp["Arquivo_Origem"] = arq.name
+                bases.append(temp)
+        except Exception as erro:
+            print(f"Falha ao ler {arq}: {erro}")
+
+    if bases:
+        base = pd.concat(bases, ignore_index=True)
+        base.columns = base.columns.astype(str).str.strip()
+        return base
+
+    return pd.DataFrame()
+
+
+def _ler_excel_csv_zip(zip_nome):
+    zip_path = Path(zip_nome)
+    if not zip_path.exists():
+        return pd.DataFrame()
+
+    bases = []
+    try:
+        with zipfile.ZipFile(zip_path, "r") as z:
+            for nome in z.namelist():
+                if not nome.lower().endswith((".xlsx", ".xls", ".csv")):
+                    continue
+
+                try:
+                    with z.open(nome) as f:
+                        if nome.lower().endswith(".csv"):
+                            try:
+                                temp = pd.read_csv(f, sep=";", encoding="utf-8-sig")
+                            except Exception:
+                                f.seek(0)
+                                temp = pd.read_csv(f, encoding="utf-8-sig")
+                        else:
+                            temp = pd.read_excel(f)
+
+                    if not temp.empty:
+                        temp["Arquivo_Origem"] = nome
+                        bases.append(temp)
+                except Exception as erro:
+                    print(f"Falha ao ler {nome} em {zip_nome}: {erro}")
+    except Exception as erro:
+        print(f"Falha ao abrir zip {zip_nome}: {erro}")
+
+    if bases:
+        base = pd.concat(bases, ignore_index=True)
+        base.columns = base.columns.astype(str).str.strip()
+        return base
+
+    return pd.DataFrame()
+
+
+def carregar_base_robusta(nome_base, pastas, zips):
+    for pasta in pastas:
+        base = _ler_excel_csv_pasta(pasta)
+        if not base.empty:
+            base["Fonte_Carregamento"] = pasta
+            return base
+
+    for zip_nome in zips:
+        base = _ler_excel_csv_zip(zip_nome)
+        if not base.empty:
+            base["Fonte_Carregamento"] = zip_nome
+            return base
+
+    print(f"{nome_base} não encontrada.")
+    return pd.DataFrame()
+
+
+def encontrar_coluna_flexivel(base, opcoes, contem=None):
+    if not isinstance(base, pd.DataFrame) or base.empty:
+        return None
+
+    colunas = base.columns.astype(str).tolist()
+
+    for opcao in opcoes:
+        for coluna in colunas:
+            if coluna.strip().lower() == str(opcao).strip().lower():
+                return coluna
+
+    if contem:
+        for coluna in colunas:
+            nome = str(coluna).lower()
+            if any(str(t).lower() in nome for t in contem):
+                return coluna
+
+    return None
+
+
+def _preco_ref_seguro(s):
+    s = pd.to_numeric(s, errors="coerce").dropna()
+    s = s[(s > 0) & (s <= 5000)]
+
+    if s.empty:
+        return None
+
+    if len(s) >= 4:
+        q1 = s.quantile(0.25)
+        q3 = s.quantile(0.75)
+        iqr = q3 - q1
+        lim_inf = max(q1 - 1.5 * iqr, 0)
+        lim_sup = q3 + 1.5 * iqr
+        s2 = s[(s >= lim_inf) & (s <= lim_sup)]
+        if not s2.empty:
+            s = s2
+
+    return float(s.median())
+
+
+def criar_simulacao_por_historico(historico_base):
+    if not isinstance(historico_base, pd.DataFrame) or historico_base.empty:
+        return pd.DataFrame()
+
+    base = historico_base.copy()
+    base.columns = base.columns.astype(str).str.strip()
+
+    col_ean = encontrar_coluna_flexivel(
+        base,
+        ["EAN", "EAN (GTIN)", "GTIN", "Código de Barras", "Codigo de Barras"],
+        ["ean", "gtin", "barras"]
+    )
+
+    col_produto = encontrar_coluna_flexivel(
+        base,
+        ["Produto", "Descrição", "Descricao", "Termo Pesquisado"],
+        ["produto", "descr", "termo"]
+    )
+
+    col_preco = encontrar_coluna_flexivel(
+        base,
+        ["Preço (R$)", "Preco (R$)", "Preço", "Preco", "Valor"],
+        ["preço", "preco", "valor"]
+    )
+
+    col_rede = encontrar_coluna_flexivel(
+        base,
+        ["Rede", "Rede Concorrente", "Bandeira", "Grupo", "Concorrente"],
+        ["rede", "bandeira", "grupo", "concorr"]
+    )
+
+    col_loja = encontrar_coluna_flexivel(
+        base,
+        ["Farmácia", "Farmacia", "Loja", "Estabelecimento", "Razão Social", "Razao Social"],
+        ["farm", "loja", "estabelec", "razão", "razao", "social"]
+    )
+
+    col_data = encontrar_coluna_flexivel(
+        base,
+        ["Data", "Data Pesquisa", "Data da Pesquisa", "Dt Pesquisa", "Data_Hora", "Data Hora"],
+        ["data", "dt"]
+    )
+
+    if not col_ean or not col_preco:
+        return pd.DataFrame()
+
+    base["EAN"] = base[col_ean].astype(str).str.replace(".0", "", regex=False).str.strip()
+    base["Preco_Base"] = pd.to_numeric(base[col_preco], errors="coerce")
+    base = base.dropna(subset=["EAN", "Preco_Base"])
+    base = base[(base["Preco_Base"] > 0) & (base["Preco_Base"] <= 5000)].copy()
+
+    if base.empty:
+        return pd.DataFrame()
+
+    simulacao = (
+        base
+        .groupby("EAN")
+        .agg(
+            Qtd_Vendida_Mes_Anterior=("Preco_Base", "count"),
+            Preco_Atual=("Preco_Base", "mean"),
+            Preco_Sugerido_Mercado=("Preco_Base", _preco_ref_seguro)
+        )
+        .reset_index()
+    )
+
+    if col_produto:
+        produto_ref = (
+            base.groupby("EAN")[col_produto]
+            .agg(lambda x: x.mode().iloc[0] if not x.mode().empty else x.iloc[0])
+            .reset_index()
+            .rename(columns={col_produto: "Produto_Simulador"})
+        )
+        simulacao = simulacao.merge(produto_ref, on="EAN", how="left")
+
+    simulacao["Preco_Atual"] = pd.to_numeric(simulacao["Preco_Atual"], errors="coerce")
+    simulacao["Preco_Sugerido_Mercado"] = pd.to_numeric(simulacao["Preco_Sugerido_Mercado"], errors="coerce")
+
+    simulacao = simulacao[
+        (simulacao["Preco_Atual"] > 0)
+        & (simulacao["Preco_Sugerido_Mercado"] > 0)
+        & (simulacao["Preco_Sugerido_Mercado"] <= simulacao["Preco_Atual"] * 3)
+    ].copy()
+
+    # Complementa o simulador com rede/loja/data do preço máximo competitivo
+    # e do menor preço encontrado no histórico de pesquisa.
+    base_ref = base[[c for c in ["EAN", "Preco_Base", col_rede, col_loja, col_data] if c and c in base.columns]].copy()
+    if not base_ref.empty and not simulacao.empty:
+        base_ref = base_ref.merge(simulacao[["EAN", "Preco_Sugerido_Mercado"]], on="EAN", how="left")
+        base_ref["Dif_Preco_Maximo"] = (base_ref["Preco_Base"] - base_ref["Preco_Sugerido_Mercado"]).abs()
+
+        idx_max = base_ref.groupby("EAN")["Dif_Preco_Maximo"].idxmin()
+        ref_max = base_ref.loc[idx_max].copy()
+
+        idx_min = base_ref.groupby("EAN")["Preco_Base"].idxmin()
+        ref_min = base_ref.loc[idx_min].copy()
+
+        def _col_ou_vazio(df_temp, coluna):
+            return df_temp[coluna].astype(str).str.strip() if coluna and coluna in df_temp.columns else ""
+
+        meta = pd.DataFrame({
+            "EAN": ref_max["EAN"].astype(str),
+            "Rede_Preco_Maximo_Competitivo": serie_nome_rede_eirox(ref_max, col_rede, col_loja),
+            "Loja_Preco_Maximo_Competitivo": _col_ou_vazio(ref_max, col_loja),
+            "Data_Preco_Maximo_Competitivo": ref_max[col_data] if col_data and col_data in ref_max.columns else ""
+        }).merge(
+            pd.DataFrame({
+                "EAN": ref_min["EAN"].astype(str),
+                "Menor_Preco": ref_min["Preco_Base"],
+                "Rede_Menor_Preco": serie_nome_rede_eirox(ref_min, col_rede, col_loja),
+                "Loja_Menor_Preco": _col_ou_vazio(ref_min, col_loja),
+                "Data_Menor_Preco": ref_min[col_data] if col_data and col_data in ref_min.columns else ""
+            }),
+            on="EAN",
+            how="left"
+        )
+
+        simulacao = simulacao.merge(meta, on="EAN", how="left")
+
+    simulacao["Venda_Preco_Antigo"] = simulacao["Qtd_Vendida_Mes_Anterior"] * simulacao["Preco_Atual"]
+    simulacao["Venda_Projetada_Preco_Sugerido"] = simulacao["Qtd_Vendida_Mes_Anterior"] * simulacao["Preco_Sugerido_Mercado"]
+    simulacao["Ganho_Unitario"] = simulacao["Preco_Sugerido_Mercado"] - simulacao["Preco_Atual"]
+    simulacao["Ganho_Potencial_Simulador"] = simulacao["Venda_Projetada_Preco_Sugerido"] - simulacao["Venda_Preco_Antigo"]
+
+    simulacao = simulacao[simulacao["Ganho_Potencial_Simulador"] > 0].copy()
+
+    for c in [
+        "Preco_Atual", "Preco_Sugerido_Mercado", "Menor_Preco", "Ganho_Unitario",
+        "Venda_Preco_Antigo", "Venda_Projetada_Preco_Sugerido",
+        "Ganho_Potencial_Simulador", "Qtd_Vendida_Mes_Anterior"
+    ]:
+        if c in simulacao.columns:
+            simulacao[c] = simulacao[c].round(2)
+
+    return simulacao
+
+
+# --------------------------------------------------
+# CONFIG
+# --------------------------------------------------
+
+
+st.set_page_config(
+    page_title="Eirox Pricing Enterprise",
+    layout="wide"
+)
+
+st.markdown(
+    """
+    <style>
+
+/* ==================================================
+   EIROX DARK ENTERPRISE PREMIUM
+   Tema escuro corporativo para Streamlit
+   ================================================== */
+
+:root {
+    --eirox-bg: #07111F;
+    --eirox-panel: #0B1B33;
+    --eirox-panel-2: #0F2747;
+    --eirox-border: rgba(120, 180, 255, 0.18);
+    --eirox-text: #F3F7FF;
+    --eirox-muted: #AFC7E8;
+    --eirox-blue: #2CA0FF;
+    --eirox-blue-2: #0E64C8;
+    --eirox-green: #2ED47A;
+    --eirox-yellow: #FFB946;
+    --eirox-red: #FF5C7A;
+    --eirox-orange: #FF8A3D;
+}
+
+html, body, [data-testid="stAppViewContainer"] {
+    background:
+        radial-gradient(circle at top left, rgba(44,160,255,0.15), transparent 32%),
+        linear-gradient(135deg, #050B14 0%, #07111F 45%, #0A1C34 100%) !important;
+    color: var(--eirox-text) !important;
+}
+
+[data-testid="stHeader"] {
+    background: rgba(5, 11, 20, 0.72) !important;
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(120, 180, 255, 0.10);
+}
+
+.block-container {
+    max-width: 100% !important;
+    padding-top: 1.2rem !important;
+    padding-left: 1.4rem !important;
+    padding-right: 1.4rem !important;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background:
+        radial-gradient(circle at top, rgba(44,160,255,0.28), transparent 30%),
+        linear-gradient(180deg, #0E2A4F 0%, #071A33 58%, #04101F 100%) !important;
+    border-right: 1px solid rgba(120, 180, 255, 0.18);
+    box-shadow: 8px 0 28px rgba(0, 0, 0, 0.26);
+}
+
+section[data-testid="stSidebar"] .block-container {
+    padding-top: 1.2rem !important;
+}
+
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3,
+section[data-testid="stSidebar"] label,
+section[data-testid="stSidebar"] p,
+section[data-testid="stSidebar"] span {
+    color: #FFFFFF !important;
+}
+
+.sidebar-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
+    border: 1px solid rgba(180, 215, 255, 0.18);
+    border-radius: 18px;
+    padding: 16px 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
+    backdrop-filter: blur(10px);
+}
+
+.sidebar-title {
+    font-size: 19px;
+    font-weight: 900;
+    letter-spacing: .02em;
+    color: #FFFFFF;
+    margin-bottom: 4px;
+}
+
+.sidebar-subtitle {
+    font-size: 12px;
+    color: #C8DFFF;
+}
+
+.sidebar-section {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: #9FD0FF !important;
+    margin-top: 18px;
+    margin-bottom: 8px;
+}
+
+.sidebar-pill {
+    display: inline-block;
+    background: linear-gradient(135deg, rgba(44,160,255,.32), rgba(46,212,122,.16));
+    border: 1px solid rgba(44,160,255,.48);
+    color: #E6F4FF;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    margin-top: 6px;
+}
+
+section[data-testid="stSidebar"] div[role="radiogroup"] label {
+    background: rgba(255,255,255,0.065);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 13px;
+    padding: 10px 10px;
+    margin-bottom: 7px;
+    transition: all .18s ease;
+}
+
+section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+    background: rgba(44,160,255,0.18);
+    border-color: rgba(44,160,255,0.42);
+    transform: translateX(3px);
+}
+
+/* Títulos */
+h1, h2, h3 {
+    color: #F6FAFF !important;
+    letter-spacing: -0.02em;
+}
+
+h1 {
+    font-weight: 900 !important;
+}
+
+h4, p, span, label {
+    color: var(--eirox-muted) !important;
+}
+
+/* Cards e containers */
+div[data-testid="stMetric"] {
+    background:
+        linear-gradient(135deg, rgba(15,39,71,.98), rgba(8,20,38,.95));
+    border: 1px solid rgba(120,180,255,.18);
+    border-radius: 18px;
+    padding: 18px 18px;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.26);
+    position: relative;
+    overflow: hidden;
+}
+
+div[data-testid="stMetric"]::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(90deg, #2CA0FF, #2ED47A);
+}
+
+div[data-testid="stMetricLabel"] {
+    color: #AFC7E8 !important;
+    font-weight: 700;
+}
+
+div[data-testid="stMetricValue"] {
+    color: #FFFFFF !important;
+    font-weight: 900;
+    font-size: 28px !important;
+}
+
+/* Alertas Streamlit */
+div[data-testid="stAlert"] {
+    background: linear-gradient(135deg, rgba(14,42,79,.88), rgba(7,26,51,.88)) !important;
+    border: 1px solid rgba(120,180,255,.18) !important;
+    border-radius: 16px !important;
+    color: #EAF4FF !important;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .18);
+}
+
+/* Inputs */
+.stTextInput input,
+.stSelectbox div[data-baseweb="select"] > div,
+.stMultiSelect div[data-baseweb="select"] > div {
+    background: rgba(6, 18, 34, 0.96) !important;
+    color: #F6FAFF !important;
+    border: 1px solid rgba(120,180,255,.22) !important;
+    border-radius: 12px !important;
+}
+
+.stTextInput input:focus {
+    border-color: rgba(44,160,255,.75) !important;
+    box-shadow: 0 0 0 2px rgba(44,160,255,.18) !important;
+}
+
+/* Botões */
+.stButton button,
+.stDownloadButton button,
+button[kind="primary"],
+button[kind="secondary"] {
+    background: linear-gradient(135deg, #0E64C8, #2CA0FF) !important;
+    color: #FFFFFF !important;
+    border: 1px solid rgba(255,255,255,.18) !important;
+    border-radius: 13px !important;
+    font-weight: 800 !important;
+    box-shadow: 0 10px 24px rgba(44,160,255,.25);
+    transition: all .18s ease;
+}
+
+.stButton button:hover,
+.stDownloadButton button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 32px rgba(44,160,255,.34);
+}
+
+/* Dataframes */
+div[data-testid="stDataFrame"] {
+    width: 100% !important;
+    border-radius: 18px !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(120,180,255,.16);
+    box-shadow: 0 16px 38px rgba(0, 0, 0, .24);
+}
+
+div[data-testid="stDataFrame"] > div {
+    width: 100% !important;
+    background: rgba(7, 17, 31, .88) !important;
+}
+
+/* Tabs e radios */
+div[role="radiogroup"] label {
+    color: #EAF4FF !important;
+}
+
+.stRadio label {
+    color: #EAF4FF !important;
+}
+
+/* Plotly */
+.js-plotly-plot,
+.plotly,
+.plot-container {
+    border-radius: 18px !important;
+}
+
+/* Cards customizados opcionais */
+.eirox-card {
+    background: linear-gradient(135deg, rgba(15,39,71,.96), rgba(8,20,38,.94));
+    border: 1px solid rgba(120,180,255,.17);
+    border-radius: 18px;
+    padding: 18px;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, .26);
+    margin-bottom: 16px;
+}
+
+.eirox-section-title {
+    font-size: 13px;
+    color: #9FD0FF;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    font-weight: 900;
+    margin-bottom: 8px;
+}
+
+.eirox-hero {
+    background:
+        radial-gradient(circle at top right, rgba(44,160,255,.22), transparent 28%),
+        linear-gradient(135deg, rgba(15,39,71,.96), rgba(7,17,31,.96));
+    border: 1px solid rgba(120,180,255,.18);
+    border-radius: 22px;
+    padding: 22px 24px;
+    margin-bottom: 18px;
+    box-shadow: 0 18px 45px rgba(0,0,0,.30);
+}
+
+.eirox-hero h1 {
+    margin: 0;
+    font-size: 30px;
+}
+
+.eirox-hero p {
+    margin: 6px 0 0 0;
+    color: #BFD7FF !important;
+}
+
+/* Destaques por prioridade em HTML */
+.tag-critical {
+    background: rgba(255,92,122,.14);
+    color: #FFD6DE;
+    border: 1px solid rgba(255,92,122,.36);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-weight: 800;
+}
+
+.tag-high {
+    background: rgba(255,138,61,.14);
+    color: #FFE3CF;
+    border: 1px solid rgba(255,138,61,.36);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-weight: 800;
+}
+
+.tag-medium {
+    background: rgba(255,185,70,.14);
+    color: #FFF1CF;
+    border: 1px solid rgba(255,185,70,.36);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-weight: 800;
+}
+
+.tag-low {
+    background: rgba(46,212,122,.14);
+    color: #D7FFE8;
+    border: 1px solid rgba(46,212,122,.36);
+    border-radius: 999px;
+    padding: 3px 9px;
+    font-weight: 800;
+}
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# --------------------------------------------------
+# ALERTA TELEGRAM DE ACESSO
+# --------------------------------------------------
+
+def obter_config_telegram(nome):
+
+    """
+    Busca configuração primeiro no Streamlit Secrets e depois em variável de ambiente.
+    Não deixa token sensível fixo no código.
+    """
+
+    try:
+        if hasattr(st, "secrets") and nome in st.secrets:
+            return str(st.secrets[nome]).strip()
+    except Exception:
+        pass
+
+    try:
+        return str(os.environ.get(nome, "")).strip()
+    except Exception:
+        return ""
+
+
+def enviar_alerta_telegram(mensagem):
+
+    """
+    Envia alerta de acesso para Telegram.
+    Para ativar no Streamlit Cloud, configurar em Secrets:
+
+    TELEGRAM_BOT_TOKEN = "seu_token"
+    TELEGRAM_CHAT_ID = "seu_chat_id"
+    """
+
+    token = obter_config_telegram("TELEGRAM_BOT_TOKEN")
+    chat_id = obter_config_telegram("TELEGRAM_CHAT_ID")
+
+    if not token or not chat_id:
+        return False
+
+    try:
+
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+
+        payload = urllib.parse.urlencode(
+            {
+                "chat_id": chat_id,
+                "text": mensagem,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": "true"
+            }
+        ).encode("utf-8")
+
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            method="POST"
+        )
+
+        with urllib.request.urlopen(req, timeout=5) as resposta:
+            return resposta.status == 200
+
+    except Exception:
+        return False
+
+
+
+def horario_brasil_formatado():
+    """
+    Retorna horário do Brasil para alertas, corrigindo UTC do Streamlit Cloud.
+    """
+
+    try:
+        return datetime.now(
+            ZoneInfo("America/Sao_Paulo")
+        ).strftime("%d/%m/%Y %H:%M:%S")
+    except Exception:
+        return horario_brasil_formatado()
+
+
+
+def obter_localizacao_query_params():
+    try:
+        params = st.query_params
+
+        lat = params.get("geo_lat", "")
+        lon = params.get("geo_lon", "")
+        acc = params.get("geo_acc", "")
+        status = params.get("geo_status", "")
+
+        if isinstance(lat, list):
+            lat = lat[0] if lat else ""
+        if isinstance(lon, list):
+            lon = lon[0] if lon else ""
+        if isinstance(acc, list):
+            acc = acc[0] if acc else ""
+        if isinstance(status, list):
+            status = status[0] if status else ""
+
+        lat = str(lat).strip()
+        lon = str(lon).strip()
+        acc = str(acc).strip()
+        status = str(status).strip()
+
+        if lat and lon:
+            st.session_state["geo_lat"] = lat
+            st.session_state["geo_lon"] = lon
+            st.session_state["geo_acc"] = acc
+            st.session_state["geo_status"] = "autorizada"
+        elif status:
+            st.session_state["geo_status"] = status
+
+        return {
+            "lat": st.session_state.get("geo_lat", ""),
+            "lon": st.session_state.get("geo_lon", ""),
+            "acc": st.session_state.get("geo_acc", ""),
+            "status": st.session_state.get("geo_status", "pendente")
+        }
+
+    except Exception:
+        return {"lat": "", "lon": "", "acc": "", "status": "indisponivel"}
+
+
+def texto_localizacao_telegram():
+    try:
+        geo = obter_localizacao_query_params()
+        lat = geo.get("lat", "")
+        lon = geo.get("lon", "")
+        acc = geo.get("acc", "")
+        status = geo.get("status", "pendente")
+
+        if lat and lon:
+            mapa = f"https://www.google.com/maps?q={lat},{lon}"
+            if acc:
+                return f"📍 <b>Localização:</b> {lat}, {lon}\n🎯 <b>Precisão:</b> {acc} metros\n🗺️ <b>Mapa:</b> {mapa}\n"
+            return f"📍 <b>Localização:</b> {lat}, {lon}\n🗺️ <b>Mapa:</b> {mapa}\n"
+
+        if status == "negada":
+            return "📍 <b>Localização:</b> permissão negada pelo usuário\n"
+
+        return "📍 <b>Localização:</b> aguardando permissão do navegador\n"
+
+    except Exception:
+        return "📍 <b>Localização:</b> indisponível\n"
+
+
+def solicitar_localizacao_navegador():
+    try:
+        components.html(
+            """
+            <script>
+            (function() {
+                const params = new URLSearchParams(window.parent.location.search);
+
+                if (params.get("geo_lat") && params.get("geo_lon")) {
+                    return;
+                }
+
+                if (!navigator.geolocation) {
+                    params.set("geo_status", "indisponivel");
+                    window.parent.history.replaceState(null, "", "?" + params.toString());
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        params.set("geo_lat", position.coords.latitude.toFixed(6));
+                        params.set("geo_lon", position.coords.longitude.toFixed(6));
+                        params.set("geo_acc", Math.round(position.coords.accuracy));
+                        params.set("geo_status", "autorizada");
+                        window.parent.history.replaceState(null, "", "?" + params.toString());
+                    },
+                    function(error) {
+                        params.set("geo_status", "negada");
+                        window.parent.history.replaceState(null, "", "?" + params.toString());
+                    },
+                    { enableHighAccuracy: true, timeout: 7000, maximumAge: 300000 }
+                );
+            })();
+            </script>
+            """,
+            height=0,
+            width=0
+        )
+
+        obter_localizacao_query_params()
+
+    except Exception:
+        pass
+
+
+def enviar_alerta_localizacao_capturada():
+    try:
+        if not st.session_state.get("logado", False):
+            return
+
+        geo = obter_localizacao_query_params()
+
+        if not geo.get("lat") or not geo.get("lon"):
+            return
+
+        if st.session_state.get("alerta_localizacao_enviado", False):
+            return
+
+        usuario = st.session_state.get("usuario", "")
+        nome = st.session_state.get("nome_usuario", "")
+        perfil = st.session_state.get("perfil_usuario", "")
+        ambiente = "Streamlit Cloud" if "/mount/src" in str(Path.cwd()) else "Localhost"
+
+        mensagem = (
+            "📍 <b>Localização capturada no Eirox Pricing</b>\n\n"
+            f"👤 <b>Usuário:</b> {usuario}\n"
+            f"🙋 <b>Nome:</b> {nome}\n"
+            f"🔐 <b>Perfil:</b> {perfil}\n"
+            f"🕒 <b>Horário:</b> {horario_brasil_formatado()}\n"
+            f"{texto_localizacao_telegram()}"
+            f"🌐 <b>Ambiente:</b> {ambiente}\n"
+            f"🏷️ <b>Versão:</b> {VERSAO_APP}"
+        )
+
+        if enviar_alerta_telegram(mensagem):
+            st.session_state["alerta_localizacao_enviado"] = True
+
+    except Exception:
+        pass
+
+
+def registrar_alerta_login(usuario, nome, perfil):
+
+    """
+    Envia alerta uma única vez por sessão autenticada.
+    Evita disparos repetidos a cada rerun do Streamlit.
+    """
+
+    try:
+
+        chave_sessao = f"alerta_login_enviado_{usuario}"
+
+        if st.session_state.get(chave_sessao, False):
+            return
+
+        ambiente = "Streamlit Cloud" if "/mount/src" in str(Path.cwd()) else "Localhost"
+
+        mensagem = (
+            "🚀 <b>Novo acesso no Eirox Pricing</b>\n\n"
+            f"👤 <b>Usuário:</b> {usuario}\n"
+            f"🙋 <b>Nome:</b> {nome}\n"
+            f"🔐 <b>Perfil:</b> {perfil}\n"
+            f"🕒 <b>Horário:</b> {horario_brasil_formatado()}\n"
+            f"{texto_localizacao_telegram()}"
+            f"🌐 <b>Ambiente:</b> {ambiente}\n"
+            f"🏷️ <b>Versão:</b> {VERSAO_APP}"
+        )
+
+        enviado = enviar_alerta_telegram(mensagem)
+
+        if enviado:
+            st.session_state[chave_sessao] = True
+
+    except Exception:
+        pass
+
+
+
+
+# --------------------------------------------------
+# CENTRAL DE AUDITORIA / LOGS DE ACESSO
+# --------------------------------------------------
+
+LOG_DIR = Path("logs")
+LOG_ARQUIVO = LOG_DIR / "log_acessos.csv"
+
+
+def usuario_pode_ver_auditoria():
+    try:
+        return usuario_master()
+    except Exception:
+        return False
+
+
+def salvar_log_acesso(evento, tela="", detalhe=""):
+    try:
+        LOG_DIR.mkdir(exist_ok=True)
+
+        ambiente = "Streamlit Cloud" if "/mount/src" in str(Path.cwd()) else "Localhost"
+
+        linha = {
+            "Data_Hora": horario_brasil_formatado() if "horario_brasil_formatado" in globals() else datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            "Usuario": st.session_state.get("usuario", ""),
+            "Nome": st.session_state.get("nome_usuario", ""),
+            "Perfil": st.session_state.get("perfil_usuario", ""),
+            "Evento": str(evento),
+            "Tela": str(tela),
+            "Detalhe": str(detalhe),
+            "Latitude": st.session_state.get("geo_lat", ""),
+            "Longitude": st.session_state.get("geo_lon", ""),
+            "Precisao_Metros": st.session_state.get("geo_acc", ""),
+            "Status_Localizacao": st.session_state.get("geo_status", ""),
+            "Ambiente": ambiente,
+            "Versao": VERSAO_APP
+        }
+
+        existe = LOG_ARQUIVO.exists()
+
+        with open(LOG_ARQUIVO, "a", newline="", encoding="utf-8-sig") as f:
+            writer = csv.DictWriter(f, fieldnames=list(linha.keys()), delimiter=";")
+            if not existe:
+                writer.writeheader()
+            writer.writerow(linha)
+
+    except Exception:
+        pass
+
+
+def carregar_logs_acesso():
+    try:
+        if not LOG_ARQUIVO.exists():
+            return pd.DataFrame()
+
+        logs = pd.read_csv(LOG_ARQUIVO, sep=";", encoding="utf-8-sig")
+
+        if not logs.empty and "Data_Hora" in logs.columns:
+            logs["Data_Hora_dt"] = pd.to_datetime(
+                logs["Data_Hora"],
+                format="%d/%m/%Y %H:%M:%S",
+                errors="coerce"
+            )
+
+        return logs
+    except Exception:
+        return pd.DataFrame()
+
+
+
+def exportar_auditoria_excel(logs_detalhe, ranking_usuarios, ranking_telas, acessos_dia):
+    """
+    Gera arquivo Excel da Central de Auditoria Avançada.
+    """
+
+    try:
+        output = io.BytesIO()
+
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            logs_detalhe.to_excel(writer, index=False, sheet_name="Historico")
+            ranking_usuarios.to_excel(writer, index=False, sheet_name="Ranking_Usuarios")
+            ranking_telas.to_excel(writer, index=False, sheet_name="Ranking_Telas")
+            acessos_dia.to_excel(writer, index=False, sheet_name="Acessos_por_Dia")
+
+        output.seek(0)
+
+        return output.getvalue()
+
+    except Exception:
+        return b""
+
+
+
+
+
+
+# --------------------------------------------------
+# BACKUP CENTER - HOMOLOGAÇÃO v1.35.4
+# --------------------------------------------------
+
+BACKUP_DIR = Path("backups_eirox")
+
+
+def _backup_agora_tag():
+    try:
+        return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%Y%m%d_%H%M%S")
+    except Exception:
+        return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+
+def _backup_agora_br():
+    try:
+        return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S")
+    except Exception:
+        return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+def _backup_tamanho_formatado(bytes_valor):
+    try:
+        bytes_valor = float(bytes_valor)
+
+        if bytes_valor >= 1024 ** 3:
+            return f"{bytes_valor / (1024 ** 3):.2f} GB".replace(".", ",")
+
+        if bytes_valor >= 1024 ** 2:
+            return f"{bytes_valor / (1024 ** 2):.2f} MB".replace(".", ",")
+
+        if bytes_valor >= 1024:
+            return f"{bytes_valor / 1024:.2f} KB".replace(".", ",")
+
+        return f"{int(bytes_valor)} B"
+
+    except Exception:
+        return "0 B"
+
+
+def _backup_arquivos_alvo():
+    return [
+        "dashboard_pricing.py",
+        "pricing_utils.py",
+        "style.css",
+        "logo eirox.png",
+        "Analise_Pricing.xlsx",
+        "VENDA_TESTE",
+        "VENDA_FINAL_TESTE",
+        "COMPRA_TESTE",
+        "ESTOQUE_TESTE",
+        "logs",
+        "USUARIOS_EIROX.csv",
+        ".streamlit"
+    ]
+
+
+def _backup_status_alvos():
+    linhas = []
+
+    for alvo in _backup_arquivos_alvo():
+        p = Path(alvo)
+        existe = p.exists()
+        tipo = "Pasta" if existe and p.is_dir() else "Arquivo"
+        tamanho = 0
+        qtd_arquivos = 0
+        atualizado_ts = None
+
+        try:
+            if existe and p.is_file():
+                tamanho = p.stat().st_size
+                qtd_arquivos = 1
+                atualizado_ts = p.stat().st_mtime
+
+            elif existe and p.is_dir():
+                for arq in p.rglob("*"):
+                    if arq.is_file():
+                        qtd_arquivos += 1
+                        tamanho += arq.stat().st_size
+                        if atualizado_ts is None or arq.stat().st_mtime > atualizado_ts:
+                            atualizado_ts = arq.stat().st_mtime
+
+        except Exception:
+            pass
+
+        atualizado = ""
+        try:
+            if atualizado_ts:
+                atualizado = datetime.fromtimestamp(atualizado_ts).strftime("%d/%m/%Y %H:%M:%S")
+        except Exception:
+            atualizado = ""
+
+        linhas.append(
+            {
+                "Item": alvo,
+                "Status": "🟢 Encontrado" if existe else "🟡 Não encontrado",
+                "Tipo": tipo if existe else "-",
+                "Arquivos": qtd_arquivos,
+                "Tamanho": _backup_tamanho_formatado(tamanho),
+                "Última Atualização": atualizado
+            }
+        )
+
+    return pd.DataFrame(linhas)
+
+
+def gerar_backup_eirox(nome_manual=""):
+    try:
+        BACKUP_DIR.mkdir(exist_ok=True)
+
+        tag = _backup_agora_tag()
+        nome_base = str(nome_manual).strip()
+
+        if not nome_base:
+            nome_base = f"BACKUP_EIROX_PRICING_{VERSAO_APP}_{tag}"
+
+        nome_base = (
+            nome_base
+            .replace("/", "_")
+            .replace("\\", "_")
+            .replace(":", "_")
+            .replace(" ", "_")
+        )
+
+        zip_path = BACKUP_DIR / f"{nome_base}.zip"
+
+        itens_incluidos = []
+        itens_ignorados = []
+
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
+
+            readme = (
+                "EIROX PRICING ENTERPRISE - BACKUP OFICIAL\\n\\n"
+                f"Versão: {VERSAO_APP}\\n"
+                f"Data/Hora: {_backup_agora_br()}\\n"
+                f"Gerado por: {st.session_state.get('usuario', '')}\\n\\n"
+                "Conteúdo:\\n"
+                "- Código principal\\n"
+                "- Bases operacionais\\n"
+                "- Logs\\n"
+                "- Usuários\\n"
+                "- Configurações locais disponíveis\\n\\n"
+                "Observação: secrets do Streamlit Cloud não são exportados automaticamente por segurança.\\n"
+            )
+
+            z.writestr("README_BACKUP.txt", readme)
+
+            for alvo in _backup_arquivos_alvo():
+                p = Path(alvo)
+
+                if not p.exists():
+                    itens_ignorados.append(alvo)
+                    continue
+
+                if p.is_file():
+                    z.write(p, arcname=str(p))
+                    itens_incluidos.append(str(p))
+
+                elif p.is_dir():
+                    for arq in p.rglob("*"):
+                        if not arq.is_file():
+                            continue
+
+                        if ".git" in arq.parts or "__pycache__" in arq.parts:
+                            continue
+
+                        # Evita backup dentro de backup gigante
+                        if BACKUP_DIR.name in arq.parts:
+                            continue
+
+                        z.write(arq, arcname=str(arq))
+                        itens_incluidos.append(str(arq))
+
+        tamanho = zip_path.stat().st_size if zip_path.exists() else 0
+
+        try:
+            registrar_log_usuario(
+                "Backup",
+                str(zip_path.name),
+                f"Backup gerado com {len(itens_incluidos)} itens. Ignorados: {len(itens_ignorados)}"
+            )
+        except Exception:
+            pass
+
+        try:
+            enviar_alerta_telegram(
+                "📦 <b>Backup gerado no Eirox Pricing</b>\\n\\n"
+                f"📄 <b>Arquivo:</b> {zip_path.name}\\n"
+                f"📦 <b>Tamanho:</b> {_backup_tamanho_formatado(tamanho)}\\n"
+                f"✅ <b>Itens incluídos:</b> {len(itens_incluidos)}\\n"
+                f"⚠️ <b>Itens não encontrados:</b> {len(itens_ignorados)}\\n"
+                f"🕒 <b>Horário:</b> {_backup_agora_br()}\\n"
+                f"👤 <b>Usuário:</b> {st.session_state.get('usuario', '')}\\n"
+                f"🏷️ <b>Versão:</b> {VERSAO_APP}"
+            )
+        except Exception:
+            pass
+
+        return {
+            "ok": True,
+            "arquivo": str(zip_path),
+            "nome": zip_path.name,
+            "tamanho": tamanho,
+            "itens_incluidos": len(itens_incluidos),
+            "itens_ignorados": itens_ignorados
+        }
+
+    except Exception as erro:
+        return {
+            "ok": False,
+            "erro": str(erro),
+            "arquivo": "",
+            "nome": "",
+            "tamanho": 0,
+            "itens_incluidos": 0,
+            "itens_ignorados": []
+        }
+
+
+def listar_backups_eirox():
+    try:
+        BACKUP_DIR.mkdir(exist_ok=True)
+
+        linhas = []
+
+        for arq in sorted(BACKUP_DIR.glob("*.zip"), key=lambda x: x.stat().st_mtime, reverse=True):
+            linhas.append(
+                {
+                    "Arquivo": arq.name,
+                    "Caminho": str(arq),
+                    "Tamanho": _backup_tamanho_formatado(arq.stat().st_size),
+                    "Bytes": arq.stat().st_size,
+                    "Criado em": datetime.fromtimestamp(arq.stat().st_mtime).strftime("%d/%m/%Y %H:%M:%S")
+                }
+            )
+
+        return pd.DataFrame(linhas)
+
+    except Exception:
+        return pd.DataFrame()
+
+
+def _backup_ultimo():
+    try:
+        backups = listar_backups_eirox()
+        if backups.empty:
+            return None
+        return backups.iloc[0].to_dict()
+    except Exception:
+        return None
+
+
+def _backup_espaco_total():
+    try:
+        total = 0
+        if not BACKUP_DIR.exists():
+            return 0
+        for arq in BACKUP_DIR.glob("*.zip"):
+            total += arq.stat().st_size
+        return total
+    except Exception:
+        return 0
+
+
+def limpar_backups_antigos(manter=10):
+    try:
+        BACKUP_DIR.mkdir(exist_ok=True)
+        backups = sorted(
+            BACKUP_DIR.glob("*.zip"),
+            key=lambda x: x.stat().st_mtime,
+            reverse=True
+        )
+
+        removidos = 0
+
+        for arq in backups[int(manter):]:
+            try:
+                arq.unlink()
+                removidos += 1
+            except Exception:
+                pass
+
+        return removidos
+
+    except Exception:
+        return 0
+
+
+
+# --------------------------------------------------
+# SAÚDE DO SISTEMA - HOMOLOGAÇÃO v1.35.3
+# --------------------------------------------------
+
+def _health_numero_br(valor):
+    try:
+        return f"{int(valor):,}".replace(",", ".")
+    except Exception:
+        return "0"
+
+
+def _health_formatar_data(timestamp):
+    try:
+        return datetime.fromtimestamp(timestamp).strftime("%d/%m/%Y %H:%M:%S")
+    except Exception:
+        return ""
+
+
+def _health_status_base(qtd_arquivos, ultima_atualizacao):
+    try:
+        if qtd_arquivos <= 0:
+            return "🔴 Não encontrada"
+
+        if ultima_atualizacao:
+            dt = datetime.strptime(ultima_atualizacao, "%d/%m/%Y %H:%M:%S")
+            dias = (datetime.now() - dt).days
+            if dias >= 7:
+                return "🟡 Desatualizada"
+
+        return "🟢 OK"
+    except Exception:
+        return "🟢 OK" if qtd_arquivos > 0 else "🔴 Não encontrada"
+
+
+def _health_ler_amostra_arquivo(arquivo):
+    try:
+        if arquivo.suffix.lower() == ".csv":
+            try:
+                return pd.read_csv(arquivo, sep=";", encoding="utf-8-sig")
+            except Exception:
+                return pd.read_csv(arquivo, encoding="utf-8-sig")
+        return pd.read_excel(arquivo)
+    except Exception:
+        return pd.DataFrame()
+
+
+def _health_analisar_pasta(nome_base, caminhos):
+    inicio = time.time()
+    arquivos = []
+
+    for caminho in caminhos:
+        p = Path(caminho)
+        if p.exists() and p.is_dir():
+            for ext in ["*.xlsx", "*.xls", "*.xlsm", "*.csv"]:
+                arquivos.extend(list(p.glob(ext)))
+        elif p.exists() and p.is_file():
+            arquivos.append(p)
+
+    arquivos = sorted(set(arquivos), key=lambda x: str(x))
+
+    total_registros = 0
+    erros = []
+    ultima_ts = None
+
+    for arquivo in arquivos:
+        try:
+            ultima_ts_arq = arquivo.stat().st_mtime
+            if ultima_ts is None or ultima_ts_arq > ultima_ts:
+                ultima_ts = ultima_ts_arq
+
+            temp = _health_ler_amostra_arquivo(arquivo)
+            if isinstance(temp, pd.DataFrame) and not temp.empty:
+                total_registros += len(temp)
+        except Exception as erro:
+            erros.append(f"{arquivo.name}: {erro}")
+
+    ultima_atualizacao = _health_formatar_data(ultima_ts) if ultima_ts else ""
+    tempo = round(time.time() - inicio, 2)
+
+    return {
+        "Base": nome_base,
+        "Status": _health_status_base(len(arquivos), ultima_atualizacao),
+        "Arquivos": len(arquivos),
+        "Registros": total_registros,
+        "Última Atualização": ultima_atualizacao,
+        "Tempo Leitura (s)": tempo,
+        "Caminhos": ", ".join([str(a) for a in arquivos[:5]]),
+        "Erros": " | ".join(erros[:5])
+    }
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def gerar_saude_bases():
+    bases = [
+        ("VENDA_TESTE", ["VENDA_TESTE", "VENDA_TESTE.zip"]),
+        ("VENDA_FINAL_TESTE", ["VENDA_FINAL_TESTE", "VENDA_TESTE_FINAL", "VENDA_FINAL", "VENDA_REDE", "VENDA_FINAL_TESTE.zip", "VENDA_TESTE_FINAL.zip", "VENDA_FINAL.zip"]),
+        ("COMPRA_TESTE", ["COMPRA_TESTE", "COMPRA", "COMPRAS_TESTE", "COMPRA_TESTE.zip", "COMPRA.zip"]),
+        ("ESTOQUE_TESTE", ["ESTOQUE_TESTE", "ESTOQUE", "ESTOQUE_TESTE.zip", "ESTOQUE.zip"]),
+        ("Analise_Pricing.xlsx", ["Analise_Pricing.xlsx"])
+    ]
+    return pd.DataFrame([_health_analisar_pasta(nome, caminhos) for nome, caminhos in bases])
+
+
+def diagnostico_integridade_basico():
+    checks = []
+    try:
+        bases_memoria = {
+            "Analise_Pricing": df if "df" in globals() else pd.DataFrame(),
+            "VENDA_TESTE": historico if "historico" in globals() else pd.DataFrame(),
+            "VENDA_FINAL_TESTE": venda_rede if "venda_rede" in globals() else pd.DataFrame(),
+            "COMPRA_TESTE": compra if "compra" in globals() else pd.DataFrame(),
+            "ESTOQUE_TESTE": estoque if "estoque" in globals() else pd.DataFrame()
+        }
+
+        for nome, base in bases_memoria.items():
+            if not isinstance(base, pd.DataFrame) or base.empty:
+                checks.append({"Base": nome, "Verificação": "Base carregada", "Status": "🔴 Erro", "Ocorrências": 0, "Detalhe": "Base vazia ou não carregada."})
+                continue
+
+            checks.append({"Base": nome, "Verificação": "Base carregada", "Status": "🟢 OK", "Ocorrências": len(base), "Detalhe": "Base disponível em memória."})
+
+            colunas = base.columns.astype(str).tolist()
+
+            col_ean = None
+            for c in colunas:
+                if str(c).strip().lower() in ["ean", "ean (gtin)", "gtin", "cód. barras/etiq.", "cod. barras/etiq.", "codigo de barras", "código de barras"]:
+                    col_ean = c
+                    break
+
+            col_produto = None
+            for c in colunas:
+                if "produto" in str(c).lower() or "descr" in str(c).lower():
+                    col_produto = c
+                    break
+
+            col_preco = None
+            for c in colunas:
+                if "preço" in str(c).lower() or "preco" in str(c).lower() or "valor" in str(c).lower():
+                    col_preco = c
+                    break
+
+            if col_ean:
+                serie_ean = base[col_ean].astype(str).str.strip()
+                vazios = int(serie_ean.isin(["", "nan", "None"]).sum())
+                checks.append({"Base": nome, "Verificação": "EAN vazio", "Status": "🟢 OK" if vazios == 0 else "🟡 Atenção", "Ocorrências": vazios, "Detalhe": f"Coluna analisada: {col_ean}"})
+
+                duplicados = int(serie_ean.duplicated().sum())
+                checks.append({"Base": nome, "Verificação": "EAN duplicado", "Status": "🟢 OK" if duplicados == 0 else "🟡 Atenção", "Ocorrências": duplicados, "Detalhe": f"Coluna analisada: {col_ean}"})
+
+            if col_produto:
+                vazios_prod = int(base[col_produto].astype(str).str.strip().isin(["", "nan", "None"]).sum())
+                checks.append({"Base": nome, "Verificação": "Produto/descrição vazio", "Status": "🟢 OK" if vazios_prod == 0 else "🟡 Atenção", "Ocorrências": vazios_prod, "Detalhe": f"Coluna analisada: {col_produto}"})
+
+            if col_preco:
+                if "converter_numero_brasil" in globals():
+                    serie = converter_numero_brasil(base[col_preco])
+                else:
+                    serie = pd.to_numeric(base[col_preco], errors="coerce")
+                zerados = int((serie.fillna(0) <= 0).sum())
+                checks.append({"Base": nome, "Verificação": "Preço/valor zerado ou inválido", "Status": "🟢 OK" if zerados == 0 else "🟡 Atenção", "Ocorrências": zerados, "Detalhe": f"Coluna analisada: {col_preco}"})
+
+    except Exception as erro:
+        checks.append({"Base": "Sistema", "Verificação": "Diagnóstico", "Status": "🔴 Erro", "Ocorrências": 1, "Detalhe": str(erro)})
+
+    return pd.DataFrame(checks)
+
+
+def health_status_telegram():
+    try:
+        token = obter_config_telegram("TELEGRAM_BOT_TOKEN") if "obter_config_telegram" in globals() else ""
+        chat = obter_config_telegram("TELEGRAM_CHAT_ID") if "obter_config_telegram" in globals() else ""
+        return "🟢 Configurado" if token and chat else "🟡 Não configurado"
+    except Exception:
+        return "🔴 Erro"
+
+
+def health_status_usuarios():
+    try:
+        if "carregar_usuarios_sistema" in globals():
+            base = carregar_usuarios_sistema()
+            total = len(base)
+            ativos = int((base["Ativo"].astype(str).str.lower() == "sim").sum()) if not base.empty and "Ativo" in base.columns else 0
+            return total, ativos, total - ativos
+        return 0, 0, 0
+    except Exception:
+        return 0, 0, 0
+
+
+def health_ultimo_login():
+    try:
+        logs = carregar_logs_acesso() if "carregar_logs_acesso" in globals() else pd.DataFrame()
+        if logs.empty or "Evento" not in logs.columns:
+            return "-"
+        logins = logs[logs["Evento"].astype(str).eq("Login")].copy()
+        if logins.empty:
+            return "-"
+        if "Data_Hora_dt" not in logins.columns:
+            logins["Data_Hora_dt"] = pd.to_datetime(logins["Data_Hora"], format="%d/%m/%Y %H:%M:%S", errors="coerce")
+        return logins.sort_values("Data_Hora_dt", ascending=False)["Data_Hora"].iloc[0]
+    except Exception:
+        return "-"
+
+
+
+
+# --------------------------------------------------
+# MULTIEMPRESA - HOMOLOGAÇÃO v1.35.5
+# --------------------------------------------------
+
+EMPRESAS_ARQUIVO = Path("EMPRESAS_EIROX.csv")
+
+
+def usuario_master():
+    """
+    Usuário master da plataforma.
+    """
+
+    try:
+        return (
+            str(st.session_state.get("usuario", ""))
+            .strip()
+            .lower()
+            == "paulomarques"
+        )
+
+    except Exception:
+        return False
+
+
+def inicializar_empresas():
+    try:
+        if not EMPRESAS_ARQUIVO.exists():
+            base = pd.DataFrame(
+                [
+                    {
+                        "EmpresaID": "1",
+                        "Empresa": "Marabá - Cliente teste",
+                        "Ativa": "Sim",
+                        "Criado_Em": horario_brasil_formatado() if "horario_brasil_formatado" in globals() else datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                    },
+                    {
+                        "EmpresaID": "2",
+                        "Empresa": "Belém - Cliente teste",
+                        "Ativa": "Sim",
+                        "Criado_Em": horario_brasil_formatado() if "horario_brasil_formatado" in globals() else datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                    }
+                ]
+            )
+            base.to_csv(EMPRESAS_ARQUIVO, index=False, sep=";", encoding="utf-8-sig")
+        return True
+    except Exception:
+        return False
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_empresas_sistema():
+    try:
+        inicializar_empresas()
+        base = pd.read_csv(EMPRESAS_ARQUIVO, sep=";", encoding="utf-8-sig", dtype=str).fillna("")
+
+        obrigatorias = ["EmpresaID", "Empresa", "Ativa", "Criado_Em"]
+
+        for col in obrigatorias:
+            if col not in base.columns:
+                base[col] = ""
+
+        base["EmpresaID"] = base["EmpresaID"].astype(str).str.strip()
+        base["Empresa"] = base["Empresa"].astype(str).str.strip()
+        base["Ativa"] = base["Ativa"].replace("", "Sim")
+
+        return base[obrigatorias].copy()
+
+    except Exception:
+        return pd.DataFrame([{"EmpresaID": "1", "Empresa": "Marabá - Cliente teste", "Ativa": "Sim", "Criado_Em": ""}])
+
+
+def salvar_empresas_sistema(base):
+    try:
+        base = base.copy()
+        base["EmpresaID"] = base["EmpresaID"].astype(str).str.strip()
+        base["Empresa"] = base["Empresa"].astype(str).str.strip()
+        base.to_csv(EMPRESAS_ARQUIVO, index=False, sep=";", encoding="utf-8-sig")
+
+        try:
+            carregar_empresas_sistema.clear()
+        except Exception:
+            pass
+
+        return True
+    except Exception:
+        return False
+
+
+def criar_ou_atualizar_empresa(empresa_id, empresa, ativa="Sim"):
+    try:
+        empresa_id = str(empresa_id).strip()
+        empresa = str(empresa).strip()
+        ativa = str(ativa).strip()
+
+        if not empresa_id or not empresa:
+            return False, "EmpresaID e nome da empresa são obrigatórios."
+
+        base = carregar_empresas_sistema()
+
+        if empresa_id in base["EmpresaID"].astype(str).tolist():
+            idx = base.index[base["EmpresaID"].astype(str) == empresa_id][0]
+            base.loc[idx, "Empresa"] = empresa
+            base.loc[idx, "Ativa"] = ativa
+            acao = "Atualização de empresa"
+        else:
+            nova = pd.DataFrame(
+                [
+                    {
+                        "EmpresaID": empresa_id,
+                        "Empresa": empresa,
+                        "Ativa": ativa,
+                        "Criado_Em": horario_brasil_formatado() if "horario_brasil_formatado" in globals() else datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                    }
+                ]
+            )
+            base = pd.concat([base, nova], ignore_index=True)
+            acao = "Criação de empresa"
+
+        salvar_empresas_sistema(base)
+
+        try:
+            registrar_log_usuario(acao, empresa_id, f"Empresa: {empresa} | Ativa: {ativa}")
+        except Exception:
+            pass
+
+        return True, f"{acao} realizada com sucesso."
+
+    except Exception as erro:
+        return False, f"Erro ao salvar empresa: {erro}"
+
+
+def obter_nome_empresa(empresa_id):
+    try:
+        empresa_id = str(empresa_id).strip()
+        empresas = carregar_empresas_sistema()
+        linha = empresas[empresas["EmpresaID"].astype(str).str.strip() == empresa_id]
+
+        if linha.empty:
+            return "Empresa não identificada"
+
+        return str(linha.iloc[0]["Empresa"])
+
+    except Exception:
+        return "Empresa não identificada"
+
+
+def empresa_usuario_logado():
+    try:
+        empresa_id = str(st.session_state.get("empresa_id_usuario", "1")).strip()
+        return empresa_id if empresa_id else "1"
+    except Exception:
+        return "1"
+
+
+def empresa_contexto_atual():
+    try:
+        if usuario_master():
+            return str(st.session_state.get("empresa_id_contexto", empresa_usuario_logado())).strip()
+        return empresa_usuario_logado()
+    except Exception:
+        return "1"
+
+
+def aplicar_filtro_empresa(base):
+    try:
+        if not isinstance(base, pd.DataFrame) or base.empty:
+            return base
+        if "EmpresaID" not in base.columns:
+            return base
+        empresa_id = empresa_contexto_atual()
+        return base[base["EmpresaID"].astype(str).str.strip() == str(empresa_id)].copy()
+    except Exception:
+        return base
+
+
+def preparar_base_usuarios_multiempresa():
+    try:
+        if "carregar_usuarios_sistema" not in globals() or "salvar_usuarios_sistema" not in globals():
+            return
+
+        base = carregar_usuarios_sistema()
+
+        if "EmpresaID" not in base.columns:
+            base["EmpresaID"] = "1"
+
+            if "Usuario" in base.columns:
+                base.loc[
+                    base["Usuario"].astype(str).str.lower().eq("paulomarques"),
+                    "EmpresaID"
+                ] = "1"
+
+            salvar_usuarios_sistema(base)
+
+    except Exception:
+        pass
+
+
+def usuario_pode_ver_multiempresa():
+    return usuario_master()
+
+
+
+
+# --------------------------------------------------
+# EXPERIÊNCIA ENTERPRISE - SUBTÍTULOS E AJUDA
+# --------------------------------------------------
+
+DESCRICOES_TELAS_ENTERPRISE = {
+    "📊 Dashboard Geral": "Visão consolidada dos principais indicadores de pricing, margem, lucratividade e competitividade.",
+    "📊 Painel Geral": "Visão consolidada dos principais indicadores de pricing, margem, lucratividade e competitividade.",
+    "🔎 Rede/Loja vs Concorrentes": "Comparativo detalhado entre preços praticados pela rede e seus principais concorrentes.",
+    "🔍 Rede/Loja vs Concorrentes": "Comparativo detalhado entre preços praticados pela rede e seus principais concorrentes.",
+    "📈 Evolução Histórica": "Acompanhamento da evolução dos preços ao longo do tempo por produto e farmácia.",
+    "🗺️ Mapa Farmácias": "Distribuição geográfica das farmácias pesquisadas e análise regional de preços.",
+    "🧠 Simulador Inteligente": "Simule cenários de preço, margem e competitividade antes de tomar decisões comerciais.",
+    "👥 Controle de Usuários": "Gerenciamento de acessos, permissões, bloqueios, expiração de senha e políticas de segurança.",
+    "🔐 Central de Auditoria": "Monitoramento completo dos acessos, navegação e atividades realizadas pelos usuários.",
+    "🟢 Saúde do Sistema": "Monitoramento operacional do ambiente, performance, integridade das bases e integrações.",
+    "📦 Backup Center": "Gerenciamento de backups, restauração e proteção das informações críticas do sistema.",
+    "🏢 Multiempresa": "Administração de empresas, segregação de dados e preparação do ambiente SaaS.",
+    "📌 Sobre o Eirox": "Informações institucionais, propósito da plataforma e visão geral do produto.",
+    "🧭 Roadmap do Produto": "Plano evolutivo da plataforma, módulos concluídos, próximos ciclos e prioridades.",
+    "💼 Licenciamento Multiempresa": "Modelo comercial, planos de uso, governança de clientes e expansão SaaS.",
+    "💼 Licenciamento Real": "Controle real de planos, expiração, limites de usuários, lojas e bloqueio de licença.",
+    "🚨 Alertas Inteligentes": "Monitoramento automático de riscos e oportunidades comerciais com envio via Telegram.",
+    "💰 Motor de Oportunidades": "Ranking financeiro das maiores oportunidades de ganho por produto, laboratório, categoria e loja."
+}
+
+
+def legenda_tela(titulo, texto=None):
+    try:
+        descricao = texto or DESCRICOES_TELAS_ENTERPRISE.get(titulo, "")
+        if descricao:
+            st.caption(f"ⓘ {descricao}")
+    except Exception:
+        pass
+
+
+def card_enterprise(titulo, descricao, icone="ⓘ"):
+    st.markdown(
+        f"""
+        <div class="eirox-card">
+            <div class="eirox-section-title">{icone} {titulo}</div>
+            <p>{descricao}</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+
+
+# --------------------------------------------------
+# LICENCIAMENTO REAL - v1.36.0
+# --------------------------------------------------
+
+LICENCAS_ARQUIVO = Path("LICENCAS_EIROX.csv")
+
+
+PLANOS_EIROX = {
+    "Starter": {
+        "MaxUsuarios": 5,
+        "MaxLojas": 10,
+        "Modulos": "Dashboard + Concorrência"
+    },
+    "Professional": {
+        "MaxUsuarios": 20,
+        "MaxLojas": 50,
+        "Modulos": "Dashboard + Concorrência + Simulador + Auditoria"
+    },
+    "Enterprise": {
+        "MaxUsuarios": 100,
+        "MaxLojas": 500,
+        "Modulos": "Todos os módulos"
+    },
+    "Enterprise Plus": {
+        "MaxUsuarios": 9999,
+        "MaxLojas": 9999,
+        "Modulos": "Todos + APIs + IA Pricing"
+    }
+}
+
+
+def inicializar_licencas():
+    """
+    Cria base inicial de licenças.
+    """
+
+    try:
+        if not LICENCAS_ARQUIVO.exists():
+
+            hoje = datetime.now(ZoneInfo("America/Sao_Paulo"))
+
+            base = pd.DataFrame(
+                [
+                    {
+                        "EmpresaID": "1",
+                        "Empresa": "Marabá - Cliente teste",
+                        "Plano": "Enterprise",
+                        "DataInicio": hoje.strftime("%d/%m/%Y"),
+                        "DataExpiracao": (hoje + pd.DateOffset(years=1)).strftime("%d/%m/%Y"),
+                        "MaxUsuarios": str(PLANOS_EIROX["Enterprise"]["MaxUsuarios"]),
+                        "MaxLojas": str(PLANOS_EIROX["Enterprise"]["MaxLojas"]),
+                        "Status": "Ativa",
+                        "Observacao": "Licença inicial de homologação"
+                    },
+                    {
+                        "EmpresaID": "2",
+                        "Empresa": "Belém - Cliente teste",
+                        "Plano": "Starter",
+                        "DataInicio": hoje.strftime("%d/%m/%Y"),
+                        "DataExpiracao": (hoje + pd.DateOffset(days=30)).strftime("%d/%m/%Y"),
+                        "MaxUsuarios": str(PLANOS_EIROX["Starter"]["MaxUsuarios"]),
+                        "MaxLojas": str(PLANOS_EIROX["Starter"]["MaxLojas"]),
+                        "Status": "Trial",
+                        "Observacao": "Cliente teste"
+                    }
+                ]
+            )
+
+            base.to_csv(
+                LICENCAS_ARQUIVO,
+                index=False,
+                sep=";",
+                encoding="utf-8-sig"
+            )
+
+        return True
+
+    except Exception:
+        return False
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_licencas_sistema():
+    """
+    Carrega licenças cadastradas.
+    """
+
+    try:
+        inicializar_licencas()
+
+        base = pd.read_csv(
+            LICENCAS_ARQUIVO,
+            sep=";",
+            encoding="utf-8-sig",
+            dtype=str
+        ).fillna("")
+
+        obrigatorias = [
+            "EmpresaID",
+            "Empresa",
+            "Plano",
+            "DataInicio",
+            "DataExpiracao",
+            "MaxUsuarios",
+            "MaxLojas",
+            "Status",
+            "Observacao"
+        ]
+
+        for col in obrigatorias:
+            if col not in base.columns:
+                base[col] = ""
+
+        base["EmpresaID"] = base["EmpresaID"].astype(str).str.strip()
+        base["Empresa"] = base["Empresa"].astype(str).str.strip()
+        base["Plano"] = base["Plano"].replace("", "Starter")
+        base["Status"] = base["Status"].replace("", "Ativa")
+
+        return base[obrigatorias].copy()
+
+    except Exception:
+        return pd.DataFrame()
+
+
+def salvar_licencas_sistema(base):
+    """
+    Salva base de licenças.
+    """
+
+    try:
+        base = base.copy()
+        base = base.astype(str)
+        base["EmpresaID"] = base["EmpresaID"].astype(str).str.strip()
+
+        base.to_csv(
+            LICENCAS_ARQUIVO,
+            index=False,
+            sep=";",
+            encoding="utf-8-sig"
+        )
+
+        try:
+            carregar_licencas_sistema.clear()
+        except Exception:
+            pass
+
+        return True
+
+    except Exception:
+        return False
+
+
+def obter_licenca_empresa(empresa_id):
+    """
+    Retorna licença da empresa.
+    """
+
+    try:
+        empresa_id = str(empresa_id).strip()
+        licencas = carregar_licencas_sistema()
+
+        linha = licencas[
+            licencas["EmpresaID"].astype(str).str.strip() == empresa_id
+        ]
+
+        if linha.empty:
+            return None
+
+        return linha.iloc[0].to_dict()
+
+    except Exception:
+        return None
+
+
+def dias_restantes_licenca(data_expiracao):
+    """
+    Calcula dias restantes da licença.
+    """
+
+    try:
+        data_exp = pd.to_datetime(
+            str(data_expiracao),
+            dayfirst=True,
+            errors="coerce"
+        )
+
+        if pd.isna(data_exp):
+            return None
+
+        hoje = pd.Timestamp.now().normalize()
+
+        return int((data_exp.normalize() - hoje).days)
+
+    except Exception:
+        return None
+
+
+def status_licenca_empresa(empresa_id):
+    """
+    Status operacional da licença.
+    """
+
+    try:
+        lic = obter_licenca_empresa(empresa_id)
+
+        if not lic:
+            return {
+                "StatusOperacional": "🔴 Sem licença",
+                "Bloqueada": True,
+                "DiasRestantes": None,
+                "Mensagem": "Empresa sem licença cadastrada."
+            }
+
+        status = str(lic.get("Status", "")).strip()
+        dias = dias_restantes_licenca(lic.get("DataExpiracao", ""))
+
+        if status.lower() in ["bloqueada", "inativa", "cancelada"]:
+            return {
+                "StatusOperacional": "🔴 Bloqueada",
+                "Bloqueada": True,
+                "DiasRestantes": dias,
+                "Mensagem": "Licença bloqueada ou inativa."
+            }
+
+        if dias is not None and dias < 0:
+            return {
+                "StatusOperacional": "🔴 Expirada",
+                "Bloqueada": True,
+                "DiasRestantes": dias,
+                "Mensagem": "Licença expirada."
+            }
+
+        if status.lower() == "trial":
+            return {
+                "StatusOperacional": "🟡 Trial",
+                "Bloqueada": False,
+                "DiasRestantes": dias,
+                "Mensagem": "Licença em período de teste."
+            }
+
+        if dias is not None and dias <= 15:
+            return {
+                "StatusOperacional": "🟡 Próxima do vencimento",
+                "Bloqueada": False,
+                "DiasRestantes": dias,
+                "Mensagem": "Licença próxima do vencimento."
+            }
+
+        return {
+            "StatusOperacional": "🟢 Ativa",
+            "Bloqueada": False,
+            "DiasRestantes": dias,
+            "Mensagem": "Licença ativa."
+        }
+
+    except Exception as erro:
+        return {
+            "StatusOperacional": "🔴 Erro",
+            "Bloqueada": True,
+            "DiasRestantes": None,
+            "Mensagem": str(erro)
+        }
+
+
+def validar_licenca_login(usuario):
+    """
+    Valida licença no login.
+    paulomarques não é bloqueado para suporte master.
+    """
+
+    try:
+        usuario = str(usuario).strip().lower()
+
+        if usuario in ["paulomarques"]:
+            return True, ""
+
+        dados = obter_dados_usuario(usuario) if "obter_dados_usuario" in globals() else None
+
+        empresa_id = "1"
+
+        if dados:
+            empresa_id = str(dados.get("EmpresaID", "1")).strip() or "1"
+
+        status = status_licenca_empresa(empresa_id)
+
+        if status.get("Bloqueada"):
+            return False, f"{status.get('StatusOperacional')} - {status.get('Mensagem')}"
+
+        return True, ""
+
+    except Exception:
+        return True, ""
+
+
+def contar_usuarios_empresa(empresa_id):
+    """
+    Conta usuários vinculados à empresa.
+    """
+
+    try:
+        if "carregar_usuarios_sistema" not in globals():
+            return 0
+
+        usuarios = carregar_usuarios_sistema()
+
+        if usuarios.empty:
+            return 0
+
+        if "EmpresaID" not in usuarios.columns:
+            usuarios["EmpresaID"] = "1"
+
+        return int(
+            usuarios[
+                usuarios["EmpresaID"].astype(str).str.strip() == str(empresa_id).strip()
+            ]["Usuario"].nunique()
+        )
+
+    except Exception:
+        return 0
+
+
+def contar_lojas_empresa(empresa_id):
+    """
+    Conta lojas quando houver colunas compatíveis.
+    Se a base ainda não tiver EmpresaID, calcula de forma geral para compatibilidade.
+    """
+
+    try:
+        bases = []
+
+        for nome_var in ["df", "venda_rede", "historico"]:
+            base = globals().get(nome_var, pd.DataFrame())
+
+            if isinstance(base, pd.DataFrame) and not base.empty:
+                temp = base.copy()
+
+                if "EmpresaID" in temp.columns:
+                    temp = temp[
+                        temp["EmpresaID"].astype(str).str.strip() == str(empresa_id).strip()
+                    ]
+
+                bases.append(temp)
+
+        if not bases:
+            return 0
+
+        base_all = pd.concat(bases, ignore_index=True)
+
+        col_loja = None
+
+        for c in base_all.columns:
+            nome = str(c).lower()
+            if nome in ["loja", "filial", "cod_loja", "codigo loja", "código loja"] or "loja" in nome or "filial" in nome:
+                col_loja = c
+                break
+
+        if col_loja:
+            return int(base_all[col_loja].astype(str).nunique())
+
+        col_farmacia = None
+
+        for c in base_all.columns:
+            nome = str(c).lower()
+            if "farmácia" in nome or "farmacia" in nome:
+                col_farmacia = c
+                break
+
+        if col_farmacia:
+            return int(base_all[col_farmacia].astype(str).nunique())
+
+        return 0
+
+    except Exception:
+        return 0
+
+
+def licenca_metricas_empresa(empresa_id):
+    """
+    Métricas completas de licença.
+    """
+
+    try:
+        lic = obter_licenca_empresa(empresa_id) or {}
+        status = status_licenca_empresa(empresa_id)
+
+        max_usuarios = int(float(str(lic.get("MaxUsuarios", 0)).replace(",", ".") or 0))
+        max_lojas = int(float(str(lic.get("MaxLojas", 0)).replace(",", ".") or 0))
+
+        usuarios_usados = contar_usuarios_empresa(empresa_id)
+        lojas_usadas = contar_lojas_empresa(empresa_id)
+
+        return {
+            "Licenca": lic,
+            "Status": status,
+            "MaxUsuarios": max_usuarios,
+            "MaxLojas": max_lojas,
+            "UsuariosUsados": usuarios_usados,
+            "LojasUsadas": lojas_usadas,
+            "UsuariosDisponiveis": max(max_usuarios - usuarios_usados, 0),
+            "LojasDisponiveis": max(max_lojas - lojas_usadas, 0)
+        }
+
+    except Exception:
+        return {
+            "Licenca": {},
+            "Status": {},
+            "MaxUsuarios": 0,
+            "MaxLojas": 0,
+            "UsuariosUsados": 0,
+            "LojasUsadas": 0,
+            "UsuariosDisponiveis": 0,
+            "LojasDisponiveis": 0
+        }
+
+
+def criar_ou_atualizar_licenca(empresa_id, empresa, plano, data_inicio, data_expiracao, status, observacao=""):
+    """
+    Cria ou atualiza licença.
+    """
+
+    try:
+        empresa_id = str(empresa_id).strip()
+        empresa = str(empresa).strip()
+        plano = str(plano).strip()
+        status = str(status).strip()
+
+        if not empresa_id or not empresa or not plano:
+            return False, "EmpresaID, Empresa e Plano são obrigatórios."
+
+        plano_info = PLANOS_EIROX.get(plano, PLANOS_EIROX["Starter"])
+
+        base = carregar_licencas_sistema()
+
+        if empresa_id in base["EmpresaID"].astype(str).tolist():
+            idx = base.index[base["EmpresaID"].astype(str) == empresa_id][0]
+
+            base.loc[idx, "Empresa"] = empresa
+            base.loc[idx, "Plano"] = plano
+            base.loc[idx, "DataInicio"] = data_inicio
+            base.loc[idx, "DataExpiracao"] = data_expiracao
+            base.loc[idx, "MaxUsuarios"] = str(plano_info["MaxUsuarios"])
+            base.loc[idx, "MaxLojas"] = str(plano_info["MaxLojas"])
+            base.loc[idx, "Status"] = status
+            base.loc[idx, "Observacao"] = observacao
+
+            acao = "Atualização de licença"
+
+        else:
+            nova = pd.DataFrame(
+                [
+                    {
+                        "EmpresaID": empresa_id,
+                        "Empresa": empresa,
+                        "Plano": plano,
+                        "DataInicio": data_inicio,
+                        "DataExpiracao": data_expiracao,
+                        "MaxUsuarios": str(plano_info["MaxUsuarios"]),
+                        "MaxLojas": str(plano_info["MaxLojas"]),
+                        "Status": status,
+                        "Observacao": observacao
+                    }
+                ]
+            )
+
+            base = pd.concat(
+                [
+                    base,
+                    nova
+                ],
+                ignore_index=True
+            )
+
+            acao = "Criação de licença"
+
+        salvar_licencas_sistema(base)
+
+        try:
+            registrar_log_usuario(
+                acao,
+                empresa_id,
+                f"Empresa={empresa} | Plano={plano} | Status={status} | Expiração={data_expiracao}"
+            )
+        except Exception:
+            pass
+
+        try:
+            enviar_alerta_telegram(
+                "💼 <b>Licença Eirox atualizada</b>\n\n"
+                f"🏢 <b>Empresa:</b> {empresa}\n"
+                f"📦 <b>Plano:</b> {plano}\n"
+                f"📅 <b>Expiração:</b> {data_expiracao}\n"
+                f"🔐 <b>Status:</b> {status}\n"
+                f"👤 <b>Usuário:</b> {st.session_state.get('usuario', '')}\n"
+                f"🏷️ <b>Versão:</b> {VERSAO_APP}"
+            )
+        except Exception:
+            pass
+
+        return True, f"{acao} realizada com sucesso."
+
+    except Exception as erro:
+        return False, f"Erro ao salvar licença: {erro}"
+
+
+def usuario_pode_ver_licenciamento_real():
+    try:
+        return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() == "paulomarques"
+    except Exception:
+        return False
+
+
+
+
+# --------------------------------------------------
+# ALERTAS INTELIGENTES - v1.36.1
+# --------------------------------------------------
+
+ALERTAS_ARQUIVO = Path("ALERTAS_EIROX.csv")
+
+
+def _alerta_numero_br(valor, casas=2):
+    try:
+        return f"{float(valor):,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return "0,00"
+
+
+def _alerta_data_hora():
+    try:
+        return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S")
+    except Exception:
+        return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+def _alerta_salvar(alertas):
+    try:
+        if not alertas:
+            return
+
+        novos = pd.DataFrame(alertas)
+
+        if ALERTAS_ARQUIVO.exists():
+            antigo = pd.read_csv(ALERTAS_ARQUIVO, sep=";", encoding="utf-8-sig", dtype=str).fillna("")
+            final = pd.concat([antigo, novos], ignore_index=True)
+        else:
+            final = novos
+
+        final.to_csv(ALERTAS_ARQUIVO, index=False, sep=";", encoding="utf-8-sig")
+
+    except Exception:
+        pass
+
+
+def carregar_historico_alertas():
+    try:
+        if not ALERTAS_ARQUIVO.exists():
+            return pd.DataFrame()
+
+        return pd.read_csv(ALERTAS_ARQUIVO, sep=";", encoding="utf-8-sig", dtype=str).fillna("")
+    except Exception:
+        return pd.DataFrame()
+
+
+def _alerta_coluna(base, possibilidades):
+    try:
+        cols = list(base.columns)
+
+        for alvo in possibilidades:
+            alvo_norm = str(alvo).strip().lower()
+            for c in cols:
+                if str(c).strip().lower() == alvo_norm:
+                    return c
+
+        for alvo in possibilidades:
+            alvo_norm = str(alvo).strip().lower()
+            for c in cols:
+                if alvo_norm in str(c).strip().lower():
+                    return c
+
+        return None
+    except Exception:
+        return None
+
+
+def _alerta_converter_numero(serie):
+    try:
+        if "converter_numero_brasil" in globals():
+            return converter_numero_brasil(serie)
+
+        return pd.to_numeric(
+            serie.astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False),
+            errors="coerce"
+        )
+    except Exception:
+        return pd.to_numeric(serie, errors="coerce")
+
+
+def gerar_alertas_inteligentes(limite_margem=20, limite_diferenca_concorrente=10, dias_sem_pesquisa=7, limite_estoque_alto=50, limite_alertas=100):
+    alertas = []
+
+    try:
+        base = globals().get("df", pd.DataFrame())
+
+        if not isinstance(base, pd.DataFrame) or base.empty:
+            base = globals().get("base_pesquisa", pd.DataFrame())
+
+        if not isinstance(base, pd.DataFrame) or base.empty:
+            return pd.DataFrame()
+
+        base = base.copy()
+
+        try:
+            if "aplicar_filtro_empresa" in globals():
+                base = aplicar_filtro_empresa(base)
+        except Exception:
+            pass
+
+        empresa_id = empresa_contexto_atual() if "empresa_contexto_atual" in globals() else "1"
+        empresa_nome = obter_nome_empresa(empresa_id) if "obter_nome_empresa" in globals() else ""
+
+        col_ean = _alerta_coluna(base, ["EAN", "EAN (GTIN)", "GTIN", "Código de Barras"])
+        col_prod = _alerta_coluna(base, ["Produto", "Produto_Base_SIM", "Descrição", "Descricao"])
+        col_margem = _alerta_coluna(base, ["Margem_%", "Margem", "Margem %"])
+        col_preco_rede = _alerta_coluna(base, ["Preco_Rede", "Preço Rede", "Preco Loja", "Preço Loja", "Preco_Venda", "Preço (R$)"])
+        col_preco_conc = _alerta_coluna(base, ["Menor_Preco_Concorrente", "Menor Concorrente", "Preco_Concorrente", "Preço Concorrente", "Menor_Preco"])
+        col_estoque = _alerta_coluna(base, ["Estoque", "Estoque Atual", "Qtde Estoque", "Quantidade Estoque"])
+        col_data = _alerta_coluna(base, ["Data", "Data Pesquisa", "Data_Pesquisa", "Última Pesquisa", "Ultima Pesquisa"])
+        col_ganho = _alerta_coluna(base, ["Ganho_Potencial", "Potencial de Captura", "Oportunidade"])
+
+        if col_margem:
+            margem = _alerta_converter_numero(base[col_margem])
+            temp = base[margem < float(limite_margem)].copy()
+            temp["_valor_alerta"] = margem[margem < float(limite_margem)]
+
+            for _, row in temp.head(limite_alertas).iterrows():
+                alertas.append({
+                    "Data_Hora": _alerta_data_hora(),
+                    "EmpresaID": empresa_id,
+                    "Empresa": empresa_nome,
+                    "Tipo": "Margem abaixo da meta",
+                    "Severidade": "Alta",
+                    "EAN": str(row.get(col_ean, "")) if col_ean else "",
+                    "Produto": str(row.get(col_prod, "")) if col_prod else "",
+                    "Valor": _alerta_numero_br(row.get("_valor_alerta", "")),
+                    "Regra": f"Margem menor que {limite_margem}%",
+                    "Ação Sugerida": "Revisar preço, custo ou negociação de compra."
+                })
+
+        if col_preco_rede and col_preco_conc:
+            preco_rede = _alerta_converter_numero(base[col_preco_rede])
+            preco_conc = _alerta_converter_numero(base[col_preco_conc])
+            dif = ((preco_rede - preco_conc) / preco_rede.replace(0, pd.NA)) * 100
+            mask = (preco_rede > 0) & (preco_conc > 0) & (dif > float(limite_diferenca_concorrente))
+
+            temp = base[mask].copy()
+            temp["_dif_alerta"] = dif[mask]
+
+            for _, row in temp.head(limite_alertas).iterrows():
+                alertas.append({
+                    "Data_Hora": _alerta_data_hora(),
+                    "EmpresaID": empresa_id,
+                    "Empresa": empresa_nome,
+                    "Tipo": "Concorrente mais barato",
+                    "Severidade": "Alta",
+                    "EAN": str(row.get(col_ean, "")) if col_ean else "",
+                    "Produto": str(row.get(col_prod, "")) if col_prod else "",
+                    "Valor": f"{_alerta_numero_br(row.get('_dif_alerta', ''))}%",
+                    "Regra": f"Concorrente mais barato acima de {limite_diferenca_concorrente}%",
+                    "Ação Sugerida": "Avaliar ajuste de preço ou estratégia por curva/margem."
+                })
+
+        if col_data:
+            datas = pd.to_datetime(base[col_data], dayfirst=True, errors="coerce")
+            dias = (pd.Timestamp.now().normalize() - datas.dt.normalize()).dt.days
+            mask = dias > int(dias_sem_pesquisa)
+
+            temp = base[mask].copy()
+            temp["_dias_alerta"] = dias[mask]
+
+            for _, row in temp.head(limite_alertas).iterrows():
+                valor = row.get("_dias_alerta", 0)
+                alertas.append({
+                    "Data_Hora": _alerta_data_hora(),
+                    "EmpresaID": empresa_id,
+                    "Empresa": empresa_nome,
+                    "Tipo": "Produto sem pesquisa recente",
+                    "Severidade": "Média",
+                    "EAN": str(row.get(col_ean, "")) if col_ean else "",
+                    "Produto": str(row.get(col_prod, "")) if col_prod else "",
+                    "Valor": f"{int(valor) if pd.notna(valor) else 0} dias",
+                    "Regra": f"Sem pesquisa há mais de {dias_sem_pesquisa} dias",
+                    "Ação Sugerida": "Incluir produto na próxima sugestão de pesquisa."
+                })
+
+        if col_estoque and col_margem:
+            estoque = _alerta_converter_numero(base[col_estoque])
+            margem = _alerta_converter_numero(base[col_margem])
+            mask = (estoque >= float(limite_estoque_alto)) & (margem < float(limite_margem))
+
+            temp = base[mask].copy()
+            temp["_estoque_alerta"] = estoque[mask]
+
+            for _, row in temp.head(limite_alertas).iterrows():
+                alertas.append({
+                    "Data_Hora": _alerta_data_hora(),
+                    "EmpresaID": empresa_id,
+                    "Empresa": empresa_nome,
+                    "Tipo": "Estoque alto com margem baixa",
+                    "Severidade": "Alta",
+                    "EAN": str(row.get(col_ean, "")) if col_ean else "",
+                    "Produto": str(row.get(col_prod, "")) if col_prod else "",
+                    "Valor": _alerta_numero_br(row.get("_estoque_alerta", ""), 0),
+                    "Regra": f"Estoque >= {limite_estoque_alto} e margem < {limite_margem}%",
+                    "Ação Sugerida": "Avaliar promoção, negociação ou reposicionamento de preço."
+                })
+
+        if col_ganho:
+            ganho = _alerta_converter_numero(base[col_ganho])
+            limite_ganho = ganho.quantile(0.90) if ganho.notna().sum() > 10 else ganho.mean()
+
+            if pd.notna(limite_ganho) and limite_ganho > 0:
+                temp = base[ganho >= limite_ganho].copy()
+                temp["_ganho_alerta"] = ganho[ganho >= limite_ganho]
+
+                for _, row in temp.head(limite_alertas).iterrows():
+                    alertas.append({
+                        "Data_Hora": _alerta_data_hora(),
+                        "EmpresaID": empresa_id,
+                        "Empresa": empresa_nome,
+                        "Tipo": "Alta oportunidade de ganho",
+                        "Severidade": "Média",
+                        "EAN": str(row.get(col_ean, "")) if col_ean else "",
+                        "Produto": str(row.get(col_prod, "")) if col_prod else "",
+                        "Valor": f"R$ {_alerta_numero_br(row.get('_ganho_alerta', ''))}",
+                        "Regra": "Produto no top 10% de ganho potencial",
+                        "Ação Sugerida": "Priorizar na análise comercial e no simulador."
+                    })
+
+        alertas_df = pd.DataFrame(alertas)
+
+        if not alertas_df.empty:
+            alertas_df = alertas_df.drop_duplicates(subset=["EmpresaID", "Tipo", "EAN", "Produto"], keep="first").head(limite_alertas)
+
+        return alertas_df
+
+    except Exception as erro:
+        return pd.DataFrame([{
+            "Data_Hora": _alerta_data_hora(),
+            "EmpresaID": empresa_contexto_atual() if "empresa_contexto_atual" in globals() else "1",
+            "Empresa": "",
+            "Tipo": "Erro ao gerar alertas",
+            "Severidade": "Alta",
+            "EAN": "",
+            "Produto": "",
+            "Valor": "",
+            "Regra": "Falha no motor de alertas",
+            "Ação Sugerida": str(erro)
+        }])
+
+
+def enviar_alertas_telegram(alertas_df, limite_envio=10):
+    try:
+        if alertas_df is None or alertas_df.empty:
+            return False, "Nenhum alerta para enviar."
+
+        top = alertas_df.head(int(limite_envio))
+        linhas = []
+
+        for _, row in top.iterrows():
+            linhas.append(f"• <b>{row.get('Tipo', '')}</b> | {row.get('Produto', '')} | {row.get('Valor', '')}")
+
+        mensagem = (
+            "🚨 <b>Alertas Inteligentes Eirox</b>\n\n"
+            f"🏢 <b>Empresa:</b> {top.iloc[0].get('Empresa', '')}\n"
+            f"📊 <b>Total gerado:</b> {len(alertas_df)}\n"
+            f"🕒 <b>Horário:</b> {_alerta_data_hora()}\n\n"
+            + "\n".join(linhas[:limite_envio])
+            + f"\n\n🏷️ <b>Versão:</b> {VERSAO_APP}"
+        )
+
+        ok = enviar_alerta_telegram(mensagem) if "enviar_alerta_telegram" in globals() else False
+        return bool(ok), "Alertas enviados ao Telegram." if ok else "Não foi possível enviar ao Telegram."
+
+    except Exception as erro:
+        return False, str(erro)
+
+
+def usuario_pode_ver_alertas_inteligentes():
+    try:
+        return usuario_master() or tela_liberada_por_plano("🚨 Alertas Inteligentes")
+    except Exception:
+        return False
+
+# --------------------------------------------------
+# MOTOR DE OPORTUNIDADES - v1.36.2
+# --------------------------------------------------
+
+OPORTUNIDADES_ARQUIVO = Path("OPORTUNIDADES_EIROX.csv")
+
+
+def _oport_numero_br(valor, casas=2):
+    try:
+        return f"{float(valor):,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return "0,00"
+
+
+def _oport_data_hora():
+    try:
+        return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S")
+    except Exception:
+        return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+def _oport_coluna(base, possibilidades):
+    try:
+        cols = list(base.columns)
+        for alvo in possibilidades:
+            alvo_norm = str(alvo).strip().lower()
+            for c in cols:
+                if str(c).strip().lower() == alvo_norm:
+                    return c
+        for alvo in possibilidades:
+            alvo_norm = str(alvo).strip().lower()
+            for c in cols:
+                if alvo_norm in str(c).strip().lower():
+                    return c
+        return None
+    except Exception:
+        return None
+
+
+def _oport_converter_numero(serie):
+    try:
+        if "converter_numero_brasil" in globals():
+            return converter_numero_brasil(serie)
+        return pd.to_numeric(serie.astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False), errors="coerce")
+    except Exception:
+        return pd.to_numeric(serie, errors="coerce")
+
+
+def carregar_historico_oportunidades():
+    try:
+        if not OPORTUNIDADES_ARQUIVO.exists():
+            return pd.DataFrame()
+        return pd.read_csv(OPORTUNIDADES_ARQUIVO, sep=";", encoding="utf-8-sig", dtype=str).fillna("")
+    except Exception:
+        return pd.DataFrame()
+
+
+def salvar_oportunidades(oportunidades_df):
+    try:
+        if oportunidades_df is None or oportunidades_df.empty:
+            return
+        salvar = oportunidades_df.copy()
+        salvar["Data_Hora"] = _oport_data_hora()
+        if OPORTUNIDADES_ARQUIVO.exists():
+            antigo = pd.read_csv(OPORTUNIDADES_ARQUIVO, sep=";", encoding="utf-8-sig", dtype=str).fillna("")
+            final = pd.concat([antigo, salvar], ignore_index=True)
+        else:
+            final = salvar
+        final.to_csv(OPORTUNIDADES_ARQUIVO, index=False, sep=";", encoding="utf-8-sig")
+    except Exception:
+        pass
+
+
+def gerar_motor_oportunidades(top_n=100, margem_minima=20, apenas_oportunidade_positiva=True):
+    try:
+        base = globals().get("df", pd.DataFrame())
+        if not isinstance(base, pd.DataFrame) or base.empty:
+            base = globals().get("base_pesquisa", pd.DataFrame())
+        if not isinstance(base, pd.DataFrame) or base.empty:
+            return pd.DataFrame()
+
+        base = base.copy()
+        try:
+            if "aplicar_filtro_empresa" in globals():
+                base = aplicar_filtro_empresa(base)
+        except Exception:
+            pass
+
+        empresa_id = empresa_contexto_atual() if "empresa_contexto_atual" in globals() else "1"
+        empresa_nome = obter_nome_empresa(empresa_id) if "obter_nome_empresa" in globals() else ""
+
+        col_ean = _oport_coluna(base, ["EAN", "EAN (GTIN)", "GTIN", "Código de Barras"])
+        col_prod = _oport_coluna(base, ["Produto", "Produto_Base_SIM", "Descrição", "Descricao"])
+        col_lab = _oport_coluna(base, ["Laboratório", "Laboratorio", "Fabricante", "Fornecedor"])
+        col_cat = _oport_coluna(base, ["Categoria", "Família", "Familia", "Departamento", "Classe"])
+        col_ganho = _oport_coluna(base, ["Ganho_Potencial", "Potencial de Captura", "Oportunidade", "Potencial"])
+        col_fat = _oport_coluna(base, ["Faturamento", "Venda", "Receita", "Faturamento_Total"])
+        col_margem = _oport_coluna(base, ["Margem_%", "Margem", "Margem %"])
+        col_preco = _oport_coluna(base, ["Preco_Rede", "Preço Rede", "Preco_Venda", "Preço (R$)", "Preço"])
+        col_custo = _oport_coluna(base, ["Custo", "Custo Médio", "Custo_Medio", "Custo Atual"])
+        col_qtd = _oport_coluna(base, ["Quantidade", "Qtd", "Qtde", "Unidades", "Volume"])
+        col_estoque = _oport_coluna(base, ["Estoque", "Estoque Atual", "Qtde Estoque"])
+        col_conc = _oport_coluna(base, ["Menor_Preco_Concorrente", "Menor Concorrente", "Preco_Concorrente", "Preço Concorrente", "Menor_Preco"])
+
+        trabalho = pd.DataFrame(index=base.index)
+        trabalho["EmpresaID"] = empresa_id
+        trabalho["Empresa"] = empresa_nome
+        trabalho["EAN"] = base[col_ean].astype(str) if col_ean else ""
+        trabalho["Produto"] = base[col_prod].astype(str) if col_prod else ""
+        trabalho["Laboratório"] = base[col_lab].astype(str) if col_lab else "Não informado"
+        trabalho["Categoria"] = base[col_cat].astype(str) if col_cat else "Não informado"
+
+        if col_ganho:
+            trabalho["Ganho_Potencial"] = _oport_converter_numero(base[col_ganho]).fillna(0)
+        else:
+            preco = _oport_converter_numero(base[col_preco]).fillna(0) if col_preco else pd.Series([0] * len(base), index=base.index)
+            qtd = _oport_converter_numero(base[col_qtd]).fillna(1) if col_qtd else pd.Series([1] * len(base), index=base.index)
+            margem = _oport_converter_numero(base[col_margem]).fillna(0) if col_margem else pd.Series([0] * len(base), index=base.index)
+            fator = 0.03
+            ajuste_margem = (float(margem_minima) - margem).clip(lower=0) / 100
+            trabalho["Ganho_Potencial"] = (preco * qtd * (fator + ajuste_margem)).fillna(0)
+
+        trabalho["Faturamento"] = _oport_converter_numero(base[col_fat]).fillna(0) if col_fat else 0
+        trabalho["Margem_%"] = _oport_converter_numero(base[col_margem]).fillna(0) if col_margem else 0
+        trabalho["Preço_Rede"] = _oport_converter_numero(base[col_preco]).fillna(0) if col_preco else 0
+        trabalho["Custo"] = _oport_converter_numero(base[col_custo]).fillna(0) if col_custo else 0
+        trabalho["Estoque"] = _oport_converter_numero(base[col_estoque]).fillna(0) if col_estoque else 0
+        trabalho["Preço_Concorrente"] = _oport_converter_numero(base[col_conc]).fillna(0) if col_conc else 0
+
+        def classificar(row):
+            ganho = float(row.get("Ganho_Potencial", 0) or 0)
+            margem = float(row.get("Margem_%", 0) or 0)
+            estoque = float(row.get("Estoque", 0) or 0)
+            preco = float(row.get("Preço_Rede", 0) or 0)
+            conc = float(row.get("Preço_Concorrente", 0) or 0)
+            if ganho > 0 and margem < float(margem_minima):
+                return "Recuperar margem"
+            if ganho > 0 and conc > 0 and preco > conc:
+                return "Revisar competitividade"
+            if ganho > 0 and estoque > 50:
+                return "Giro de estoque"
+            if ganho > 0:
+                return "Ganho potencial"
+            return "Monitorar"
+
+        trabalho["Tipo_Oportunidade"] = trabalho.apply(classificar, axis=1)
+
+        def acao(row):
+            tipo = row.get("Tipo_Oportunidade", "")
+            if tipo == "Recuperar margem":
+                return "Avaliar preço, custo e negociação com fornecedor."
+            if tipo == "Revisar competitividade":
+                return "Simular ajuste de preço com base no concorrente."
+            if tipo == "Giro de estoque":
+                return "Avaliar ação comercial para acelerar giro."
+            if tipo == "Ganho potencial":
+                return "Priorizar análise no simulador inteligente."
+            return "Manter acompanhamento."
+
+        trabalho["Ação_Sugerida"] = trabalho.apply(acao, axis=1)
+
+        agrup_cols = ["EmpresaID", "Empresa", "EAN", "Produto", "Laboratório", "Categoria"]
+        trabalho = (
+            trabalho.groupby(agrup_cols, dropna=False)
+            .agg(
+                Ganho_Potencial=("Ganho_Potencial", "sum"),
+                Faturamento=("Faturamento", "sum"),
+                Margem_Media=("Margem_%", "mean"),
+                Estoque_Total=("Estoque", "sum"),
+                Preco_Medio=("Preço_Rede", "mean"),
+                Concorrente_Medio=("Preço_Concorrente", "mean"),
+                Tipo_Oportunidade=("Tipo_Oportunidade", "first"),
+                Ação_Sugerida=("Ação_Sugerida", "first")
+            )
+            .reset_index()
+        )
+
+        if apenas_oportunidade_positiva:
+            trabalho = trabalho[trabalho["Ganho_Potencial"] > 0]
+
+        trabalho = trabalho.sort_values("Ganho_Potencial", ascending=False).head(int(top_n))
+        trabalho["Ranking"] = range(1, len(trabalho) + 1)
+
+        cols = ["Ranking", "EmpresaID", "Empresa", "EAN", "Produto", "Laboratório", "Categoria", "Ganho_Potencial", "Faturamento", "Margem_Media", "Estoque_Total", "Preco_Medio", "Concorrente_Medio", "Tipo_Oportunidade", "Ação_Sugerida"]
+        return trabalho[cols].copy()
+
+    except Exception as erro:
+        return pd.DataFrame([{
+            "Ranking": 1, "EmpresaID": empresa_contexto_atual() if "empresa_contexto_atual" in globals() else "1",
+            "Empresa": "", "EAN": "", "Produto": "", "Laboratório": "", "Categoria": "",
+            "Ganho_Potencial": 0, "Faturamento": 0, "Margem_Media": 0, "Estoque_Total": 0,
+            "Preco_Medio": 0, "Concorrente_Medio": 0, "Tipo_Oportunidade": "Erro", "Ação_Sugerida": str(erro)
+        }])
+
+
+def enviar_oportunidades_telegram(oportunidades_df, limite_envio=10):
+    try:
+        if oportunidades_df is None or oportunidades_df.empty:
+            return False, "Nenhuma oportunidade para enviar."
+
+        top = oportunidades_df.head(int(limite_envio))
+        ganho_total = oportunidades_df["Ganho_Potencial"].sum() if "Ganho_Potencial" in oportunidades_df.columns else 0
+
+        linhas = []
+        for _, row in top.iterrows():
+            linhas.append(f"• <b>{row.get('Produto', '')}</b> | R$ {_oport_numero_br(row.get('Ganho_Potencial', 0))}")
+
+        mensagem = (
+            "💰 <b>Motor de Oportunidades Eirox</b>\n\n"
+            f"🏢 <b>Empresa:</b> {top.iloc[0].get('Empresa', '')}\n"
+            f"🎯 <b>Oportunidades:</b> {len(oportunidades_df)}\n"
+            f"💵 <b>Ganho potencial:</b> R$ {_oport_numero_br(ganho_total)}\n"
+            f"🕒 <b>Horário:</b> {_oport_data_hora()}\n\n"
+            + "\n".join(linhas)
+            + f"\n\n🏷️ <b>Versão:</b> {VERSAO_APP}"
+        )
+
+        ok = enviar_alerta_telegram(mensagem) if "enviar_alerta_telegram" in globals() else False
+        return bool(ok), "Oportunidades enviadas ao Telegram." if ok else "Não foi possível enviar ao Telegram."
+    except Exception as erro:
+        return False, str(erro)
+
+
+def usuario_pode_ver_motor_oportunidades():
+    try:
+        return usuario_master() or tela_liberada_por_plano("💰 Motor de Oportunidades")
+    except Exception:
+        return False
+
+# --------------------------------------------------
+# RELEASE CANDIDATE CENTER - v1.36.3 RC
+# --------------------------------------------------
+
+ARQUIVOS_ADMINISTRATIVOS_RC = [
+    "USUARIOS_EIROX.csv",
+    "EMPRESAS_EIROX.csv",
+    "LICENCAS_EIROX.csv",
+    "ALERTAS_EIROX.csv",
+    "OPORTUNIDADES_EIROX.csv",
+    "logs/log_acessos.csv",
+    "logs/log_usuarios.csv"
+]
+
+
+def usuario_pode_ver_release_candidate():
+    try:
+        return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() == "paulomarques"
+    except Exception:
+        return False
+
+
+def _rc_tamanho_formatado(bytes_valor):
+    try:
+        bytes_valor = float(bytes_valor)
+        if bytes_valor >= 1024 ** 3:
+            return f"{bytes_valor / (1024 ** 3):.2f} GB".replace(".", ",")
+        if bytes_valor >= 1024 ** 2:
+            return f"{bytes_valor / (1024 ** 2):.2f} MB".replace(".", ",")
+        if bytes_valor >= 1024:
+            return f"{bytes_valor / 1024:.2f} KB".replace(".", ",")
+        return f"{int(bytes_valor)} B"
+    except Exception:
+        return "0 B"
+
+
+def status_arquivo_rc(caminho):
+    try:
+        p = Path(caminho)
+        if not p.exists():
+            return {"Arquivo": caminho, "Status": "🟡 Não encontrado", "Tamanho": "0 B", "Última Atualização": "-"}
+        return {
+            "Arquivo": caminho,
+            "Status": "🟢 OK",
+            "Tamanho": _rc_tamanho_formatado(p.stat().st_size),
+            "Última Atualização": datetime.fromtimestamp(p.stat().st_mtime).strftime("%d/%m/%Y %H:%M:%S")
+        }
+    except Exception as erro:
+        return {"Arquivo": caminho, "Status": "🔴 Erro", "Tamanho": "0 B", "Última Atualização": str(erro)}
+
+
+def gerar_checklist_rc():
+    checks = []
+
+    def add(item, status, detalhe):
+        checks.append({"Item": item, "Status": status, "Detalhe": detalhe})
+
+    try:
+        add("Versão RC", "🟢 OK" if "rc" in VERSAO_APP.lower() else "🟡 Atenção", VERSAO_APP)
+        add("Controle de Usuários", "🟢 OK" if "carregar_usuarios_sistema" in globals() else "🔴 Erro", "Cadastro, bloqueio, reset e expiração")
+        add("Multiempresa", "🟢 OK" if "carregar_empresas_sistema" in globals() else "🔴 Erro", "Empresas e contexto master")
+        add("Licenciamento Real", "🟢 OK" if "carregar_licencas_sistema" in globals() else "🔴 Erro", "Planos, limites e expiração")
+        add("Auditoria", "🟢 OK" if "carregar_logs_acesso" in globals() else "🔴 Erro", "Histórico de acesso e navegação")
+        add("Saúde do Sistema", "🟢 OK" if "gerar_saude_bases" in globals() else "🔴 Erro", "Monitoramento das bases")
+        add("Backup Center", "🟢 OK" if "gerar_backup_eirox" in globals() else "🔴 Erro", "Backup e download")
+        add("Alertas Inteligentes", "🟢 OK" if "gerar_alertas_inteligentes" in globals() else "🔴 Erro", "Alertas e Telegram")
+        add("Motor de Oportunidades", "🟢 OK" if "gerar_motor_oportunidades" in globals() else "🔴 Erro", "Ranking financeiro")
+        add("Telegram", health_status_telegram() if "health_status_telegram" in globals() else "🟡 Não verificado", "Integração de notificações")
+        try:
+            emp = empresa_contexto_atual() if "empresa_contexto_atual" in globals() else "1"
+            lic = status_licenca_empresa(emp) if "status_licenca_empresa" in globals() else {}
+            add("Licença empresa contexto", lic.get("StatusOperacional", "🟡 Não verificado"), lic.get("Mensagem", ""))
+        except Exception:
+            add("Licença empresa contexto", "🟡 Não verificado", "")
+    except Exception as erro:
+        add("Checklist RC", "🔴 Erro", str(erro))
+
+    return pd.DataFrame(checks)
+
+
+def gerar_status_arquivos_rc():
+    return pd.DataFrame([status_arquivo_rc(c) for c in ARQUIVOS_ADMINISTRATIVOS_RC])
+
+
+def gerar_resumo_release_candidate():
+    try:
+        checklist = gerar_checklist_rc()
+        arquivos = gerar_status_arquivos_rc()
+        total_checks = len(checklist)
+        ok_checks = int(checklist["Status"].astype(str).str.contains("OK|Ativa|Trial|Protegido|Configurado", regex=True, na=False).sum()) if not checklist.empty else 0
+        arquivos_ok = int(arquivos["Status"].astype(str).str.contains("OK", na=False).sum()) if not arquivos.empty else 0
+        status_final = "🟢 RC pronta para homologação final" if ok_checks >= max(total_checks - 2, 1) else "🟡 RC com pendências"
+        return {"Status": status_final, "ChecksOK": ok_checks, "TotalChecks": total_checks, "ArquivosOK": arquivos_ok, "TotalArquivos": len(arquivos)}
+    except Exception:
+        return {"Status": "🔴 Erro no resumo RC", "ChecksOK": 0, "TotalChecks": 0, "ArquivosOK": 0, "TotalArquivos": 0}
+
+
+
+
+# --------------------------------------------------
+# IA PRICING ENTERPRISE - v1.37.0
+# --------------------------------------------------
+
+IA_PRICING_ARQUIVO = Path("IA_PRICING_EIROX.csv")
+
+
+def usuario_pode_ver_ia_pricing():
+    try:
+        return usuario_master() or tela_liberada_por_plano("🤖 IA Pricing Enterprise")
+    except Exception:
+        return False
+
+
+def _ia_numero_br(valor, casas=2):
+    try:
+        return f"{float(valor):,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return "0,00"
+
+
+def _ia_coluna(base, possibilidades):
+    try:
+        cols = list(base.columns)
+        for alvo in possibilidades:
+            alvo_norm = str(alvo).strip().lower()
+            for c in cols:
+                if str(c).strip().lower() == alvo_norm:
+                    return c
+        for alvo in possibilidades:
+            alvo_norm = str(alvo).strip().lower()
+            for c in cols:
+                if alvo_norm in str(c).strip().lower():
+                    return c
+    except Exception:
+        pass
+    return None
+
+
+def _ia_num(serie):
+    try:
+        if "converter_numero_brasil" in globals():
+            return converter_numero_brasil(serie)
+        return pd.to_numeric(serie.astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False), errors="coerce")
+    except Exception:
+        return pd.to_numeric(serie, errors="coerce")
+
+
+def carregar_historico_ia_pricing():
+    try:
+        if not IA_PRICING_ARQUIVO.exists():
+            return pd.DataFrame()
+        return pd.read_csv(IA_PRICING_ARQUIVO, sep=";", encoding="utf-8-sig", dtype=str).fillna("")
+    except Exception:
+        return pd.DataFrame()
+
+
+def salvar_recomendacoes_ia(ia_df):
+    try:
+        if ia_df is None or ia_df.empty:
+            return
+        out = ia_df.copy()
+        out["Data_Hora"] = datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S") if "ZoneInfo" in globals() else datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        if IA_PRICING_ARQUIVO.exists():
+            old = pd.read_csv(IA_PRICING_ARQUIVO, sep=";", encoding="utf-8-sig", dtype=str).fillna("")
+            out = pd.concat([old, out], ignore_index=True)
+        out.to_csv(IA_PRICING_ARQUIVO, index=False, sep=";", encoding="utf-8-sig")
+    except Exception:
+        pass
+
+
+def gerar_ia_pricing_enterprise(margem_minima=25, margem_alvo=35, limite_reducao=8, limite_aumento=12, top_n=150):
+    try:
+        base = globals().get("df", pd.DataFrame())
+        if not isinstance(base, pd.DataFrame) or base.empty:
+            base = globals().get("base_pesquisa", pd.DataFrame())
+        if not isinstance(base, pd.DataFrame) or base.empty:
+            return pd.DataFrame()
+        base = base.copy()
+        try:
+            if "aplicar_filtro_empresa" in globals():
+                base = aplicar_filtro_empresa(base)
+        except Exception:
+            pass
+        empresa_id = empresa_contexto_atual() if "empresa_contexto_atual" in globals() else "1"
+        empresa_nome = obter_nome_empresa(empresa_id) if "obter_nome_empresa" in globals() else ""
+        col_ean = _ia_coluna(base, ["EAN", "EAN (GTIN)", "GTIN", "Código de Barras"])
+        col_prod = _ia_coluna(base, ["Produto", "Produto_Base_SIM", "Descrição", "Descricao"])
+        col_lab = _ia_coluna(base, ["Laboratório", "Laboratorio", "Fabricante", "Fornecedor"])
+        col_cat = _ia_coluna(base, ["Categoria", "Família", "Familia", "Departamento", "Classe"])
+        col_curva = _ia_coluna(base, ["CURVA", "Curva", "ABC", "Curva ABC"])
+        col_preco = _ia_coluna(base, ["Preco_Rede", "Preço Rede", "Preco_Venda", "Preço (R$)", "Preço", "Preco"])
+        col_custo = _ia_coluna(base, ["Custo", "Custo Médio", "Custo_Medio", "Custo Atual"])
+        col_margem = _ia_coluna(base, ["Margem_%", "Margem", "Margem %"])
+        col_conc = _ia_coluna(base, ["Menor_Preco_Concorrente", "Menor Concorrente", "Preco_Concorrente", "Preço Concorrente", "Menor_Preco"])
+        col_ganho = _ia_coluna(base, ["Ganho_Potencial", "Potencial de Captura", "Oportunidade", "Potencial"])
+        col_estoque = _ia_coluna(base, ["Estoque", "Estoque Atual", "Qtde Estoque"])
+        col_qtd = _ia_coluna(base, ["Quantidade", "Qtd", "Qtde", "Unidades", "Volume"])
+        n=len(base)
+        idx=base.index
+        preco = _ia_num(base[col_preco]).fillna(0) if col_preco else pd.Series([0]*n,index=idx)
+        custo = _ia_num(base[col_custo]).fillna(0) if col_custo else pd.Series([0]*n,index=idx)
+        margem = _ia_num(base[col_margem]).fillna(0) if col_margem else pd.Series([0]*n,index=idx)
+        conc = _ia_num(base[col_conc]).fillna(0) if col_conc else pd.Series([0]*n,index=idx)
+        ganho = _ia_num(base[col_ganho]).fillna(0) if col_ganho else pd.Series([0]*n,index=idx)
+        estoque = _ia_num(base[col_estoque]).fillna(0) if col_estoque else pd.Series([0]*n,index=idx)
+        qtd = _ia_num(base[col_qtd]).fillna(1) if col_qtd else pd.Series([1]*n,index=idx)
+        margem_calc=margem.copy()
+        mask=(margem_calc<=0)&(preco>0)&(custo>0)
+        margem_calc.loc[mask]=((preco.loc[mask]-custo.loc[mask])/preco.loc[mask])*100
+        preco_rec=preco.copy()
+        preco_alvo = custo / max((1-float(margem_alvo)/100),0.01)
+        mask_subir=(preco>0)&(custo>0)&(margem_calc<float(margem_minima))&(preco_alvo>preco)
+        preco_rec.loc[mask_subir]=preco_alvo.loc[mask_subir]
+        dif=pd.Series([0]*n,index=idx,dtype='float')
+        mask_conc=(preco>0)&(conc>0)
+        dif.loc[mask_conc]=((preco.loc[mask_conc]-conc.loc[mask_conc])/preco.loc[mask_conc])*100
+        mask_red=(dif>float(limite_reducao))&(margem_calc>=float(margem_minima))
+        preco_rec.loc[mask_red]=preco.loc[mask_red]*(1-float(limite_reducao)/100)
+        max_aum=preco*(1+float(limite_aumento)/100)
+        mask_lim=(preco>0)&(preco_rec>max_aum)
+        preco_rec.loc[mask_lim]=max_aum.loc[mask_lim]
+        var=pd.Series([0]*n,index=idx,dtype='float')
+        mask_preco=preco>0
+        var.loc[mask_preco]=((preco_rec.loc[mask_preco]-preco.loc[mask_preco])/preco.loc[mask_preco])*100
+        margem_rec=pd.Series([0]*n,index=idx,dtype='float')
+        mask_pr=preco_rec>0
+        margem_rec.loc[mask_pr]=((preco_rec.loc[mask_pr]-custo.loc[mask_pr])/preco_rec.loc[mask_pr])*100
+        ganho_est=((preco_rec-preco)*qtd).fillna(0)
+        ganho_est=ganho_est.where(ganho_est.abs()>0, ganho)
+        out=pd.DataFrame(index=idx)
+        out["EmpresaID"]=empresa_id; out["Empresa"]=empresa_nome
+        out["EAN"]=base[col_ean].astype(str) if col_ean else ""
+        out["Produto"]=base[col_prod].astype(str) if col_prod else ""
+        out["Laboratório"]=base[col_lab].astype(str) if col_lab else "Não informado"
+        out["Categoria"]=base[col_cat].astype(str) if col_cat else "Não informado"
+        out["Curva"]=base[col_curva].astype(str) if col_curva else "Não informado"
+        out["Preço_Atual"]=preco; out["Preço_Recomendado"]=preco_rec; out["Variação_Pct"]=var
+        out["Margem_Atual"]=margem_calc; out["Margem_Recomendada"]=margem_rec; out["Preço_Concorrente"]=conc
+        out["Estoque"]=estoque; out["Ganho_Estimado"]=ganho_est
+        def acao(row):
+            v=float(row.get("Variação_Pct",0) or 0); m=float(row.get("Margem_Atual",0) or 0); c=float(row.get("Preço_Concorrente",0) or 0); p=float(row.get("Preço_Atual",0) or 0); e=float(row.get("Estoque",0) or 0)
+            if v>1: return "Aumentar preço"
+            if v<-1: return "Reduzir preço"
+            if m<float(margem_minima): return "Revisar margem"
+            if c>0 and p>c: return "Monitorar concorrência"
+            if e>50: return "Avaliar giro"
+            return "Manter"
+        out["Ação"]=out.apply(acao,axis=1)
+        out["Motivo"]=out["Ação"].map({
+            "Aumentar preço":"Margem abaixo da meta ou oportunidade de recuperação de rentabilidade.",
+            "Reduzir preço":"Concorrência mais agressiva com margem suficiente para ajuste controlado.",
+            "Revisar margem":"Margem abaixo do limite mínimo configurado.",
+            "Monitorar concorrência":"Preço atual acima do concorrente identificado.",
+            "Avaliar giro":"Estoque elevado exige acompanhamento comercial.",
+            "Manter":"Preço dentro dos parâmetros configurados."
+        }).fillna("Analisar produto.")
+        out["Score_IA"]=(out["Ganho_Estimado"].abs().rank(pct=True).fillna(0)*40+(100-out["Margem_Atual"].clip(0,100))*0.25+out["Variação_Pct"].abs().clip(upper=50)*0.7+out["Estoque"].rank(pct=True).fillna(0)*10).round(2)
+        cols_group=["EmpresaID","Empresa","EAN","Produto","Laboratório","Categoria","Curva","Ação","Motivo"]
+        agg=out.groupby(cols_group,dropna=False).agg(Score_IA=("Score_IA","max"),Preço_Atual=("Preço_Atual","mean"),Preço_Recomendado=("Preço_Recomendado","mean"),Variação_Pct=("Variação_Pct","mean"),Margem_Atual=("Margem_Atual","mean"),Margem_Recomendada=("Margem_Recomendada","mean"),Preço_Concorrente=("Preço_Concorrente","mean"),Estoque=("Estoque","sum"),Ganho_Estimado=("Ganho_Estimado","sum")).reset_index()
+        agg=agg.sort_values(["Score_IA","Ganho_Estimado"],ascending=False).head(int(top_n))
+        agg["Ranking"]=range(1,len(agg)+1)
+        return agg[["Ranking","EmpresaID","Empresa","EAN","Produto","Laboratório","Categoria","Curva","Ação","Preço_Atual","Preço_Recomendado","Variação_Pct","Margem_Atual","Margem_Recomendada","Preço_Concorrente","Estoque","Ganho_Estimado","Score_IA","Motivo"]]
+    except Exception as erro:
+        return pd.DataFrame([{"Ranking":1,"EmpresaID":"1","Empresa":"","EAN":"","Produto":"","Laboratório":"","Categoria":"","Curva":"","Ação":"Erro","Preço_Atual":0,"Preço_Recomendado":0,"Variação_Pct":0,"Margem_Atual":0,"Margem_Recomendada":0,"Preço_Concorrente":0,"Estoque":0,"Ganho_Estimado":0,"Score_IA":0,"Motivo":str(erro)}])
+
+
+def enviar_ia_pricing_telegram(ia_df, limite_envio=10):
+    try:
+        if ia_df is None or ia_df.empty:
+            return False, "Nenhuma recomendação para enviar."
+        top=ia_df.head(int(limite_envio)); ganho_total=ia_df["Ganho_Estimado"].sum() if "Ganho_Estimado" in ia_df.columns else 0
+        linhas=[f"• <b>{r.get('Produto','')}</b> | {r.get('Ação','')} | R$ {_ia_numero_br(r.get('Preço_Recomendado',0))}" for _,r in top.iterrows()]
+        mensagem=("🤖 <b>IA Pricing Enterprise</b>\n\n"+f"🏢 <b>Empresa:</b> {top.iloc[0].get('Empresa','')}\n"+f"🎯 <b>Recomendações:</b> {len(ia_df)}\n"+f"💵 <b>Ganho estimado:</b> R$ {_ia_numero_br(ganho_total)}\n\n"+"\n".join(linhas)+f"\n\n🏷️ <b>Versão:</b> {VERSAO_APP}")
+        ok=enviar_alerta_telegram(mensagem) if "enviar_alerta_telegram" in globals() else False
+        return bool(ok), "Recomendações enviadas ao Telegram." if ok else "Não foi possível enviar ao Telegram."
+    except Exception as erro:
+        return False, str(erro)
+
+
+
+# --------------------------------------------------
+# WORKFLOW COMERCIAL - v1.37.1
+# --------------------------------------------------
+
+WORKFLOW_COMERCIAL_ARQUIVO = Path("WORKFLOW_COMERCIAL_EIROX.csv")
+
+
+def usuario_pode_ver_workflow_comercial():
+    try:
+        return usuario_master() or tela_liberada_por_plano("📋 Workflow Comercial")
+    except Exception:
+        return False
+
+
+def _wf_data_hora():
+    try:
+        return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S")
+    except Exception:
+        return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+def carregar_workflow_comercial():
+    try:
+        if not WORKFLOW_COMERCIAL_ARQUIVO.exists():
+            return pd.DataFrame(columns=[
+                "ID", "Data_Hora", "EmpresaID", "Empresa", "Usuario", "EAN", "Produto",
+                "Acao_IA", "Preco_Atual", "Preco_Recomendado", "Ganho_Estimado",
+                "Status", "Justificativa", "Origem", "Versao"
+            ])
+
+        return pd.read_csv(
+            WORKFLOW_COMERCIAL_ARQUIVO,
+            sep=";",
+            encoding="utf-8-sig",
+            dtype=str
+        ).fillna("")
+
+    except Exception:
+        return pd.DataFrame()
+
+
+def salvar_workflow_comercial(base):
+    try:
+        base.to_csv(
+            WORKFLOW_COMERCIAL_ARQUIVO,
+            index=False,
+            sep=";",
+            encoding="utf-8-sig"
+        )
+        return True
+    except Exception:
+        return False
+
+
+def adicionar_recomendacoes_ao_workflow(recomendacoes_df, origem="IA Pricing"):
+    try:
+        if recomendacoes_df is None or recomendacoes_df.empty:
+            return False, "Nenhuma recomendação disponível."
+
+        workflow = carregar_workflow_comercial()
+        novos = []
+
+        for _, row in recomendacoes_df.iterrows():
+            empresa_id = str(row.get("EmpresaID", empresa_contexto_atual() if "empresa_contexto_atual" in globals() else "1"))
+            empresa = str(row.get("Empresa", obter_nome_empresa(empresa_id) if "obter_nome_empresa" in globals() else ""))
+            ean = str(row.get("EAN", ""))
+            produto = str(row.get("Produto", ""))
+            acao = str(row.get("Ação", row.get("Tipo_Oportunidade", "")))
+            preco_atual = str(row.get("Preço_Atual", row.get("Preco_Medio", "")))
+            preco_rec = str(row.get("Preço_Recomendado", row.get("Preco_Recomendado", "")))
+            ganho = str(row.get("Ganho_Estimado", row.get("Ganho_Potencial", "")))
+
+            if not workflow.empty and all(c in workflow.columns for c in ["EAN", "Produto", "EmpresaID", "Status"]):
+                pendente = workflow[
+                    (workflow["EAN"].astype(str) == ean) &
+                    (workflow["Produto"].astype(str) == produto) &
+                    (workflow["EmpresaID"].astype(str) == empresa_id) &
+                    (workflow["Status"].astype(str).isin(["Pendente", "Em análise"]))
+                ]
+                if not pendente.empty:
+                    continue
+
+            novos.append({
+                "ID": f"WF-{datetime.now().strftime('%Y%m%d%H%M%S')}-{len(novos)+1}",
+                "Data_Hora": _wf_data_hora(),
+                "EmpresaID": empresa_id,
+                "Empresa": empresa,
+                "Usuario": st.session_state.get("usuario", ""),
+                "EAN": ean,
+                "Produto": produto,
+                "Acao_IA": acao,
+                "Preco_Atual": preco_atual,
+                "Preco_Recomendado": preco_rec,
+                "Ganho_Estimado": ganho,
+                "Status": "Pendente",
+                "Justificativa": "",
+                "Origem": origem,
+                "Versao": VERSAO_APP
+            })
+
+        if not novos:
+            return False, "Nenhuma nova recomendação foi adicionada. Pode já existir pendência para esses itens."
+
+        final = pd.concat([workflow, pd.DataFrame(novos)], ignore_index=True)
+        salvar_workflow_comercial(final)
+
+        try:
+            enviar_alerta_telegram(
+                "📋 <b>Workflow Comercial atualizado</b>\\n\\n"
+                f"✅ <b>Novas recomendações:</b> {len(novos)}\\n"
+                f"👤 <b>Usuário:</b> {st.session_state.get('usuario', '')}\\n"
+                f"🕒 <b>Horário:</b> {_wf_data_hora()}\\n"
+                f"🏷️ <b>Versão:</b> {VERSAO_APP}"
+            )
+        except Exception:
+            pass
+
+        return True, f"{len(novos)} recomendações enviadas para aprovação."
+
+    except Exception as erro:
+        return False, f"Erro ao adicionar ao workflow: {erro}"
+
+
+def atualizar_status_workflow(ids, novo_status, justificativa):
+    try:
+        if not ids:
+            return False, "Selecione ao menos uma recomendação."
+
+        if novo_status in ["Aprovado", "Rejeitado"] and not str(justificativa).strip():
+            return False, "Justificativa obrigatória para aprovar ou rejeitar."
+
+        base = carregar_workflow_comercial()
+
+        if base.empty:
+            return False, "Workflow vazio."
+
+        ids = [str(i) for i in ids]
+        mask = base["ID"].astype(str).isin(ids)
+
+        if not mask.any():
+            return False, "Nenhum ID encontrado."
+
+        base.loc[mask, "Status"] = novo_status
+        base.loc[mask, "Justificativa"] = str(justificativa).strip()
+        base.loc[mask, "Usuario"] = st.session_state.get("usuario", "")
+        base.loc[mask, "Data_Hora"] = _wf_data_hora()
+        base.loc[mask, "Versao"] = VERSAO_APP
+
+        salvar_workflow_comercial(base)
+
+        try:
+            enviar_alerta_telegram(
+                "📋 <b>Status do Workflow Comercial alterado</b>\\n\\n"
+                f"🔁 <b>Status:</b> {novo_status}\\n"
+                f"📦 <b>Itens:</b> {len(ids)}\\n"
+                f"👤 <b>Usuário:</b> {st.session_state.get('usuario', '')}\\n"
+                f"🕒 <b>Horário:</b> {_wf_data_hora()}\\n"
+                f"📝 <b>Justificativa:</b> {str(justificativa).strip()[:300]}"
+            )
+        except Exception:
+            pass
+
+        return True, f"{len(ids)} recomendações atualizadas para {novo_status}."
+
+    except Exception as erro:
+        return False, f"Erro ao atualizar workflow: {erro}"
+
+
+
+
+# --------------------------------------------------
+# CRM ENTERPRISE / GESTÃO DE CLIENTES - v1.38.0
+# --------------------------------------------------
+
+CLIENTES_EIROX_ARQUIVO = Path("CLIENTES_EIROX.csv")
+
+
+def usuario_pode_ver_crm_enterprise():
+    try:
+        return usuario_master() if "usuario_master" in globals() else str(st.session_state.get("usuario", "")).lower() in ["paulomarques"]
+    except Exception:
+        return False
+
+
+def _crm_data_hora():
+    try:
+        return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S")
+    except Exception:
+        return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+def _crm_numero_br(valor, casas=2):
+    try:
+        return f"{float(valor):,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return "0,00"
+
+
+def inicializar_clientes_eirox():
+    try:
+        if not CLIENTES_EIROX_ARQUIVO.exists():
+            base = pd.DataFrame(
+                [
+                    {
+                        "ClienteID": "1",
+                        "EmpresaID": "1",
+                        "Cliente": "Marabá - Cliente teste",
+                        "CNPJ": "",
+                        "Cidade": "Marabá",
+                        "UF": "PA",
+                        "Qtd_Lojas": "0",
+                        "Plano": "Enterprise",
+                        "MRR": "0",
+                        "Data_Implantacao": "",
+                        "Data_Renovacao": "",
+                        "Status": "Implantação",
+                        "Responsavel_Comercial": "",
+                        "Observacao": "Cliente teste criado automaticamente",
+                        "Criado_Em": _crm_data_hora()
+                    },
+                    {
+                        "ClienteID": "2",
+                        "EmpresaID": "2",
+                        "Cliente": "Belém - Cliente teste",
+                        "CNPJ": "",
+                        "Cidade": "Belém",
+                        "UF": "PA",
+                        "Qtd_Lojas": "0",
+                        "Plano": "Starter",
+                        "MRR": "0",
+                        "Data_Implantacao": "",
+                        "Data_Renovacao": "",
+                        "Status": "Implantação",
+                        "Responsavel_Comercial": "",
+                        "Observacao": "Cliente teste criado automaticamente",
+                        "Criado_Em": _crm_data_hora()
+                    }
+                ]
+            )
+
+            base.to_csv(
+                CLIENTES_EIROX_ARQUIVO,
+                index=False,
+                sep=";",
+                encoding="utf-8-sig"
+            )
+
+        return True
+    except Exception:
+        return False
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_clientes_eirox():
+    try:
+        inicializar_clientes_eirox()
+
+        base = pd.read_csv(
+            CLIENTES_EIROX_ARQUIVO,
+            sep=";",
+            encoding="utf-8-sig",
+            dtype=str
+        ).fillna("")
+
+        obrigatorias = [
+            "ClienteID",
+            "EmpresaID",
+            "Cliente",
+            "CNPJ",
+            "Cidade",
+            "UF",
+            "Qtd_Lojas",
+            "Plano",
+            "MRR",
+            "Data_Implantacao",
+            "Data_Renovacao",
+            "Status",
+            "Responsavel_Comercial",
+            "Observacao",
+            "Criado_Em"
+        ]
+
+        for col in obrigatorias:
+            if col not in base.columns:
+                base[col] = ""
+
+        return base[obrigatorias].copy()
+
+    except Exception:
+        return pd.DataFrame()
+
+
+def salvar_clientes_eirox(base):
+    try:
+        base = base.copy()
+
+        base.to_csv(
+            CLIENTES_EIROX_ARQUIVO,
+            index=False,
+            sep=";",
+            encoding="utf-8-sig"
+        )
+
+        try:
+            carregar_clientes_eirox.clear()
+        except Exception:
+            pass
+
+        return True
+
+    except Exception:
+        return False
+
+
+def criar_ou_atualizar_cliente_eirox(
+    cliente_id,
+    empresa_id,
+    cliente,
+    cnpj,
+    cidade,
+    uf,
+    qtd_lojas,
+    plano,
+    mrr,
+    data_implantacao,
+    data_renovacao,
+    status,
+    responsavel,
+    observacao
+):
+    try:
+        cliente_id = str(cliente_id).strip()
+        empresa_id = str(empresa_id).strip()
+        cliente = str(cliente).strip()
+
+        if not cliente_id or not empresa_id or not cliente:
+            return False, "ClienteID, EmpresaID e Cliente são obrigatórios."
+
+        base = carregar_clientes_eirox()
+
+        nova_linha = {
+            "ClienteID": cliente_id,
+            "EmpresaID": empresa_id,
+            "Cliente": cliente,
+            "CNPJ": str(cnpj).strip(),
+            "Cidade": str(cidade).strip(),
+            "UF": str(uf).strip().upper(),
+            "Qtd_Lojas": str(qtd_lojas).strip(),
+            "Plano": str(plano).strip(),
+            "MRR": str(mrr).strip(),
+            "Data_Implantacao": str(data_implantacao).strip(),
+            "Data_Renovacao": str(data_renovacao).strip(),
+            "Status": str(status).strip(),
+            "Responsavel_Comercial": str(responsavel).strip(),
+            "Observacao": str(observacao).strip(),
+            "Criado_Em": _crm_data_hora()
+        }
+
+        if not base.empty and cliente_id in base["ClienteID"].astype(str).tolist():
+            idx = base.index[base["ClienteID"].astype(str) == cliente_id][0]
+            for k, v in nova_linha.items():
+                if k != "Criado_Em":
+                    base.loc[idx, k] = v
+            acao = "Atualização de cliente"
+        else:
+            base = pd.concat([base, pd.DataFrame([nova_linha])], ignore_index=True)
+            acao = "Criação de cliente"
+
+        salvar_clientes_eirox(base)
+
+        try:
+            registrar_log_usuario(
+                acao,
+                cliente,
+                f"EmpresaID={empresa_id} | Plano={plano} | Status={status}"
+            )
+        except Exception:
+            pass
+
+        try:
+            enviar_alerta_telegram(
+                "🏢 <b>Cliente CRM Eirox atualizado</b>\\n\\n"
+                f"🏪 <b>Cliente:</b> {cliente}\\n"
+                f"📦 <b>Plano:</b> {plano}\\n"
+                f"🔐 <b>Status:</b> {status}\\n"
+                f"💰 <b>MRR:</b> R$ {_crm_numero_br(str(mrr).replace(',', '.'))}\\n"
+                f"👤 <b>Usuário:</b> {st.session_state.get('usuario', '')}\\n"
+                f"🕒 <b>Horário:</b> {_crm_data_hora()}\\n"
+                f"🏷️ <b>Versão:</b> {VERSAO_APP}"
+            )
+        except Exception:
+            pass
+
+        return True, f"{acao} realizada com sucesso."
+
+    except Exception as erro:
+        return False, f"Erro ao salvar cliente: {erro}"
+
+
+def metricas_crm_enterprise():
+    try:
+        base = carregar_clientes_eirox()
+
+        if base.empty:
+            return {
+                "Clientes": 0,
+                "Ativos": 0,
+                "Implantacao": 0,
+                "Suspensos": 0,
+                "Lojas": 0,
+                "MRR": 0
+            }
+
+        mrr = pd.to_numeric(
+            base["MRR"].astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False),
+            errors="coerce"
+        ).fillna(0)
+
+        lojas = pd.to_numeric(base["Qtd_Lojas"], errors="coerce").fillna(0)
+
+        return {
+            "Clientes": int(len(base)),
+            "Ativos": int((base["Status"].astype(str).str.lower() == "ativo").sum()),
+            "Implantacao": int((base["Status"].astype(str).str.lower() == "implantação").sum() + (base["Status"].astype(str).str.lower() == "implantacao").sum()),
+            "Suspensos": int((base["Status"].astype(str).str.lower() == "suspenso").sum()),
+            "Lojas": int(lojas.sum()),
+            "MRR": float(mrr.sum())
+        }
+
+    except Exception:
+        return {
+            "Clientes": 0,
+            "Ativos": 0,
+            "Implantacao": 0,
+            "Suspensos": 0,
+            "Lojas": 0,
+            "MRR": 0
+        }
+
+
+
+
+# --------------------------------------------------
+# MENU POR PLANO - v1.38.1
+# --------------------------------------------------
+
+TELAS_CLIENTE_POR_PLANO = {
+    "Starter": [
+        "🏢 Portal do Cliente",
+        "🎯 Sugestão de Pesquisa",
+        "🏢 Dashboard Executivo",
+        "🔎 Rede/Loja vs Concorrentes",
+    ],
+    "Professional": [
+        "🏢 Portal do Cliente",
+        "💰 Motor de Oportunidades",
+        "🚨 Alertas Inteligentes",
+        "🎯 Sugestão de Pesquisa",
+        "📈 Simulador Inteligente",
+        "🏢 Dashboard Executivo",
+        "🌎 Mapa Geográfico de Concorrência",
+        "🔎 Rede/Loja vs Concorrentes",
+        "🛒 Negociação Compras",
+        "🚨 Central de Alertas",
+    ],
+    "Enterprise": [
+        "🏢 Portal do Cliente",
+        "📋 Workflow Comercial",
+        "🤖 IA Pricing Enterprise",
+        "💰 Motor de Oportunidades",
+        "🚨 Alertas Inteligentes",
+        "🎯 Sugestão de Pesquisa",
+        "📈 Simulador Inteligente",
+        "🏢 Dashboard Executivo",
+        "🌎 Mapa Geográfico de Concorrência",
+        "🔎 Rede/Loja vs Concorrentes",
+        "🛒 Negociação Compras",
+        "🚨 Central de Alertas",
+    ],
+    "Enterprise Plus": [
+        "🏢 Portal do Cliente",
+        "📋 Workflow Comercial",
+        "🤖 IA Pricing Enterprise",
+        "💰 Motor de Oportunidades",
+        "🚨 Alertas Inteligentes",
+        "🎯 Sugestão de Pesquisa",
+        "📈 Simulador Inteligente",
+        "🏢 Dashboard Executivo",
+        "🌎 Mapa Geográfico de Concorrência",
+        "🔎 Rede/Loja vs Concorrentes",
+        "🛒 Negociação Compras",
+        "🚨 Central de Alertas",
+    ]
+}
+
+TELAS_ADMIN_EIROX = [
+    "👥 Controle de Usuários",
+    "🔐 Central de Auditoria",
+    "📋 Central de Auditoria",
+    "🟢 Saúde do Sistema",
+    "📦 Backup Center",
+    "🏢 Multiempresa",
+    "💼 Licenciamento Multiempresa",
+    "💼 Licenciamento Real",
+    "🏢 CRM Enterprise",
+    "🏁 Release Candidate",
+    "📌 Sobre o Eirox",
+    "🧭 Roadmap do Produto",
+    "🧪 Diagnóstico",
+    "💳 Billing Enterprise"]
+
+
+def plano_empresa_contexto():
+    try:
+        empresa_id = empresa_contexto_atual() if "empresa_contexto_atual" in globals() else st.session_state.get("empresa_id_usuario", "1")
+        lic = obter_licenca_empresa(empresa_id) if "obter_licenca_empresa" in globals() else None
+        if lic:
+            return str(lic.get("Plano", "Starter")).strip() or "Starter"
+        return "Starter"
+    except Exception:
+        return "Starter"
+
+
+def tela_liberada_por_plano(pagina_nome):
+    try:
+        if usuario_master():
+            return True
+
+        plano = plano_empresa_contexto()
+        telas = TELAS_CLIENTE_POR_PLANO.get(plano, TELAS_CLIENTE_POR_PLANO["Starter"])
+
+        pagina_txt = str(pagina_nome).strip()
+        pagina_norm = pagina_txt.lower()
+
+        if pagina_txt in telas:
+            return True
+
+        # Compatibilidade por palavras-chave para evitar sumiço de módulos por pequenas mudanças no nome da tela.
+        grupos = {
+            "dashboard": ["dashboard", "painel"],
+            "rede": ["rede/loja", "concorrente"],
+            "sugestao": ["sugestão", "sugestao", "pesquisa"],
+            "simulador": ["simulador"],
+            "mapa": ["mapa", "geográfico", "geografico"],
+            "alertas": ["alerta"],
+            "motor": ["motor", "oportunidade"],
+            "ia": ["ia pricing", "pricing enterprise"],
+            "workflow": ["workflow"],
+            "negociacao": ["negociação", "negociacao", "compras"],
+            "portal": ["portal do cliente"]
+        }
+
+        def grupo_da_pagina(nome):
+            nome = str(nome).lower()
+            for grupo, palavras in grupos.items():
+                if any(p in nome for p in palavras):
+                    return grupo
+            return None
+
+        grupo_pagina = grupo_da_pagina(pagina_norm)
+
+        if not grupo_pagina:
+            return False
+
+        grupos_liberados = set()
+
+        for tela in telas:
+            g = grupo_da_pagina(tela)
+            if g:
+                grupos_liberados.add(g)
+
+        return grupo_pagina in grupos_liberados
+
+    except Exception:
+        return False
+
+
+def filtrar_paginas_por_plano(paginas):
+    try:
+        paginas = list(paginas)
+
+        if usuario_master():
+            return paginas
+
+        plano = plano_empresa_contexto()
+
+        admin_pages = ['🏁 Release Candidate', '🏢 CRM Enterprise', '🏢 Multiempresa', '👥 Controle de Usuários', '💳 Billing Enterprise', '💼 Licenciamento Multiempresa', '💼 Licenciamento Real', '📌 Sobre o Eirox', '📦 Backup Center', '🔐 Central de Auditoria', '🟢 Saúde do Sistema', '🧪 Diagnóstico', '🧭 Roadmap do Produto']
+
+        # Garante que todas as páginas de cliente existentes entrem no menu conforme o plano.
+        todas_paginas_cliente = ['🏢 Portal do Cliente', '📋 Workflow Comercial', '🤖 IA Pricing Enterprise', '💰 Motor de Oportunidades', '🚨 Alertas Inteligentes', '🎯 Sugestão de Pesquisa', '📈 Simulador Inteligente', '🏢 Dashboard Executivo', '🌎 Mapa Geográfico de Concorrência', '🔎 Rede/Loja vs Concorrentes', '🛒 Negociação Compras', '🚨 Central de Alertas']
+
+        for p in todas_paginas_cliente:
+            if p not in paginas:
+                paginas.append(p)
+
+        telas_liberadas = TELAS_CLIENTE_POR_PLANO.get(plano, TELAS_CLIENTE_POR_PLANO["Starter"])
+
+        liberadas = []
+
+        for p in paginas:
+            if p in admin_pages:
+                continue
+
+            if p in telas_liberadas:
+                liberadas.append(p)
+
+        return liberadas
+
+    except Exception:
+        return paginas
+
+
+def dividir_menu_cliente_admin(paginas):
+    """
+    Separa menu em Área do Cliente e Administração Eirox.
+    """
+
+    try:
+        paginas = list(paginas)
+
+        admin_pages = ['🏁 Release Candidate', '🏢 CRM Enterprise', '🏢 Multiempresa', '👥 Controle de Usuários', '💳 Billing Enterprise', '💼 Licenciamento Multiempresa', '💼 Licenciamento Real', '📌 Sobre o Eirox', '📦 Backup Center', '🔐 Central de Auditoria', '🟢 Saúde do Sistema', '🧪 Diagnóstico', '🧭 Roadmap do Produto']
+
+        cliente = [p for p in paginas if p not in admin_pages]
+        admin = [p for p in paginas if p in admin_pages]
+
+        if usuario_master():
+            return cliente, admin
+
+        return cliente, []
+
+    except Exception:
+        return paginas, []
+
+# --------------------------------------------------
+# PORTAL DO CLIENTE ENTERPRISE - v1.39.1
+# --------------------------------------------------
+
+SUPORTE_CLIENTE_ARQUIVO = Path("SUPORTE_CLIENTE_EIROX.csv")
+
+
+def usuario_pode_ver_portal_cliente():
+    return True
+
+
+def _portal_data_hora():
+    try:
+        return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S")
+    except Exception:
+        return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+def _portal_numero_br(valor, casas=2):
+    try:
+        return f"{float(valor):,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return "0,00"
+
+
+def _portal_percentual(valor):
+    try:
+        valor = float(valor)
+        return max(min(valor, 100), 0)
+    except Exception:
+        return 0
+
+
+def _portal_barra_consumo(valor):
+    try:
+        valor = _portal_percentual(valor)
+        cheios = int(round(valor / 10))
+        vazios = 10 - cheios
+        return "█" * cheios + "░" * vazios + f" {valor:.0f}%"
+    except Exception:
+        return "░░░░░░░░░░ 0%"
+
+
+def portal_empresa_atual():
+    try:
+        empresa_id = empresa_contexto_atual() if "empresa_contexto_atual" in globals() else st.session_state.get("empresa_id_usuario", "1")
+        empresa_nome = obter_nome_empresa(empresa_id) if "obter_nome_empresa" in globals() else "Empresa não identificada"
+        return str(empresa_id), str(empresa_nome)
+    except Exception:
+        return "1", "Empresa não identificada"
+
+
+def portal_dados_cliente():
+    try:
+        empresa_id, empresa_nome = portal_empresa_atual()
+
+        dados = {
+            "EmpresaID": empresa_id,
+            "Cliente": empresa_nome,
+            "CNPJ": "",
+            "Cidade": "",
+            "UF": "",
+            "Qtd_Lojas": "",
+            "Plano": plano_empresa_contexto() if "plano_empresa_contexto" in globals() else "Starter",
+            "Status": "",
+            "Data_Implantacao": "",
+            "Data_Renovacao": "",
+            "Responsavel_Comercial": "",
+            "Observacao": ""
+        }
+
+        if "carregar_clientes_eirox" in globals():
+            clientes = carregar_clientes_eirox()
+            if isinstance(clientes, pd.DataFrame) and not clientes.empty and "EmpresaID" in clientes.columns:
+                linha = clientes[clientes["EmpresaID"].astype(str).str.strip() == str(empresa_id)]
+                if not linha.empty:
+                    dados.update(linha.iloc[0].to_dict())
+
+        return dados
+
+    except Exception:
+        return {}
+
+
+def portal_metricas_licenca():
+    try:
+        empresa_id, _ = portal_empresa_atual()
+
+        if "licenca_metricas_empresa" in globals():
+            return licenca_metricas_empresa(empresa_id)
+
+        return {
+            "Licenca": {},
+            "Status": {},
+            "MaxUsuarios": 0,
+            "MaxLojas": 0,
+            "UsuariosUsados": 0,
+            "LojasUsadas": 0,
+            "UsuariosDisponiveis": 0,
+            "LojasDisponiveis": 0
+        }
+
+    except Exception:
+        return {
+            "Licenca": {},
+            "Status": {},
+            "MaxUsuarios": 0,
+            "MaxLojas": 0,
+            "UsuariosUsados": 0,
+            "LojasUsadas": 0,
+            "UsuariosDisponiveis": 0,
+            "LojasDisponiveis": 0
+        }
+
+
+def portal_metricas_uso():
+    try:
+        empresa_id, _ = portal_empresa_atual()
+
+        logs = carregar_logs_acesso() if "carregar_logs_acesso" in globals() else pd.DataFrame()
+
+        total_acessos = 0
+        usuarios_ativos = 0
+        ultimo_acesso = "-"
+
+        if isinstance(logs, pd.DataFrame) and not logs.empty:
+            logs_empresa = logs.copy()
+
+            if "EmpresaID" in logs_empresa.columns:
+                logs_empresa = logs_empresa[logs_empresa["EmpresaID"].astype(str).str.strip() == str(empresa_id)]
+
+            total_acessos = len(logs_empresa)
+
+            if "Usuario" in logs_empresa.columns:
+                usuarios_ativos = logs_empresa["Usuario"].astype(str).nunique()
+
+            if "Data_Hora_dt" in logs_empresa.columns and logs_empresa["Data_Hora_dt"].notna().any():
+                ultimo_acesso = logs_empresa["Data_Hora_dt"].max().strftime("%d/%m/%Y %H:%M:%S")
+            elif "Data_Hora" in logs_empresa.columns and not logs_empresa.empty:
+                ultimo_acesso = str(logs_empresa.tail(1).iloc[0].get("Data_Hora", "-"))
+
+        produtos_monitorados = 0
+        recomendacoes_ia = 0
+        alertas = 0
+
+        try:
+            base = globals().get("df", pd.DataFrame())
+            if isinstance(base, pd.DataFrame) and not base.empty:
+                if "EmpresaID" in base.columns:
+                    base = base[base["EmpresaID"].astype(str).str.strip() == str(empresa_id)]
+
+                if "EAN" in base.columns:
+                    produtos_monitorados = int(base["EAN"].astype(str).nunique())
+                else:
+                    produtos_monitorados = int(len(base))
+        except Exception:
+            pass
+
+        try:
+            hist_ia = carregar_historico_ia_pricing() if "carregar_historico_ia_pricing" in globals() else pd.DataFrame()
+            if isinstance(hist_ia, pd.DataFrame) and not hist_ia.empty:
+                if "EmpresaID" in hist_ia.columns:
+                    hist_ia = hist_ia[hist_ia["EmpresaID"].astype(str).str.strip() == str(empresa_id)]
+                recomendacoes_ia = len(hist_ia)
+        except Exception:
+            pass
+
+        try:
+            hist_alertas = carregar_historico_alertas() if "carregar_historico_alertas" in globals() else pd.DataFrame()
+            if isinstance(hist_alertas, pd.DataFrame) and not hist_alertas.empty:
+                if "EmpresaID" in hist_alertas.columns:
+                    hist_alertas = hist_alertas[hist_alertas["EmpresaID"].astype(str).str.strip() == str(empresa_id)]
+                alertas = len(hist_alertas)
+        except Exception:
+            pass
+
+        return {
+            "UltimoAcesso": ultimo_acesso,
+            "UsuariosAtivos": usuarios_ativos,
+            "TotalAcessos": total_acessos,
+            "ProdutosMonitorados": produtos_monitorados,
+            "RecomendacoesIA": recomendacoes_ia,
+            "Alertas": alertas
+        }
+
+    except Exception:
+        return {
+            "UltimoAcesso": "-",
+            "UsuariosAtivos": 0,
+            "TotalAcessos": 0,
+            "ProdutosMonitorados": 0,
+            "RecomendacoesIA": 0,
+            "Alertas": 0
+        }
+
+
+def carregar_chamados_suporte_cliente():
+    try:
+        if not SUPORTE_CLIENTE_ARQUIVO.exists():
+            return pd.DataFrame(columns=[
+                "ID", "Data_Hora", "EmpresaID", "Empresa", "Usuario",
+                "Assunto", "Prioridade", "Status", "Mensagem", "Versao"
+            ])
+
+        return pd.read_csv(
+            SUPORTE_CLIENTE_ARQUIVO,
+            sep=";",
+            encoding="utf-8-sig",
+            dtype=str
+        ).fillna("")
+
+    except Exception:
+        return pd.DataFrame()
+
+
+def salvar_chamado_suporte_cliente(assunto, prioridade, mensagem):
+    try:
+        empresa_id, empresa_nome = portal_empresa_atual()
+
+        base = carregar_chamados_suporte_cliente()
+
+        novo = {
+            "ID": f"SUP-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            "Data_Hora": _portal_data_hora(),
+            "EmpresaID": empresa_id,
+            "Empresa": empresa_nome,
+            "Usuario": st.session_state.get("usuario", ""),
+            "Assunto": str(assunto).strip(),
+            "Prioridade": str(prioridade).strip(),
+            "Status": "Aberto",
+            "Mensagem": str(mensagem).strip(),
+            "Versao": VERSAO_APP
+        }
+
+        final = pd.concat([base, pd.DataFrame([novo])], ignore_index=True)
+
+        final.to_csv(
+            SUPORTE_CLIENTE_ARQUIVO,
+            index=False,
+            sep=";",
+            encoding="utf-8-sig"
+        )
+
+        try:
+            enviar_alerta_telegram(
+                "🎫 <b>Novo chamado no Portal do Cliente</b>\\n\\n"
+                f"🏢 <b>Empresa:</b> {empresa_nome}\\n"
+                f"👤 <b>Usuário:</b> {st.session_state.get('usuario', '')}\\n"
+                f"📌 <b>Assunto:</b> {assunto}\\n"
+                f"⚠️ <b>Prioridade:</b> {prioridade}\\n"
+                f"🕒 <b>Horário:</b> {_portal_data_hora()}\\n"
+                f"🏷️ <b>Versão:</b> {VERSAO_APP}"
+            )
+        except Exception:
+            pass
+
+        return True, "Chamado aberto com sucesso."
+
+    except Exception as erro:
+        return False, f"Erro ao abrir chamado: {erro}"
+
+
+def portal_novidades():
+    return pd.DataFrame(
+        [
+            {"Versão": "v1.39.1", "Novidade": "Portal do Cliente Enterprise", "Descrição": "Minha empresa, licença, uso, suporte e central de conhecimento."},
+            {"Versão": "v1.38.1", "Novidade": "Menu por plano", "Descrição": "Área do Cliente separada da Administração Eirox."},
+            {"Versão": "v1.38.0", "Novidade": "CRM Enterprise", "Descrição": "Gestão comercial de clientes, planos, MRR e implantação."},
+            {"Versão": "v1.37.1", "Novidade": "Workflow Comercial", "Descrição": "Aprovação e rejeição de recomendações da IA."},
+            {"Versão": "v1.37.0", "Novidade": "IA Pricing Enterprise", "Descrição": "Recomendações automáticas de preço."},
+            {"Versão": "v1.36.2", "Novidade": "Motor de Oportunidades", "Descrição": "Ranking financeiro de oportunidades comerciais."}
+        ]
+    )
+
+
+
+
+# --------------------------------------------------
+# BILLING ENTERPRISE - v1.40.0
+# --------------------------------------------------
+
+BILLING_EIROX_ARQUIVO = Path("BILLING_EIROX.csv")
+
+
+PLANOS_BILLING_EIROX = {
+    "Starter": {
+        "Mensalidade": 490,
+        "MaxUsuarios": 5,
+        "MaxLojas": 10
+    },
+    "Professional": {
+        "Mensalidade": 1290,
+        "MaxUsuarios": 20,
+        "MaxLojas": 50
+    },
+    "Enterprise": {
+        "Mensalidade": 2990,
+        "MaxUsuarios": 100,
+        "MaxLojas": 500
+    },
+    "Enterprise Plus": {
+        "Mensalidade": 5990,
+        "MaxUsuarios": 9999,
+        "MaxLojas": 9999
+    }
+}
+
+
+def usuario_pode_ver_billing_enterprise():
+    try:
+        return usuario_master()
+    except Exception:
+        return str(st.session_state.get("usuario", "")).strip().lower() == "paulomarques"
+
+
+def _billing_data_hora():
+    try:
+        return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M:%S")
+    except Exception:
+        return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+def _billing_numero_br(valor, casas=2):
+    try:
+        return f"{float(valor):,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return "0,00"
+
+
+def _billing_parse_numero(valor):
+    try:
+        return float(str(valor).replace("R$", "").replace(" ", "").replace(".", "").replace(",", "."))
+    except Exception:
+        return 0.0
+
+
+def _billing_dias_vencimento(data_vencimento):
+    try:
+        dt = pd.to_datetime(str(data_vencimento), dayfirst=True, errors="coerce")
+        if pd.isna(dt):
+            return None
+        hoje = pd.Timestamp.now().normalize()
+        return int((dt.normalize() - hoje).days)
+    except Exception:
+        return None
+
+
+def inicializar_billing_eirox():
+    try:
+        if not BILLING_EIROX_ARQUIVO.exists():
+            hoje = datetime.now(ZoneInfo("America/Sao_Paulo"))
+
+            base = pd.DataFrame(
+                [
+                    {
+                        "FaturaID": "FAT-0001",
+                        "EmpresaID": "1",
+                        "Cliente": "Marabá - Cliente teste",
+                        "Plano": "Enterprise",
+                        "Valor_Mensal": str(PLANOS_BILLING_EIROX["Enterprise"]["Mensalidade"]),
+                        "Data_Emissao": hoje.strftime("%d/%m/%Y"),
+                        "Data_Vencimento": (hoje + pd.DateOffset(days=30)).strftime("%d/%m/%Y"),
+                        "Data_Pagamento": "",
+                        "Status": "Em aberto",
+                        "Ciclo": "Mensal",
+                        "Forma_Pagamento": "",
+                        "Observacao": "Fatura inicial de teste",
+                        "Criado_Em": _billing_data_hora()
+                    },
+                    {
+                        "FaturaID": "FAT-0002",
+                        "EmpresaID": "2",
+                        "Cliente": "Belém - Cliente teste",
+                        "Plano": "Starter",
+                        "Valor_Mensal": str(PLANOS_BILLING_EIROX["Starter"]["Mensalidade"]),
+                        "Data_Emissao": hoje.strftime("%d/%m/%Y"),
+                        "Data_Vencimento": (hoje + pd.DateOffset(days=30)).strftime("%d/%m/%Y"),
+                        "Data_Pagamento": "",
+                        "Status": "Trial",
+                        "Ciclo": "Mensal",
+                        "Forma_Pagamento": "",
+                        "Observacao": "Fatura inicial de teste",
+                        "Criado_Em": _billing_data_hora()
+                    }
+                ]
+            )
+
+            base.to_csv(
+                BILLING_EIROX_ARQUIVO,
+                index=False,
+                sep=";",
+                encoding="utf-8-sig"
+            )
+
+        return True
+
+    except Exception:
+        return False
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_billing_eirox():
+    try:
+        inicializar_billing_eirox()
+
+        base = pd.read_csv(
+            BILLING_EIROX_ARQUIVO,
+            sep=";",
+            encoding="utf-8-sig",
+            dtype=str
+        ).fillna("")
+
+        obrigatorias = [
+            "FaturaID",
+            "EmpresaID",
+            "Cliente",
+            "Plano",
+            "Valor_Mensal",
+            "Data_Emissao",
+            "Data_Vencimento",
+            "Data_Pagamento",
+            "Status",
+            "Ciclo",
+            "Forma_Pagamento",
+            "Observacao",
+            "Criado_Em"
+        ]
+
+        for col in obrigatorias:
+            if col not in base.columns:
+                base[col] = ""
+
+        return base[obrigatorias].copy()
+
+    except Exception:
+        return pd.DataFrame()
+
+
+def salvar_billing_eirox(base):
+    try:
+        base = base.copy().astype(str)
+
+        base.to_csv(
+            BILLING_EIROX_ARQUIVO,
+            index=False,
+            sep=";",
+            encoding="utf-8-sig"
+        )
+
+        try:
+            carregar_billing_eirox.clear()
+        except Exception:
+            pass
+
+        return True
+
+    except Exception:
+        return False
+
+
+def gerar_id_fatura():
+    try:
+        base = carregar_billing_eirox()
+        if base.empty:
+            return "FAT-0001"
+
+        nums = []
+        for x in base["FaturaID"].astype(str).tolist():
+            m = re.search(r'(\d+)$', x)
+            if m:
+                nums.append(int(m.group(1)))
+
+        prox = max(nums) + 1 if nums else len(base) + 1
+        return f"FAT-{prox:04d}"
+
+    except Exception:
+        return f"FAT-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+
+def criar_ou_atualizar_fatura_eirox(
+    fatura_id,
+    empresa_id,
+    cliente,
+    plano,
+    valor_mensal,
+    data_emissao,
+    data_vencimento,
+    data_pagamento,
+    status,
+    ciclo,
+    forma_pagamento,
+    observacao
+):
+    try:
+        fatura_id = str(fatura_id).strip() or gerar_id_fatura()
+        empresa_id = str(empresa_id).strip()
+        cliente = str(cliente).strip()
+
+        if not empresa_id or not cliente:
+            return False, "EmpresaID e Cliente são obrigatórios."
+
+        base = carregar_billing_eirox()
+
+        linha = {
+            "FaturaID": fatura_id,
+            "EmpresaID": empresa_id,
+            "Cliente": cliente,
+            "Plano": str(plano).strip(),
+            "Valor_Mensal": str(valor_mensal).strip(),
+            "Data_Emissao": str(data_emissao).strip(),
+            "Data_Vencimento": str(data_vencimento).strip(),
+            "Data_Pagamento": str(data_pagamento).strip(),
+            "Status": str(status).strip(),
+            "Ciclo": str(ciclo).strip(),
+            "Forma_Pagamento": str(forma_pagamento).strip(),
+            "Observacao": str(observacao).strip(),
+            "Criado_Em": _billing_data_hora()
+        }
+
+        if not base.empty and fatura_id in base["FaturaID"].astype(str).tolist():
+            idx = base.index[base["FaturaID"].astype(str) == fatura_id][0]
+            for k, v in linha.items():
+                if k != "Criado_Em":
+                    base.loc[idx, k] = v
+            acao = "Atualização de fatura"
+        else:
+            base = pd.concat([base, pd.DataFrame([linha])], ignore_index=True)
+            acao = "Criação de fatura"
+
+        salvar_billing_eirox(base)
+
+        try:
+            registrar_log_usuario(
+                acao,
+                fatura_id,
+                f"Cliente={cliente} | Plano={plano} | Valor={valor_mensal} | Status={status}"
+            )
+        except Exception:
+            pass
+
+        try:
+            enviar_alerta_telegram(
+                "💳 <b>Billing Eirox atualizado</b>\\n\\n"
+                f"📄 <b>Fatura:</b> {fatura_id}\\n"
+                f"🏢 <b>Cliente:</b> {cliente}\\n"
+                f"📦 <b>Plano:</b> {plano}\\n"
+                f"💰 <b>Valor:</b> R$ {_billing_numero_br(_billing_parse_numero(valor_mensal))}\\n"
+                f"🔐 <b>Status:</b> {status}\\n"
+                f"👤 <b>Usuário:</b> {st.session_state.get('usuario', '')}\\n"
+                f"🕒 <b>Horário:</b> {_billing_data_hora()}\\n"
+                f"🏷️ <b>Versão:</b> {VERSAO_APP}"
+            )
+        except Exception:
+            pass
+
+        return True, f"{acao} realizada com sucesso."
+
+    except Exception as erro:
+        return False, f"Erro ao salvar fatura: {erro}"
+
+
+def metricas_billing_enterprise():
+    try:
+        base = carregar_billing_eirox()
+
+        if base.empty:
+            return {
+                "Faturas": 0,
+                "EmAberto": 0,
+                "Pagas": 0,
+                "Vencidas": 0,
+                "Trial": 0,
+                "MRR": 0,
+                "ARR": 0,
+                "ReceitaPaga": 0
+            }
+
+        b = base.copy()
+
+        valores = b["Valor_Mensal"].apply(_billing_parse_numero)
+
+        dias = b["Data_Vencimento"].apply(_billing_dias_vencimento)
+
+        status = b["Status"].astype(str).str.lower()
+
+        vencidas_mask = (dias < 0) & (~status.isin(["paga", "cancelada"]))
+
+        mrr_mask = status.isin(["em aberto", "paga", "trial"])
+        mrr = float(valores[mrr_mask].sum())
+
+        pagas = status.eq("paga")
+
+        return {
+            "Faturas": int(len(b)),
+            "EmAberto": int(status.eq("em aberto").sum()),
+            "Pagas": int(pagas.sum()),
+            "Vencidas": int(vencidas_mask.sum()),
+            "Trial": int(status.eq("trial").sum()),
+            "MRR": mrr,
+            "ARR": mrr * 12,
+            "ReceitaPaga": float(valores[pagas].sum())
+        }
+
+    except Exception:
+        return {
+            "Faturas": 0,
+            "EmAberto": 0,
+            "Pagas": 0,
+            "Vencidas": 0,
+            "Trial": 0,
+            "MRR": 0,
+            "ARR": 0,
+            "ReceitaPaga": 0
+        }
+
+
+def atualizar_licenca_por_billing(empresa_id, cliente, plano, status_financeiro):
+    """
+    Integra billing com licenciamento.
+    Se inadimplente/suspenso/cancelado, bloqueia licença.
+    Se pago/em aberto/trial, mantém licença ativa/trial.
+    """
+
+    try:
+        if "criar_ou_atualizar_licenca" not in globals():
+            return False, "Licenciamento não disponível."
+
+        hoje = datetime.now(ZoneInfo("America/Sao_Paulo"))
+
+        if str(status_financeiro).lower() in ["vencida", "suspenso", "cancelada", "inadimplente"]:
+            status_lic = "Bloqueada"
+        elif str(status_financeiro).lower() == "trial":
+            status_lic = "Trial"
+        else:
+            status_lic = "Ativa"
+
+        data_inicio = hoje.strftime("%d/%m/%Y")
+        data_expiracao = (hoje + pd.DateOffset(days=30)).strftime("%d/%m/%Y")
+
+        return criar_ou_atualizar_licenca(
+            empresa_id,
+            cliente,
+            plano,
+            data_inicio,
+            data_expiracao,
+            status_lic,
+            f"Atualizado automaticamente pelo Billing Enterprise em {_billing_data_hora()}"
+        )
+
+    except Exception as erro:
+        return False, str(erro)
+
+
+def faturamento_por_plano():
+    try:
+        base = carregar_billing_eirox()
+        if base.empty:
+            return pd.DataFrame()
+
+        b = base.copy()
+        b["Valor_Num"] = b["Valor_Mensal"].apply(_billing_parse_numero)
+
+        return (
+            b.groupby("Plano", dropna=False)
+            .agg(
+                Faturas=("FaturaID", "count"),
+                Receita=("Valor_Num", "sum")
+            )
+            .reset_index()
+            .sort_values("Receita", ascending=False)
+        )
+
+    except Exception:
+        return pd.DataFrame()
+
+
+def faturamento_por_cliente():
+    try:
+        base = carregar_billing_eirox()
+        if base.empty:
+            return pd.DataFrame()
+
+        b = base.copy()
+        b["Valor_Num"] = b["Valor_Mensal"].apply(_billing_parse_numero)
+
+        return (
+            b.groupby(["EmpresaID", "Cliente"], dropna=False)
+            .agg(
+                Faturas=("FaturaID", "count"),
+                Receita=("Valor_Num", "sum")
+            )
+            .reset_index()
+            .sort_values("Receita", ascending=False)
+        )
+
+    except Exception:
+        return pd.DataFrame()
+
+
+
+# --------------------------------------------------
+# LOGIN E CONTROLE DE ACESSO
+# --------------------------------------------------
+
+USUARIOS = {
+    "admin": {
+        "senha_hash": hashlib.sha256("admin123".encode()).hexdigest(),
+        "nome": "Administrador",
+        "perfil": "Diretoria"
+    },
+    "paulo": {
+        "senha_hash": hashlib.sha256("paulo123".encode()).hexdigest(),
+        "nome": "Paulo Marques",
+        "perfil": "Diretoria"
+    },
+    "paulomarques": {
+        "senha_hash": hashlib.sha256("031730".encode()).hexdigest(),
+        "nome": "Paulo Marques",
+        "perfil": "Diretoria"
+    },
+    "vanderlei": {
+        "senha_hash": hashlib.sha256("031730".encode()).hexdigest(),
+        "nome": "Vanderlei",
+        "perfil": "Diretoria"
+    },
+    "ubiratan": {
+        "senha_hash": hashlib.sha256("031730".encode()).hexdigest(),
+        "nome": "Ubiratan",
+        "perfil": "Diretoria"
+    },
+
+    "pricing": {
+        "senha_hash": hashlib.sha256("pricing123".encode()).hexdigest(),
+        "nome": "Equipe Pricing",
+        "perfil": "Pricing"
+    },
+    "comercial": {
+        "senha_hash": hashlib.sha256("comercial123".encode()).hexdigest(),
+        "nome": "Equipe Comercial",
+        "perfil": "Comercial"
+    },
+    "regional": {
+        "senha_hash": hashlib.sha256("regional123".encode()).hexdigest(),
+        "nome": "Gerente Regional",
+        "perfil": "Regional"
+    },
+    "consulta": {
+        "senha_hash": hashlib.sha256("consulta123".encode()).hexdigest(),
+        "nome": "Consulta",
+        "perfil": "Consulta"
+    }
+}
+
+
+
+
+# --------------------------------------------------
+# GESTÃO DINÂMICA DE USUÁRIOS - HOMOLOGAÇÃO v1.35
+# --------------------------------------------------
+
+USUARIOS_ARQUIVO = Path("USUARIOS_EIROX.csv")
+USUARIOS_LOG_ARQUIVO = Path("logs") / "log_usuarios.csv"
+
+
+def _agora_brasil_txt():
+    try:
+        return horario_brasil_formatado()
+    except Exception:
+        return datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+
+def registrar_log_usuario(acao, usuario_alvo="", detalhe=""):
+    """
+    Registra alterações feitas no cadastro de usuários.
+    """
+
+    try:
+        Path("logs").mkdir(exist_ok=True)
+
+        linha = {
+            "Data_Hora": _agora_brasil_txt(),
+            "Administrador": st.session_state.get("usuario", ""),
+            "Usuario_Alvo": str(usuario_alvo),
+            "Acao": str(acao),
+            "Detalhe": str(detalhe),
+            "Versao": VERSAO_APP
+        }
+
+        existe = USUARIOS_LOG_ARQUIVO.exists()
+
+        with open(USUARIOS_LOG_ARQUIVO, "a", newline="", encoding="utf-8-sig") as f:
+            writer = csv.DictWriter(f, fieldnames=list(linha.keys()), delimiter=";")
+
+            if not existe:
+                writer.writeheader()
+
+            writer.writerow(linha)
+
+    except Exception:
+        pass
+
+
+def _usuarios_padrao_dataframe():
+    """
+    Migra os usuários fixos do código para a base USUARIOS_EIROX.csv.
+    """
+
+    linhas = []
+
+    for usuario, dados in USUARIOS.items():
+        linhas.append(
+            {
+                "Usuario": str(usuario).strip().lower(),
+                "Nome": str(dados.get("nome", "")),
+                "Perfil": str(dados.get("perfil", "Consulta")),
+                "Senha_Hash": str(dados.get("senha_hash", "")),
+                "Ativo": "Sim",
+                "Expira_Em": "",
+                "Forcar_Reset": "Não",
+                "EmpresaID": "1",
+                "Criado_Em": _agora_brasil_txt(),
+                "Atualizado_Em": _agora_brasil_txt()
+            }
+        )
+
+    return pd.DataFrame(linhas)
+
+
+def inicializar_arquivo_usuarios():
+    """
+    Cria o arquivo de usuários dinâmico caso ainda não exista.
+    """
+
+    try:
+        if not USUARIOS_ARQUIVO.exists():
+            base = _usuarios_padrao_dataframe()
+            base.to_csv(
+                USUARIOS_ARQUIVO,
+                index=False,
+                sep=";",
+                encoding="utf-8-sig"
+            )
+
+        return True
+
+    except Exception:
+        return False
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_usuarios_sistema():
+    """
+    Carrega usuários dinâmicos.
+    """
+
+    try:
+        inicializar_arquivo_usuarios()
+
+        base = pd.read_csv(
+            USUARIOS_ARQUIVO,
+            sep=";",
+            encoding="utf-8-sig",
+            dtype=str
+        ).fillna("")
+
+        base.columns = base.columns.astype(str).str.strip()
+
+        obrigatorias = [
+            "Usuario",
+            "Nome",
+            "Perfil",
+            "Senha_Hash",
+            "Ativo",
+            "Expira_Em",
+            "Forcar_Reset",
+            "EmpresaID",
+            "Criado_Em",
+            "Atualizado_Em"
+        ]
+
+        for col in obrigatorias:
+            if col not in base.columns:
+                base[col] = ""
+
+        base["Usuario"] = base["Usuario"].astype(str).str.strip().str.lower()
+        base["Ativo"] = base["Ativo"].replace("", "Sim")
+        base["Forcar_Reset"] = base["Forcar_Reset"].replace("", "Não")
+
+        return base[obrigatorias].copy()
+
+    except Exception:
+        return _usuarios_padrao_dataframe()
+
+
+def salvar_usuarios_sistema(base):
+    """
+    Salva a base dinâmica de usuários.
+    """
+
+    try:
+        base = base.copy()
+        base["Usuario"] = base["Usuario"].astype(str).str.strip().str.lower()
+
+        base.to_csv(
+            USUARIOS_ARQUIVO,
+            index=False,
+            sep=";",
+            encoding="utf-8-sig"
+        )
+
+        try:
+            carregar_usuarios_sistema.clear()
+        except Exception:
+            pass
+
+        return True
+
+    except Exception:
+        return False
+
+
+def usuario_expirado(expira_em):
+    """
+    Verifica se o usuário está expirado.
+    Formato: dd/mm/aaaa.
+    """
+
+    try:
+        expira_em = str(expira_em).strip()
+
+        if not expira_em:
+            return False
+
+        data_exp = pd.to_datetime(
+            expira_em,
+            dayfirst=True,
+            errors="coerce"
+        )
+
+        if pd.isna(data_exp):
+            return False
+
+        hoje = pd.Timestamp.now().normalize()
+
+        return data_exp.normalize() < hoje
+
+    except Exception:
+        return False
+
+
+def obter_dados_usuario(usuario):
+    """
+    Busca usuário na base dinâmica.
+    """
+
+    try:
+        usuario = str(usuario).strip().lower()
+        base = carregar_usuarios_sistema()
+        linha = base[base["Usuario"] == usuario]
+
+        if linha.empty:
+            return None
+
+        return linha.iloc[0].to_dict()
+
+    except Exception:
+        return None
+
+
+def usuario_pode_gerenciar_usuarios():
+    """
+    Gestão de usuários exclusiva inicialmente para paulomarques.
+    """
+
+    try:
+        return str(st.session_state.get("usuario", "")).strip().lower() == "paulomarques"
+    except Exception:
+        return False
+
+
+def criar_ou_atualizar_usuario(usuario, nome, perfil, senha=None, ativo="Sim", expira_em="", forcar_reset="Não", empresa_id="1"):
+    """
+    Cria ou atualiza usuário na base dinâmica.
+    """
+
+    try:
+        usuario = str(usuario).strip().lower()
+        nome = str(nome).strip()
+        perfil = str(perfil).strip()
+        ativo = str(ativo).strip()
+        expira_em = str(expira_em).strip()
+        forcar_reset = str(forcar_reset).strip()
+        empresa_id = str(empresa_id).strip() or "1"
+
+        if not usuario or not nome or not perfil:
+            return False, "Usuário, nome e perfil são obrigatórios."
+
+        base = carregar_usuarios_sistema()
+        existe = base["Usuario"].eq(usuario).any()
+        agora = _agora_brasil_txt()
+
+        if existe:
+            idx = base.index[base["Usuario"] == usuario][0]
+
+            base.loc[idx, "Nome"] = nome
+            base.loc[idx, "Perfil"] = perfil
+            base.loc[idx, "Ativo"] = ativo
+            base.loc[idx, "Expira_Em"] = expira_em
+            base.loc[idx, "Forcar_Reset"] = forcar_reset
+            base.loc[idx, "EmpresaID"] = empresa_id
+            base.loc[idx, "Atualizado_Em"] = agora
+
+            if senha:
+                base.loc[idx, "Senha_Hash"] = hashlib.sha256(str(senha).encode()).hexdigest()
+                detalhe = "Usuário atualizado com reset de senha."
+            else:
+                detalhe = "Usuário atualizado."
+
+            salvar_usuarios_sistema(base)
+            registrar_log_usuario("Atualização", usuario, detalhe)
+
+            try:
+                enviar_alerta_telegram(
+                    "👥 <b>Usuário atualizado no Eirox</b>\n\n"
+                    f"👤 <b>Usuário:</b> {usuario}\n"
+                    f"🔐 <b>Perfil:</b> {perfil}\n"
+                    f"✅ <b>Ativo:</b> {ativo}\n"
+                    f"🕒 <b>Horário:</b> {_agora_brasil_txt()}\n"
+                    f"🙋 <b>Administrador:</b> {st.session_state.get('usuario', '')}"
+                )
+            except Exception:
+                pass
+
+            return True, detalhe
+
+        if not senha:
+            return False, "Senha obrigatória para novo usuário."
+
+        nova_linha = {
+            "Usuario": usuario,
+            "Nome": nome,
+            "Perfil": perfil,
+            "Senha_Hash": hashlib.sha256(str(senha).encode()).hexdigest(),
+            "Ativo": ativo,
+            "Expira_Em": expira_em,
+            "Forcar_Reset": forcar_reset,
+            "EmpresaID": empresa_id,
+            "Criado_Em": agora,
+            "Atualizado_Em": agora
+        }
+
+        base = pd.concat(
+            [
+                base,
+                pd.DataFrame([nova_linha])
+            ],
+            ignore_index=True
+        )
+
+        salvar_usuarios_sistema(base)
+        registrar_log_usuario("Criação", usuario, "Usuário criado.")
+
+        try:
+            enviar_alerta_telegram(
+                "👥 <b>Novo usuário criado no Eirox</b>\n\n"
+                f"👤 <b>Usuário:</b> {usuario}\n"
+                f"🙋 <b>Nome:</b> {nome}\n"
+                f"🔐 <b>Perfil:</b> {perfil}\n"
+                f"✅ <b>Ativo:</b> {ativo}\n"
+                f"🕒 <b>Horário:</b> {_agora_brasil_txt()}\n"
+                f"🧑‍💼 <b>Administrador:</b> {st.session_state.get('usuario', '')}"
+            )
+        except Exception:
+            pass
+
+        return True, "Usuário criado com sucesso."
+
+    except Exception as erro:
+        return False, f"Erro ao salvar usuário: {erro}"
+
+
+def bloquear_desbloquear_usuario(usuario, ativo):
+    """
+    Bloqueia ou desbloqueia usuário.
+    """
+
+    try:
+        usuario = str(usuario).strip().lower()
+        base = carregar_usuarios_sistema()
+
+        if usuario not in base["Usuario"].tolist():
+            return False, "Usuário não encontrado."
+
+        idx = base.index[base["Usuario"] == usuario][0]
+        base.loc[idx, "Ativo"] = "Sim" if ativo else "Não"
+        base.loc[idx, "Atualizado_Em"] = _agora_brasil_txt()
+
+        salvar_usuarios_sistema(base)
+
+        acao = "Desbloqueio" if ativo else "Bloqueio"
+        registrar_log_usuario(acao, usuario, f"Ativo={base.loc[idx, 'Ativo']}")
+
+        try:
+            enviar_alerta_telegram(
+                f"{'🔓' if ativo else '🔒'} <b>{acao} de usuário no Eirox</b>\n\n"
+                f"👤 <b>Usuário:</b> {usuario}\n"
+                f"✅ <b>Ativo:</b> {base.loc[idx, 'Ativo']}\n"
+                f"🕒 <b>Horário:</b> {_agora_brasil_txt()}\n"
+                f"🧑‍💼 <b>Administrador:</b> {st.session_state.get('usuario', '')}"
+            )
+        except Exception:
+            pass
+
+        return True, f"Usuário {'desbloqueado' if ativo else 'bloqueado'} com sucesso."
+
+    except Exception as erro:
+        return False, f"Erro ao alterar status: {erro}"
+
+
+def resetar_senha_usuario(usuario, nova_senha, forcar_reset="Não"):
+    """
+    Reseta senha do usuário.
+    """
+
+    try:
+        usuario = str(usuario).strip().lower()
+
+        if not nova_senha:
+            return False, "Informe a nova senha."
+
+        base = carregar_usuarios_sistema()
+
+        if usuario not in base["Usuario"].tolist():
+            return False, "Usuário não encontrado."
+
+        idx = base.index[base["Usuario"] == usuario][0]
+        base.loc[idx, "Senha_Hash"] = hashlib.sha256(str(nova_senha).encode()).hexdigest()
+        base.loc[idx, "Forcar_Reset"] = forcar_reset
+        base.loc[idx, "Atualizado_Em"] = _agora_brasil_txt()
+
+        salvar_usuarios_sistema(base)
+        registrar_log_usuario("Reset de senha", usuario, f"Forcar_Reset={forcar_reset}")
+
+        try:
+            enviar_alerta_telegram(
+                "🔑 <b>Reset de senha no Eirox</b>\n\n"
+                f"👤 <b>Usuário:</b> {usuario}\n"
+                f"🔁 <b>Forçar reset:</b> {forcar_reset}\n"
+                f"🕒 <b>Horário:</b> {_agora_brasil_txt()}\n"
+                f"🧑‍💼 <b>Administrador:</b> {st.session_state.get('usuario', '')}"
+            )
+        except Exception:
+            pass
+
+        return True, "Senha redefinida com sucesso."
+
+    except Exception as erro:
+        return False, f"Erro ao redefinir senha: {erro}"
+
+
+def carregar_log_usuarios():
+    """
+    Carrega log de alterações de usuários.
+    """
+
+    try:
+        if not USUARIOS_LOG_ARQUIVO.exists():
+            return pd.DataFrame()
+
+        return pd.read_csv(
+            USUARIOS_LOG_ARQUIVO,
+            sep=";",
+            encoding="utf-8-sig"
+        )
+
+    except Exception:
+        return pd.DataFrame()
+
+
+
+PERMISSOES_TELAS = {
+    "Diretoria": [
+        "📊 Dashboard Geral",
+        "🔎 Rede/Loja vs Concorrentes",
+        "🛒 Negociação Compras",
+        "🌎 Mapa Geográfico de Concorrência",
+        "🚨 Central de Alertas",
+        "📈 Simulador Inteligente",
+        "🏢 Dashboard Executivo",
+        "🎯 Sugestão de Pesquisa",
+        "🧪 Diagnóstico"
+    ],
+    "Pricing": [
+        "📊 Dashboard Geral",
+        "🔎 Rede/Loja vs Concorrentes",
+        "🛒 Negociação Compras",
+        "🌎 Mapa Geográfico de Concorrência",
+        "🚨 Central de Alertas",
+        "📈 Simulador Inteligente",
+        "🏢 Dashboard Executivo",
+        "🎯 Sugestão de Pesquisa",
+        "🧪 Diagnóstico"
+    ],
+    "Comercial": [
+        "📊 Dashboard Geral",
+        "🔎 Rede/Loja vs Concorrentes",
+        "🛒 Negociação Compras",
+        "🌎 Mapa Geográfico de Concorrência",
+        "🚨 Central de Alertas",
+        "📈 Simulador Inteligente",
+        "🏢 Dashboard Executivo",
+        "🎯 Sugestão de Pesquisa",
+        "🧪 Diagnóstico"
+    ],
+    "Regional": [
+        "📊 Dashboard Geral",
+        "🔎 Rede/Loja vs Concorrentes",
+        "🛒 Negociação Compras",
+        "🌎 Mapa Geográfico de Concorrência",
+        "🚨 Central de Alertas",
+        "📈 Simulador Inteligente",
+        "🏢 Dashboard Executivo",
+        "🎯 Sugestão de Pesquisa",
+        "🧪 Diagnóstico"
+    ],
+    "Consulta": [
+        "📊 Dashboard Geral",
+        "🏢 Dashboard Executivo"
+    ]
+}
+
+
+
+def iniciar_auditoria_sessao(usuario, nome, perfil):
+    """
+    Inicializa controle de navegação do usuário na sessão atual.
+    """
+
+    try:
+        agora = horario_brasil_formatado()
+
+        if not st.session_state.get("auditoria_sessao_iniciada", False):
+
+            st.session_state["auditoria_sessao_iniciada"] = True
+            st.session_state["auditoria_usuario"] = usuario
+            st.session_state["auditoria_nome"] = nome
+            st.session_state["auditoria_perfil"] = perfil
+            st.session_state["auditoria_entrada"] = agora
+            st.session_state["auditoria_ultima_acao"] = agora
+            st.session_state["auditoria_paginas"] = []
+            st.session_state["auditoria_paginas_unicas"] = []
+            st.session_state["auditoria_contador_paginas"] = 0
+
+    except Exception:
+        pass
+
+
+def registrar_pagina_acessada(pagina):
+    """
+    Registra cada navegação entre telas.
+    """
+
+    try:
+        if not st.session_state.get("logado", False):
+            return
+
+        agora = horario_brasil_formatado()
+
+        if "auditoria_paginas" not in st.session_state:
+            st.session_state["auditoria_paginas"] = []
+
+        if "auditoria_paginas_unicas" not in st.session_state:
+            st.session_state["auditoria_paginas_unicas"] = []
+
+        pagina_limpa = str(pagina).strip()
+
+        if not pagina_limpa:
+            return
+
+        ultima_pagina = st.session_state["auditoria_paginas"][-1]["pagina"] if st.session_state["auditoria_paginas"] else None
+
+        if pagina_limpa != ultima_pagina:
+
+            st.session_state["auditoria_paginas"].append(
+                {
+                    "pagina": pagina_limpa,
+                    "horario": agora
+                }
+            )
+
+            if pagina_limpa not in st.session_state["auditoria_paginas_unicas"]:
+                st.session_state["auditoria_paginas_unicas"].append(pagina_limpa)
+
+            st.session_state["auditoria_contador_paginas"] = len(
+                st.session_state["auditoria_paginas"]
+            )
+
+        st.session_state["auditoria_ultima_acao"] = agora
+        st.session_state["auditoria_ultima_pagina"] = pagina_limpa
+
+    except Exception:
+        pass
+
+
+def calcular_tempo_sessao():
+    """
+    Calcula tempo aproximado entre entrada e última ação.
+    """
+
+    try:
+        entrada_txt = st.session_state.get("auditoria_entrada")
+        ultima_txt = st.session_state.get("auditoria_ultima_acao")
+
+        if not entrada_txt or not ultima_txt:
+            return "Não disponível"
+
+        entrada = datetime.strptime(
+            entrada_txt,
+            "%d/%m/%Y %H:%M:%S"
+        )
+
+        ultima = datetime.strptime(
+            ultima_txt,
+            "%d/%m/%Y %H:%M:%S"
+        )
+
+        total_segundos = int(
+            max(
+                0,
+                (ultima - entrada).total_seconds()
+            )
+        )
+
+        horas = total_segundos // 3600
+        minutos = (total_segundos % 3600) // 60
+        segundos = total_segundos % 60
+
+        if horas > 0:
+            return f"{horas}h {minutos}min {segundos}s"
+
+        if minutos > 0:
+            return f"{minutos}min {segundos}s"
+
+        return f"{segundos}s"
+
+    except Exception:
+        return "Não disponível"
+
+
+def montar_resumo_navegacao():
+    """
+    Monta mensagem de resumo da sessão para Telegram.
+    """
+
+    try:
+        usuario = st.session_state.get("auditoria_usuario", st.session_state.get("usuario", ""))
+        nome = st.session_state.get("auditoria_nome", st.session_state.get("nome_usuario", ""))
+        perfil = st.session_state.get("auditoria_perfil", st.session_state.get("perfil_usuario", ""))
+        entrada = st.session_state.get("auditoria_entrada", "")
+        ultima = st.session_state.get("auditoria_ultima_acao", "")
+        ultima_pagina = st.session_state.get("auditoria_ultima_pagina", "")
+        paginas_unicas = st.session_state.get("auditoria_paginas_unicas", [])
+        paginas = st.session_state.get("auditoria_paginas", [])
+
+        ambiente = "Streamlit Cloud" if "/mount/src" in str(Path.cwd()) else "Localhost"
+
+        lista_paginas = ""
+
+        for i, pag in enumerate(paginas_unicas, start=1):
+            lista_paginas += f"{i}. {pag}\n"
+
+        if not lista_paginas:
+            lista_paginas = "Nenhuma página registrada\n"
+
+        mensagem = (
+            "📊 <b>Resumo de navegação Eirox</b>\n\n"
+            f"👤 <b>Usuário:</b> {usuario}\n"
+            f"🙋 <b>Nome:</b> {nome}\n"
+            f"🔐 <b>Perfil:</b> {perfil}\n\n"
+            f"🕒 <b>Entrada:</b> {entrada}\n"
+            f"🕘 <b>Última ação:</b> {ultima}\n"
+            f"⏱️ <b>Tempo no sistema:</b> {calcular_tempo_sessao()}\n\n"
+            f"🧭 <b>Telas navegadas:</b> {len(paginas_unicas)}\n"
+            f"🔁 <b>Trocas de tela:</b> {len(paginas)}\n\n"
+            f"📍 <b>Última página:</b> {ultima_pagina}\n\n"
+            f"📄 <b>Páginas acessadas:</b>\n{lista_paginas}\n"
+            f"{texto_localizacao_telegram()}"
+            f"🌐 <b>Ambiente:</b> {ambiente}\n"
+            f"🏷️ <b>Versão:</b> {VERSAO_APP}"
+        )
+
+        return mensagem
+
+    except Exception:
+        return ""
+
+
+def enviar_resumo_navegacao_telegram():
+    """
+    Envia o resumo da sessão, evitando duplicidade.
+    """
+
+    try:
+        if st.session_state.get("resumo_navegacao_enviado", False):
+            return
+
+        mensagem = montar_resumo_navegacao()
+
+        if mensagem:
+            enviado = enviar_alerta_telegram(mensagem)
+
+            if enviado:
+                st.session_state["resumo_navegacao_enviado"] = True
+
+    except Exception:
+        pass
+
+
+
+
+def enviar_resumo_periodico_navegacao():
+    """
+    Envia resumo automático durante o uso.
+    Isso cobre casos em que o usuário fecha o navegador sem clicar em Sair.
+
+    Regra:
+    - Envia no máximo uma vez a cada 5 minutos.
+    - Envia também quando houver pelo menos 3 trocas de tela desde o último envio.
+    """
+
+    try:
+        if not st.session_state.get("logado", False):
+            return
+
+        agora_txt = horario_brasil_formatado()
+
+        ultima_envio_txt = st.session_state.get("auditoria_ultimo_resumo_auto")
+        trocas_atuais = int(st.session_state.get("auditoria_contador_paginas", 0))
+        trocas_ultimo_envio = int(st.session_state.get("auditoria_trocas_ultimo_resumo", 0))
+
+        deve_enviar = False
+
+        if not ultima_envio_txt:
+            # Não envia imediatamente no login para evitar duplicar o alerta de entrada.
+            st.session_state["auditoria_ultimo_resumo_auto"] = agora_txt
+            st.session_state["auditoria_trocas_ultimo_resumo"] = trocas_atuais
+            return
+
+        try:
+            ultima_envio = datetime.strptime(
+                ultima_envio_txt,
+                "%d/%m/%Y %H:%M:%S"
+            )
+
+            agora = datetime.strptime(
+                agora_txt,
+                "%d/%m/%Y %H:%M:%S"
+            )
+
+            minutos_passados = (
+                agora - ultima_envio
+            ).total_seconds() / 60
+
+            if minutos_passados >= 5:
+                deve_enviar = True
+
+        except Exception:
+            pass
+
+        if trocas_atuais - trocas_ultimo_envio >= 3:
+            deve_enviar = True
+
+        if not deve_enviar:
+            return
+
+        mensagem = montar_resumo_navegacao()
+
+        if mensagem:
+            mensagem = mensagem.replace(
+                "📊 <b>Resumo de navegação Eirox</b>",
+                "📡 <b>Resumo automático de navegação Eirox</b>"
+            )
+
+            enviado = enviar_alerta_telegram(mensagem)
+
+            if enviado:
+                st.session_state["auditoria_ultimo_resumo_auto"] = agora_txt
+                st.session_state["auditoria_trocas_ultimo_resumo"] = trocas_atuais
+
+    except Exception:
+        pass
+
+
+
+def autenticar_usuario(usuario, senha):
+
+    usuario = str(usuario).strip().lower()
+
+    dados_usuario = obter_dados_usuario(usuario)
+
+    if not dados_usuario:
+        return False
+
+    if str(dados_usuario.get("Ativo", "Sim")).strip().lower() != "sim":
+        st.session_state["login_bloqueado_motivo"] = "Usuário bloqueado."
+        return False
+
+    if usuario_expirado(dados_usuario.get("Expira_Em", "")):
+        st.session_state["login_bloqueado_motivo"] = "Acesso expirado."
+        return False
+
+    senha_hash = hashlib.sha256(
+        str(senha).encode()
+    ).hexdigest()
+
+    ok = senha_hash == str(dados_usuario.get("Senha_Hash", ""))
+
+    if ok and str(dados_usuario.get("Forcar_Reset", "Não")).strip().lower() == "sim":
+        st.session_state["login_bloqueado_motivo"] = "Senha temporária. Solicite alteração ao administrador."
+        return False
+
+    return ok
+
+
+def tela_login():
+
+    st.markdown(
+        """
+        <div style="text-align:center; margin-top:30px;">
+            <h1>📊 Eirox Pricing</h1>
+            <h3 style="font-weight:400; color:#B0B0B0;">
+                Ferramenta de Inteligência de Pricing
+            </h3>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    with st.form("form_login"):
+
+        usuario = st.text_input(
+            "Usuário"
+        )
+
+        senha = st.text_input(
+            "Senha",
+            type="password"
+        )
+
+        entrar = st.form_submit_button(
+            "Entrar",
+            use_container_width=True
+        )
+
+    if entrar:
+
+        if autenticar_usuario(
+            usuario,
+            senha
+        ):
+
+            usuario_key = str(usuario).strip().lower()
+
+            licenca_ok, licenca_msg = validar_licenca_login(usuario_key)
+
+            if not licenca_ok:
+                st.error(licenca_msg)
+                return
+
+            dados_login = obter_dados_usuario(usuario_key)
+
+            st.session_state["logado"] = True
+            st.session_state["usuario"] = usuario_key
+            st.session_state["nome_usuario"] = dados_login.get("Nome", usuario_key) if dados_login else usuario_key
+            st.session_state["perfil_usuario"] = dados_login.get("Perfil", "Consulta") if dados_login else "Consulta"
+            st.session_state["empresa_id_usuario"] = dados_login.get("EmpresaID", "1") if dados_login else "1"
+            st.session_state["empresa_id_contexto"] = st.session_state["empresa_id_usuario"]
+
+            salvar_log_acesso(
+                "Login",
+                "Sistema",
+                "Usuário autenticado com sucesso"
+            )
+
+            registrar_alerta_login(
+                usuario_key,
+                st.session_state["nome_usuario"],
+                st.session_state["perfil_usuario"]
+            )
+
+            iniciar_auditoria_sessao(
+                usuario_key,
+                st.session_state["nome_usuario"],
+                st.session_state["perfil_usuario"]
+            )
+
+            st.rerun()
+
+        else:
+
+            motivo = st.session_state.pop("login_bloqueado_motivo", "")
+
+            if motivo:
+                st.error(motivo)
+            else:
+                st.error(
+                    "Usuário ou senha inválidos."
+                )
+
+
+def exigir_login():
+
+    if "logado" not in st.session_state:
+        st.session_state["logado"] = False
+
+    if not st.session_state["logado"]:
+
+        tela_login()
+        st.stop()
+
+
+def logout():
+
+    enviar_resumo_navegacao_telegram()
+
+    st.session_state["logado"] = False
+    st.session_state["usuario"] = None
+    st.session_state["nome_usuario"] = None
+    st.session_state["perfil_usuario"] = None
+    st.session_state["auditoria_sessao_iniciada"] = False
+    st.rerun()
+
+
+exigir_login()
+
+
+if not st.session_state.get("geo_solicitada_sessao", False):
+    solicitar_localizacao_navegador()
+    st.session_state["geo_solicitada_sessao"] = True
+
+
+perfil_usuario = st.session_state.get(
+    "perfil_usuario",
+    "Consulta"
+)
+
+nome_usuario = st.session_state.get(
+    "nome_usuario",
+    ""
+)
+
+# Contexto Multiempresa
+preparar_base_usuarios_multiempresa()
+
+if "empresa_id_usuario" not in st.session_state:
+    st.session_state["empresa_id_usuario"] = "1"
+
+if "empresa_id_contexto" not in st.session_state:
+    st.session_state["empresa_id_contexto"] = st.session_state.get("empresa_id_usuario", "1")
+
+empresa_id_contexto = empresa_contexto_atual()
+nome_empresa_contexto = obter_nome_empresa(empresa_id_contexto)
+
+pode_exportar = perfil_usuario in [
+    "Diretoria",
+    "Pricing"
+]
+
+pode_ver_margem = perfil_usuario in [
+    "Diretoria",
+    "Pricing"
+]
+
+# Controle global de exportação por perfil
+_st_download_button_original = st.download_button
+
+def download_button_controlado(*args, **kwargs):
+
+    if pode_exportar:
+        return _st_download_button_original(*args, **kwargs)
+
+    label = args[0] if len(args) > 0 else kwargs.get("label", "Download")
+
+    return _st_download_button_original(
+        label=f"{label} 🔒",
+        data="Seu perfil não tem permissão para exportar.",
+        file_name="sem_permissao.txt",
+        mime="text/plain",
+        disabled=True
+    )
+
+st.download_button = download_button_controlado
+
+
+
+
+# --------------------------------------------------
+
+st.markdown(
+    """
+    <style>
+        .block-container {
+            max-width: 100% !important;
+            padding-left: 1.5rem !important;
+            padding-right: 1.5rem !important;
+        }
+
+        div[data-testid="stDataFrame"] {
+            width: 100% !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# CSS
+# --------------------------------------------------
+
+try:
+
+    with open(
+        "style.css",
+        encoding="utf-8"
+    ) as f:
+
+        st.markdown(
+            f"<style>{f.read()}</style>",
+            unsafe_allow_html=True
+        )
+
+except:
+    pass
+
+# --------------------------------------------------
+# LOGO
+# --------------------------------------------------
+
+try:
+
+    st.image(
+        "logo eirox.png",
+        width=460
+    )
+
+except:
+    pass
+
+st.markdown(
+    """
+    <div class="eirox-hero">
+        <div class="eirox-section-title">Eirox Pricing Enterprise</div>
+        <h1>📊 Inteligência de Pricing & Competitividade</h1>
+        <p>Monitoramento executivo de preços, concorrência, margem, alertas e oportunidades comerciais.</p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 
 # --------------------------------------------------
@@ -31,90 +6758,115 @@ st.caption("Monitoramento executivo de preços, concorrência, margem, alertas e
 # --------------------------------------------------
 
 @st.cache_data
-@st.cache_data(show_spinner=False)
 def carregar():
-    """
-    Carregamento definitivo e seguro da base Analise_Pricing.
-    Não usa argumentos inválidos no read_excel.
-    """
 
-    try:
-        candidatos = [
-            Path("Analise_Pricing.xlsx"),
-            Path("ANALISE_PRICING.xlsx"),
-            Path("analise_pricing.xlsx"),
-            Path("Analise_Pricing.csv"),
-            Path("ANALISE_PRICING.csv"),
-            Path("analise_pricing.csv")
-        ]
-
-        arquivo = None
-
-        for caminho in candidatos:
-            if caminho.exists():
-                arquivo = caminho
-                break
-
-        if arquivo is None:
-            encontrados = []
-            for nome in [
-                "Analise_Pricing.xlsx",
-                "ANALISE_PRICING.xlsx",
-                "analise_pricing.xlsx",
-                "Analise_Pricing.csv",
-                "ANALISE_PRICING.csv",
-                "analise_pricing.csv"
-            ]:
-                encontrados.extend(list(Path(".").rglob(nome)))
-
-            encontrados = [
-                p for p in encontrados
-                if ".git" not in p.parts
-                and "__pycache__" not in p.parts
-                and ".venv" not in p.parts
-                and "venv" not in p.parts
-            ]
-
-            if encontrados:
-                arquivo = encontrados[0]
-
-        if arquivo is None:
-            return pd.DataFrame()
-
-        if arquivo.suffix.lower() == ".csv":
-            try:
-                base = pd.read_csv(arquivo)
-            except Exception:
-                base = pd.read_csv(arquivo)
-        else:
-            base = pd.read_excel(arquivo, engine="openpyxl")
-
-        if not isinstance(base, pd.DataFrame):
-            return pd.DataFrame()
-
-        base.columns = base.columns.astype(str).str.strip()
-
-        if "Ganho_Potencial" in base.columns:
-            base["Ganho_Potencial"] = pd.to_numeric(base["Ganho_Potencial"], errors="coerce").fillna(0)
-
-        return base
-
-    except Exception as erro:
-        st.error(f"Erro ao carregar base principal: {erro}")
-        return pd.DataFrame()
-
+    return pd.read_excel(
+        "Analise_Pricing.xlsx"
+    )
 
 df = carregar()
-if not isinstance(df, pd.DataFrame):
-    df = pd.DataFrame()
 
-if not df.empty:
-    df.columns = df.columns.astype(str).str.strip()
+historico = carregar_historico()
+compra = carregar_compra()
+venda_rede = carregar_venda_rede()
+estoque = carregar_estoque()
+
+if historico.empty:
+    historico = ler_base_pasta_ou_zip(
+        ["VENDA_TESTE"],
+        ["VENDA_TESTE.zip"]
+    )
+
+if compra.empty:
+    compra = ler_base_pasta_ou_zip(
+        ["COMPRA_TESTE", "COMPRA", "COMPRAS_TESTE"],
+        ["COMPRA_TESTE.zip", "COMPRA.zip"]
+    )
+
+if venda_rede.empty:
+    venda_rede = ler_base_pasta_ou_zip(
+        ["VENDA_FINAL_TESTE", "VENDA_TESTE_FINAL", "VENDA_FINAL", "VENDA_REDE"],
+        ["VENDA_FINAL_TESTE.zip", "VENDA_TESTE_FINAL.zip", "VENDA_FINAL.zip"]
+    )
+
+if estoque.empty:
+    estoque = ler_base_pasta_ou_zip(
+        ["ESTOQUE_TESTE", "ESTOQUE"],
+        ["ESTOQUE_TESTE.zip", "ESTOQUE.zip"]
+    )
+
+# Fallback final compatível com .xls, .xlsx e .xlsm
+# Necessário para Streamlit Cloud quando a pasta contém arquivos .xls.
+if historico.empty:
+    historico = carregar_pasta_excel_compat(
+        ["VENDA_TESTE"],
+        "VENDA_TESTE"
+    )
+
+if compra.empty:
+    compra = carregar_pasta_excel_compat(
+        ["COMPRA_TESTE", "COMPRA", "COMPRAS_TESTE"],
+        "COMPRA_TESTE"
+    )
+
+if venda_rede.empty:
+    venda_rede = carregar_pasta_excel_compat(
+        ["VENDA_FINAL_TESTE", "VENDA_TESTE_FINAL", "VENDA_FINAL", "VENDA_REDE"],
+        "VENDA_FINAL_TESTE"
+    )
+
+# Última tentativa: procurar a venda final em qualquer pasta do projeto
+# identificando automaticamente arquivos com Cód. Barras/Etiq., Itens e Venda.
+if venda_rede.empty:
+    venda_rede = carregar_base_recursiva_por_colunas(
+        "VENDA_FINAL_TESTE",
+        [
+            "Cód. Barras/Etiq.",
+            "Itens",
+            "Venda"
+        ]
+    )
+
+if estoque.empty:
+    estoque = carregar_pasta_excel_compat(
+        ["ESTOQUE_TESTE", "ESTOQUE"],
+        "ESTOQUE_TESTE"
+    )
+
+# Fallback robusto para Streamlit Cloud / GitHub
+if historico.empty:
+    historico = carregar_base_robusta(
+        "VENDA_TESTE",
+        ["VENDA_TESTE"],
+        ["VENDA_TESTE.zip"]
+    )
+
+if compra.empty:
+    compra = carregar_base_robusta(
+        "COMPRA_TESTE",
+        ["COMPRA_TESTE", "COMPRA", "COMPRAS_TESTE"],
+        ["COMPRA_TESTE.zip", "COMPRA.zip"]
+    )
+
+if venda_rede.empty:
+    venda_rede = carregar_base_robusta(
+        "VENDA_FINAL_TESTE",
+        ["VENDA_FINAL_TESTE", "VENDA_TESTE_FINAL", "VENDA_FINAL", "VENDA_REDE"],
+        ["VENDA_FINAL_TESTE.zip", "VENDA_TESTE_FINAL.zip", "VENDA_FINAL.zip"]
+    )
+
+if estoque.empty:
+    estoque = carregar_base_robusta(
+        "ESTOQUE_TESTE",
+        ["ESTOQUE_TESTE", "ESTOQUE"],
+        ["ESTOQUE_TESTE.zip", "ESTOQUE.zip"]
+    )
 
 # --------------------------------------------------
 # PADRONIZAR COLUNAS
 # --------------------------------------------------
 
+df.columns = df.columns.astype(str).str.strip()
 
 if not historico.empty:
     historico.columns = historico.columns.astype(str).str.strip()
@@ -571,8 +7323,6 @@ df_filtrado = propagar_ganho_potencial(df_filtrado)
 
 if pagina == "💳 Billing Enterprise":
 
-    mostrar_explicacao_visao_eirox("💳 Billing Enterprise")
-
     if not usuario_pode_ver_billing_enterprise():
         st.error("Acesso não autorizado.")
         st.stop()
@@ -651,7 +7401,9 @@ if pagina == "💳 Billing Enterprise":
             )
 
             csv_billing = view.to_csv(
-                index=False
+                index=False,
+                sep=";",
+                encoding="utf-8-sig"
             )
 
             st.download_button(
@@ -964,8 +7716,6 @@ if pagina == "💳 Billing Enterprise":
 
 if pagina == "🏢 Portal do Cliente":
 
-    mostrar_explicacao_visao_eirox("🏢 Portal do Cliente")
-
     if not usuario_pode_ver_portal_cliente():
         st.error("Acesso não autorizado.")
         st.stop()
@@ -1160,8 +7910,6 @@ if pagina == "🏢 Portal do Cliente":
 # --------------------------------------------------
 
 if pagina == "🏢 CRM Enterprise":
-
-    mostrar_explicacao_visao_eirox("🏢 CRM Enterprise")
 
     if not usuario_pode_ver_crm_enterprise():
         st.error("Acesso não autorizado.")
@@ -1374,7 +8122,9 @@ if pagina == "🏢 CRM Enterprise":
             )
 
             csv_clientes = view.to_csv(
-                index=False
+                index=False,
+                sep=";",
+                encoding="utf-8-sig"
             )
 
             st.download_button(
@@ -1472,8 +8222,6 @@ if pagina == "🏢 CRM Enterprise":
 # --------------------------------------------------
 
 if pagina == "📋 Workflow Comercial":
-
-    mostrar_explicacao_visao_eirox("📋 Workflow Comercial")
 
     if not usuario_pode_ver_workflow_comercial():
         st.error("Acesso não autorizado.")
@@ -1591,7 +8339,7 @@ if pagina == "📋 Workflow Comercial":
 
     st.markdown("### 📤 Exportação")
 
-    csv_workflow = view.to_csv(index=False)
+    csv_workflow = view.to_csv(index=False, sep=";", encoding="utf-8-sig")
 
     st.download_button(
         "📥 Exportar Workflow CSV",
@@ -1608,8 +8356,6 @@ if pagina == "📋 Workflow Comercial":
 # --------------------------------------------------
 
 if pagina == "🤖 IA Pricing Enterprise":
-
-    mostrar_explicacao_visao_eirox("🤖 IA Pricing Enterprise")
 
     if not usuario_pode_ver_ia_pricing():
         st.error("Acesso não autorizado.")
@@ -1697,7 +8443,7 @@ if pagina == "🤖 IA Pricing Enterprise":
             fig_lab.update_layout(height=420, margin=dict(l=10, r=10, t=60, b=10), yaxis=dict(autorange="reversed"))
             c2.plotly_chart(fig_lab, use_container_width=True)
 
-        csv_ia = view.to_csv(index=False)
+        csv_ia = view.to_csv(index=False, sep=";", encoding="utf-8-sig")
         st.download_button("📥 Exportar Recomendações IA CSV", data=csv_ia, file_name="ia_pricing_enterprise_eirox.csv", mime="text/csv", use_container_width=True)
 
     st.markdown("### 📜 Histórico IA Pricing")
@@ -1713,8 +8459,6 @@ if pagina == "🤖 IA Pricing Enterprise":
 # --------------------------------------------------
 
 if pagina == "🏁 Release Candidate":
-
-    mostrar_explicacao_visao_eirox("🏁 Release Candidate")
 
     if not usuario_pode_ver_release_candidate():
         st.error("Acesso não autorizado.")
@@ -1783,7 +8527,7 @@ if pagina == "🏁 Release Candidate":
         ignore_index=True
     )
 
-    csv_rc = rc_export.to_csv(index=False)
+    csv_rc = rc_export.to_csv(index=False, sep=";", encoding="utf-8-sig")
 
     st.download_button(
         "📥 Exportar Checklist RC",
@@ -1802,8 +8546,6 @@ if pagina == "🏁 Release Candidate":
 # --------------------------------------------------
 
 if pagina == "👥 Controle de Usuários":
-
-    mostrar_explicacao_visao_eirox("👥 Controle de Usuários")
 
     if not usuario_pode_gerenciar_usuarios():
         st.error("Acesso não autorizado.")
@@ -2065,7 +8807,9 @@ if pagina == "👥 Controle de Usuários":
             )
 
             csv_logs = logs_usuarios.to_csv(
-                index=False
+                index=False,
+                sep=";",
+                encoding="utf-8-sig"
             )
 
             st.download_button(
@@ -2089,8 +8833,6 @@ if pagina == "👥 Controle de Usuários":
 # --------------------------------------------------
 
 if pagina == "📌 Sobre o Eirox":
-
-    mostrar_explicacao_visao_eirox("📌 Sobre o Eirox")
 
     if not usuario_pode_ver_multiempresa():
         st.error("Acesso não autorizado.")
@@ -2158,8 +8900,6 @@ if pagina == "📌 Sobre o Eirox":
 # --------------------------------------------------
 
 if pagina == "🧭 Roadmap do Produto":
-
-    mostrar_explicacao_visao_eirox("🧭 Roadmap do Produto")
 
     if not usuario_pode_ver_multiempresa():
         st.error("Acesso não autorizado.")
@@ -2230,8 +8970,6 @@ if pagina == "🧭 Roadmap do Produto":
 # --------------------------------------------------
 
 if pagina == "💰 Motor de Oportunidades":
-
-    mostrar_explicacao_visao_eirox("💰 Motor de Oportunidades")
 
     if not usuario_pode_ver_motor_oportunidades():
         st.error("Acesso não autorizado.")
@@ -2321,18 +9059,18 @@ if pagina == "💰 Motor de Oportunidades":
 
         if "Laboratório" in oportunidades_df.columns:
             ganho_lab = oportunidades_df.groupby("Laboratório", dropna=False).agg(Ganho_Potencial=("Ganho_Potencial", "sum")).reset_index().sort_values("Ganho_Potencial", ascending=False).head(15)
-            fig_lab = px.bar(ganho_lab, x="Ganho_Potencial", y="Laboratório", orientation="h", title="Top laboratórios por ganho potencial")
+            fig_lab = px.bar(ganho_lab, x="Ganho_Potencial", y="Laboratório", orientation="h", title="Top laboratórios por potencial de captura")
             fig_lab.update_layout(height=420, margin=dict(l=10, r=10, t=60, b=10), yaxis=dict(autorange="reversed"))
             g1.plotly_chart(fig_lab, use_container_width=True)
 
         if "Categoria" in oportunidades_df.columns:
             ganho_cat = oportunidades_df.groupby("Categoria", dropna=False).agg(Ganho_Potencial=("Ganho_Potencial", "sum")).reset_index().sort_values("Ganho_Potencial", ascending=False).head(15)
-            fig_cat = px.bar(ganho_cat, x="Ganho_Potencial", y="Categoria", orientation="h", title="Top categorias por ganho potencial")
+            fig_cat = px.bar(ganho_cat, x="Ganho_Potencial", y="Categoria", orientation="h", title="Top categorias por potencial de captura")
             fig_cat.update_layout(height=420, margin=dict(l=10, r=10, t=60, b=10), yaxis=dict(autorange="reversed"))
             g2.plotly_chart(fig_cat, use_container_width=True)
 
         st.markdown("### 📤 Exportação")
-        csv_oport = view.to_csv(index=False)
+        csv_oport = view.to_csv(index=False, sep=";", encoding="utf-8-sig")
         st.download_button("📥 Exportar Oportunidades CSV", data=csv_oport, file_name="motor_oportunidades_eirox.csv", mime="text/csv", use_container_width=True)
 
     st.markdown("### 📜 Histórico de oportunidades")
@@ -2351,8 +9089,6 @@ if pagina == "💰 Motor de Oportunidades":
 # --------------------------------------------------
 
 if pagina == "🚨 Alertas Inteligentes":
-
-    mostrar_explicacao_visao_eirox("🚨 Alertas Inteligentes")
 
     if not usuario_pode_ver_alertas_inteligentes():
         st.error("Acesso não autorizado.")
@@ -2451,7 +9187,7 @@ if pagina == "🚨 Alertas Inteligentes":
 
         st.dataframe(view, use_container_width=True, hide_index=True)
 
-        csv_alertas = view.to_csv(index=False)
+        csv_alertas = view.to_csv(index=False, sep=";", encoding="utf-8-sig")
 
         st.download_button(
             "📥 Exportar Alertas CSV",
@@ -2479,8 +9215,6 @@ if pagina == "🚨 Alertas Inteligentes":
 # --------------------------------------------------
 
 if pagina == "💼 Licenciamento Real":
-
-    mostrar_explicacao_visao_eirox("💼 Licenciamento Real")
 
     if not usuario_pode_ver_licenciamento_real():
         st.error("Acesso não autorizado.")
@@ -2659,8 +9393,6 @@ if pagina == "💼 Licenciamento Real":
 
 if pagina == "💼 Licenciamento Multiempresa":
 
-    mostrar_explicacao_visao_eirox("💼 Licenciamento Multiempresa")
-
     if not usuario_pode_ver_multiempresa():
         st.error("Acesso não autorizado.")
         st.stop()
@@ -2719,8 +9451,6 @@ if pagina == "💼 Licenciamento Multiempresa":
 # --------------------------------------------------
 
 if pagina == "🏢 Multiempresa":
-
-    mostrar_explicacao_visao_eirox("🏢 Multiempresa")
 
     if not usuario_pode_ver_multiempresa():
         st.error("Acesso não autorizado.")
@@ -2901,8 +9631,6 @@ if pagina == "🏢 Multiempresa":
 
 if pagina == "📦 Backup Center":
 
-    mostrar_explicacao_visao_eirox("📦 Backup Center")
-
     if not usuario_pode_ver_auditoria():
         st.error("Acesso não autorizado.")
         st.stop()
@@ -3054,8 +9782,6 @@ if pagina == "📦 Backup Center":
 
 if pagina == "🟢 Saúde do Sistema":
 
-    mostrar_explicacao_visao_eirox("🟢 Saúde do Sistema")
-
     if not usuario_pode_ver_auditoria():
         st.error("Acesso não autorizado.")
         st.stop()
@@ -3172,13 +9898,13 @@ if pagina == "🟢 Saúde do Sistema":
 
             st.dataframe(diag, use_container_width=True, hide_index=True)
 
-            csv_diag = diag.to_csv(index=False)
+            csv_diag = diag.to_csv(index=False, sep=";", encoding="utf-8-sig")
             st.download_button("📥 Exportar Diagnóstico CSV", data=csv_diag, file_name="diagnostico_saude_sistema.csv", mime="text/csv", use_container_width=True)
 
     st.markdown("### 📊 Histórico de atualização das bases")
     st.dataframe(saude_bases, use_container_width=True, hide_index=True)
 
-    csv_health = saude_bases.to_csv(index=False)
+    csv_health = saude_bases.to_csv(index=False, sep=";", encoding="utf-8-sig")
     st.download_button("📥 Exportar Saúde do Sistema CSV", data=csv_health, file_name="saude_sistema_eirox.csv", mime="text/csv", use_container_width=True)
 
     st.stop()
@@ -3190,8 +9916,6 @@ if pagina == "🟢 Saúde do Sistema":
 # --------------------------------------------------
 
 if pagina == "🔐 Central de Auditoria":
-
-    mostrar_explicacao_visao_eirox("🔐 Central de Auditoria")
 
     if not usuario_pode_ver_auditoria():
         st.error("Acesso não autorizado.")
@@ -3546,7 +10270,9 @@ if pagina == "🔐 Central de Auditoria":
     st.markdown("### 📤 Exportação")
 
     csv_export = logs_detalhe[colunas_exibir].to_csv(
-        index=False
+        index=False,
+        sep=";",
+        encoding="utf-8-sig"
     )
 
     col_exp1, col_exp2 = st.columns(2)
@@ -3670,7 +10396,7 @@ if pagina == "🔐 Central de Auditoria":
 
     st.dataframe(logs_view[colunas], use_container_width=True, hide_index=True)
 
-    csv_export = logs_view[colunas].to_csv(index=False)
+    csv_export = logs_view[colunas].to_csv(index=False, sep=";", encoding="utf-8-sig")
 
     st.download_button(
         "📥 Exportar Auditoria CSV",
@@ -3689,8 +10415,6 @@ if pagina == "🔐 Central de Auditoria":
 # --------------------------------------------------
 
 if pagina == "🎯 Sugestão de Pesquisa":
-
-    mostrar_explicacao_visao_eirox("🎯 Sugestão de Pesquisa")
 
     st.markdown(
         """
@@ -4118,13 +10842,16 @@ if pagina == "🎯 Sugestão de Pesquisa":
     )
 
     fig.update_traces(textposition="outside")
+    fig = adicionar_valores_verticais_heatmap(
+        fig,
+        heat_pivot
+    )
+
     fig.update_layout(
         height=420,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)"
     )
-
-    fig = aplicar_layout_heatmap_eirox(fig)
 
     st.plotly_chart(fig, use_container_width=True)
 
@@ -4178,7 +10905,7 @@ if pagina == "🎯 Sugestão de Pesquisa":
 
     csv_pesquisa = (
         tabela_exibir
-        .to_csv(index=False)
+        .to_csv(index=False, sep=";")
         .encode("utf-8-sig")
     )
 
@@ -4199,8 +10926,6 @@ if pagina == "🎯 Sugestão de Pesquisa":
 # --------------------------------------------------
 
 if pagina == "🧪 Diagnóstico":
-
-    mostrar_explicacao_visao_eirox("🧪 Diagnóstico")
 
     st.markdown(
         """
@@ -4485,8 +11210,6 @@ if pagina == "🧪 Diagnóstico":
 # --------------------------------------------------
 
 if pagina == "📈 Simulador Inteligente":
-
-    mostrar_explicacao_visao_eirox("📈 Simulador Inteligente")
 
     st.markdown(
         """
@@ -5548,7 +12271,7 @@ if pagina == "📈 Simulador Inteligente":
 
             csv_sim = (
                 resumo_sim
-                .to_csv(index=False)
+                .to_csv(index=False, sep=";")
                 .encode("utf-8-sig")
             )
 
@@ -5576,14 +12299,12 @@ if pagina == "📈 Simulador Inteligente":
 
 if pagina == "🏢 Dashboard Executivo":
 
-    
-
     st.markdown(
         """
         <div class="eirox-hero">
             <div class="eirox-section-title">Diretoria</div>
             <h1>🏢 Dashboard Executivo Premium</h1>
-            <p>Resumo estratégico para tomada de decisão: riscos, oportunidades, margem e ganho potencial.</p>
+            <p>Resumo estratégico para tomada de decisão: riscos, oportunidades, margem e potencial de captura.</p>
         </div>
         """,
         unsafe_allow_html=True
@@ -5636,12 +12357,12 @@ if pagina == "🏢 Dashboard Executivo":
     )
 
     k2.metric(
-        "Ganho Potencial",
-        moeda_br(ganho_total)
+        "Potencial de Captura",
+        moeda_br_kpi(ganho_total)
     )
 
     k3.metric(
-        "Margem Média",
+        "Rentabilidade Atual",
         percentual_br(margem_media)
     )
 
@@ -5741,8 +12462,6 @@ if pagina == "🏢 Dashboard Executivo":
 # --------------------------------------------------
 
 if pagina == "🌎 Mapa Geográfico de Concorrência":
-
-    mostrar_explicacao_visao_eirox("🌎 Mapa Geográfico de Concorrência")
 
     st.markdown(
         """
@@ -5952,20 +12671,12 @@ if pagina == "🌎 Mapa Geográfico de Concorrência":
         mapbox=dict(
             style="carto-darkmatter",
             center=dict(lat=centro_lat, lon=centro_lon),
-            zoom=18
+            zoom=11
         ),
         height=680,
         margin=dict(l=0, r=0, t=20, b=0),
 paper_bgcolor="rgba(0,0,0,0)"
     )
-
-    try:
-
-        fig_mapa = aplicar_zoom_mapa_eirox(fig_mapa, df_mapa_filtrado if "df_mapa_filtrado" in locals() else (df_mapa if "df_mapa" in locals() else (dados_mapa if "dados_mapa" in locals() else (mapa_df if "mapa_df" in locals() else None))), zoom=18)
-
-    except Exception:
-
-        pass
 
     st.plotly_chart(fig_mapa, use_container_width=True, key="mapa_geografico_concorrencia")
 
@@ -5988,7 +12699,7 @@ paper_bgcolor="rgba(0,0,0,0)"
 
     st.dataframe(ranking_exibir, use_container_width=True, height=420)
 
-    csv_mapa = ranking_exibir.to_csv(index=False).encode("utf-8-sig")
+    csv_mapa = ranking_exibir.to_csv(index=False, sep=";").encode("utf-8-sig")
 
     st.download_button(
         "📥 Exportar ranking geográfico",
@@ -6007,8 +12718,6 @@ paper_bgcolor="rgba(0,0,0,0)"
 # --------------------------------------------------
 
 if pagina == "🔎 Rede/Loja vs Concorrentes":
-
-    mostrar_explicacao_visao_eirox("🔎 Rede/Loja vs Concorrentes")
 
     st.subheader(
         "🔎 Rede/Loja vs Concorrentes"
@@ -6470,20 +13179,12 @@ if pagina == "🔎 Rede/Loja vs Concorrentes":
                     "Venda_Projetada_Preco_Sugerido": "Venda Projetada Preço Sugerido",
                     "Ganho_Unitario": "Ganho Unitário",
                     "Ganho_Potencial_Simulador": "Ganho Produto",
-                    "Ganho_Potencial": "Ganho Potencial",
+                    "Ganho_Potencial": "Potencial de Captura",
                     "Margem_%": "Margem %",
-                    "Margem % Seguir Concorrência": "Margem % Seguir Concorrência",
-                    "Margem Nominal Seguir Concorrência": "Margem Nominal Seguir Concorrência",
                     "Lucro_Unitario": "Lucro Unitário",
                     "Preco_Medio": "Preço Médio"
                 }
             )
-
-            analise_exibir = adicionar_margem_seguir_concorrencia(analise_exibir)
-            analise_exibir = formatar_margem_seguir_concorrencia(analise_exibir)
-
-            analise_exibir = adicionar_margem_menor_preco_concorrencia(analise_exibir)
-            analise_exibir = formatar_margem_menor_preco_concorrencia(analise_exibir)
 
             st.dataframe(
                 analise_exibir,
@@ -6494,7 +13195,8 @@ if pagina == "🔎 Rede/Loja vs Concorrentes":
             csv_analise = (
                 analise_exibir
                 .to_csv(
-                    index=False
+                    index=False,
+                    sep=";"
                 )
                 .encode("utf-8-sig")
             )
@@ -6528,8 +13230,6 @@ if pagina == "🔎 Rede/Loja vs Concorrentes":
 # --------------------------------------------------
 
 if pagina == "🛒 Negociação Compras":
-
-    mostrar_explicacao_visao_eirox("🛒 Negociação Compras")
 
     st.subheader(
         "🛒 Negociação Compras"
@@ -7217,7 +13917,8 @@ if pagina == "🛒 Negociação Compras":
             csv_compras = (
                 compras_exibir
                 .to_csv(
-                    index=False
+                    index=False,
+                    sep=";"
                 )
                 .encode("utf-8-sig")
             )
@@ -7251,8 +13952,6 @@ if pagina == "🛒 Negociação Compras":
 # --------------------------------------------------
 
 if pagina == "🚨 Central de Alertas":
-
-    mostrar_explicacao_visao_eirox("🚨 Central de Alertas")
 
     st.subheader(
         "🚨 Central de Alertas Inteligentes"
@@ -8114,7 +14813,8 @@ if pagina == "🚨 Central de Alertas":
             csv_alertas = (
                 alertas_exibir
                 .to_csv(
-                    index=False
+                    index=False,
+                    sep=";"
                 )
                 .encode("utf-8-sig")
             )
@@ -8170,7 +14870,8 @@ else:
 # KPIS
 # --------------------------------------------------
 
-k1,k2,k3,k4,k5,k6 = st.columns(6)
+# Card Potencial de Captura ampliado para evitar corte do valor.
+k1,k2,k3,k4,k5,k6 = st.columns([1, 1, 1, 1.65, 1, 1])
 
 k1.metric(
     "Produtos",
@@ -8178,7 +14879,7 @@ k1.metric(
 )
 
 k2.metric(
-    "Margem Média",
+    "Rentabilidade Atual",
     percentual_br(df_filtrado["Margem_%"].mean())
 )
 
@@ -8188,8 +14889,8 @@ k3.metric(
 )
 
 k4.metric(
-    "Ganho Potencial",
-    moeda_br(df_filtrado["Ganho_Potencial"].sum())
+    "Potencial de Captura",
+    moeda_br_kpi(df_filtrado["Ganho_Potencial"].sum())
 )
 
 k5.metric(
@@ -8200,6 +14901,18 @@ k5.metric(
 k6.metric(
     "Preço Médio",
     moeda_br(df_filtrado["Preco_Medio"].mean())
+)
+
+explicacao_calculo(
+    "Indicadores principais do Painel Geral",
+    [
+        "Produtos = quantidade de linhas/produtos após os filtros aplicados.",
+        "Margem Média = média da coluna Margem_% dos produtos filtrados.",
+        "Lucro Médio = média da coluna Lucro_Unitario dos produtos filtrados.",
+        "Ganho Potencial = soma da coluna Ganho_Potencial dos produtos filtrados.",
+        "Laboratórios = quantidade de laboratórios únicos após os filtros.",
+        "Preço Médio = média da coluna Preco_Medio dos produtos filtrados."
+    ]
 )
 
 # --------------------------------------------------
@@ -8277,6 +14990,15 @@ with c2:
 # Ações recomendadas
 st.subheader(
     "📋 Ações Recomendadas"
+)
+
+explicacao_calculo(
+    "Ações recomendadas",
+    [
+        "A tabela conta quantos produtos existem em cada Recomendacao dentro do filtro atual.",
+        "Cada recomendação recebe uma orientação comercial padrão: subir preço, manter, analisar redução ou corrigir cadastro.",
+        "Ao selecionar uma recomendação, o painel detalha somente os produtos pertencentes àquela ação."
+    ]
 )
 
 acoes = {
@@ -8423,6 +15145,119 @@ if (
         on="EAN",
         how="inner"
     )
+
+    # --------------------------------------------------
+    # CUSTO UNITÁRIO PELA VENDA_FINAL_TESTE
+    # --------------------------------------------------
+    # Regra solicitada:
+    # Custo unitário = soma da coluna "Custo" / soma da coluna "Itens"
+    # A origem é a base venda_rede, carregada da pasta VENDA_FINAL_TESTE.
+
+    try:
+
+        if "Custo" not in produtos_detalhe.columns and isinstance(venda_rede, pd.DataFrame) and not venda_rede.empty:
+
+            base_custo_venda = venda_rede.copy()
+            base_custo_venda.columns = base_custo_venda.columns.astype(str).str.strip()
+
+            col_ean_custo = achar_coluna(
+                base_custo_venda,
+                [
+                    "EAN",
+                    "EAN (GTIN)",
+                    "GTIN",
+                    "Código de Barras",
+                    "Codigo de Barras",
+                    "Cód. Barras/Etiq.",
+                    "Cod. Barras/Etiq."
+                ],
+                [
+                    "ean",
+                    "gtin",
+                    "barras"
+                ]
+            )
+
+            col_custo_venda = achar_coluna(
+                base_custo_venda,
+                [
+                    "Custo",
+                    "CUSTO",
+                    "Valor Custo",
+                    "Custo Total",
+                    "CMV"
+                ],
+                [
+                    "custo",
+                    "cmv"
+                ]
+            )
+
+            col_itens_venda = achar_coluna(
+                base_custo_venda,
+                [
+                    "Itens",
+                    "Item",
+                    "Quantidade",
+                    "Qtd",
+                    "QTD",
+                    "Qtde",
+                    "Unidades"
+                ],
+                [
+                    "itens",
+                    "item",
+                    "qtd",
+                    "quant",
+                    "qtde",
+                    "unid"
+                ]
+            )
+
+            if col_ean_custo and col_custo_venda and col_itens_venda:
+
+                base_custo_venda["EAN"] = (
+                    base_custo_venda[col_ean_custo]
+                    .astype(str)
+                    .str.replace(".0", "", regex=False)
+                    .str.strip()
+                )
+
+                base_custo_venda["Custo_Total_Venda_Final"] = converter_numero_brasil(
+                    base_custo_venda[col_custo_venda]
+                )
+
+                base_custo_venda["Itens_Venda_Final"] = converter_numero_brasil(
+                    base_custo_venda[col_itens_venda]
+                )
+
+                custo_por_ean = (
+                    base_custo_venda
+                    .dropna(subset=["EAN", "Custo_Total_Venda_Final", "Itens_Venda_Final"])
+                    .groupby("EAN", as_index=False)
+                    .agg(
+                        Custo_Total_Venda_Final=("Custo_Total_Venda_Final", "sum"),
+                        Itens_Venda_Final=("Itens_Venda_Final", "sum")
+                    )
+                )
+
+                custo_por_ean = custo_por_ean[
+                    custo_por_ean["Itens_Venda_Final"] > 0
+                ].copy()
+
+                custo_por_ean["Custo"] = (
+                    custo_por_ean["Custo_Total_Venda_Final"]
+                    / custo_por_ean["Itens_Venda_Final"]
+                )
+
+                produtos_detalhe = produtos_detalhe.merge(
+                    custo_por_ean[["EAN", "Custo"]],
+                    on="EAN",
+                    how="left"
+                )
+
+    except Exception:
+        pass
 
     # --------------------------------------------------
     # MENOR PREÇO E LOJA COM MENOR PREÇO
@@ -8586,9 +15421,10 @@ if not produtos_detalhe.empty:
         "Recomendacao",
         "Qtd_Vendida_Mes_Anterior",
         "Venda_Preco_Antigo",
+        "Venda_Projetada_Preco_Sugerido",
+        "Custo",
         "Preco_Atual",
         "Preco_Sugerido_Mercado",
-        "Venda_Projetada_Preco_Sugerido",
         "Ganho_Unitario",
         "Ganho_Potencial_Simulador",
         "Menor_Preco",
@@ -8603,15 +15439,28 @@ if not produtos_detalhe.empty:
 
     produtos_exibir = produtos_detalhe[colunas_exibir].copy()
 
+    # Nova coluna: Margem considerando seguir o menor preço do mercado.
+    # IMPORTANTE: mantém a coluna original Margem_% sem alteração.
+    # Fórmula: (Menor Preço - Custo) / Menor Preço * 100
+    if "Custo" in produtos_exibir.columns and "Menor_Preco" in produtos_exibir.columns:
+        custo_num = pd.to_numeric(produtos_exibir["Custo"], errors="coerce")
+        menor_preco_num = pd.to_numeric(produtos_exibir["Menor_Preco"], errors="coerce")
+        produtos_exibir["Margem_%_Menor_Preco"] = np.where(
+            menor_preco_num > 0,
+            ((menor_preco_num - custo_num) / menor_preco_num) * 100,
+            np.nan
+        )
+
     # --------------------------------------------------
     # FORMATAR PADRÃO BRASIL
     # --------------------------------------------------
 
     for coluna in [
         "Venda_Preco_Antigo",
+        "Venda_Projetada_Preco_Sugerido",
+        "Custo",
         "Preco_Atual",
         "Preco_Sugerido_Mercado",
-        "Venda_Projetada_Preco_Sugerido",
         "Ganho_Unitario",
         "Ganho_Potencial_Simulador",
         "Menor_Preco",
@@ -8624,6 +15473,9 @@ if not produtos_detalhe.empty:
 
     if "Margem_%" in produtos_exibir.columns:
         produtos_exibir["Margem_%"] = produtos_exibir["Margem_%"].apply(percentual_br)
+
+    if "Margem_%_Menor_Preco" in produtos_exibir.columns:
+        produtos_exibir["Margem_%_Menor_Preco"] = produtos_exibir["Margem_%_Menor_Preco"].apply(percentual_br)
 
     if "Qtd_Vendida_Mes_Anterior" in produtos_exibir.columns:
         produtos_exibir["Qtd_Vendida_Mes_Anterior"] = (
@@ -8659,15 +15511,43 @@ if not produtos_detalhe.empty:
             "Qtd_Vendida_Mes_Anterior": "Qtd Vendida Mês Anterior",
             "Preco_Medio": "Preço Médio",
             "Margem_%": "Margem %",
+            "Margem_%_Menor_Preco": "Margem % Menor Preço",
             "Lucro_Unitario": "Lucro Unitário"
         }
     )
 
-    produtos_exibir = adicionar_margem_menor_preco_concorrencia(produtos_exibir)
-    produtos_exibir = formatar_margem_menor_preco_concorrencia(produtos_exibir)
+    # Ordem oficial das colunas na tabela de produtos da recomendação
+    colunas_exibicao = [
+        "EAN",
+        "Produto",
+        "Laboratório",
+        "Família",
+        "CURVA",
+        "Recomendacao",
+        "Qtd Vendida Mês Anterior",
+        "Venda Preço Antigo",
+        "Venda Projetada Preço Sugerido",
+        "Custo",
+        "Preço Atual",
+        "Preço Sugerido Mercado",
+        "Preço Médio",
+        "Menor Preço",
+        "Margem % Menor Preço",
+        "Margem %",
+        "Loja Menor Preço Concorrente",
+        "Lucro Unitário",
+        "Ganho Unitário",
+        "Ganho Produto"
+    ]
+
+    produtos_exibir = produtos_exibir[
+        [c for c in colunas_exibicao if c in produtos_exibir.columns]
+    ]
+
     st.dataframe(
         produtos_exibir,
         use_container_width=True,
+        hide_index=True,
         height=420
     )
 
@@ -8677,11 +15557,23 @@ if not produtos_detalhe.empty:
 
     exportar_recomendacao = produtos_detalhe[colunas_exibir].copy()
 
+    # Nova coluna na exportação: Margem considerando seguir o menor preço do mercado.
+    # IMPORTANTE: mantém a coluna original Margem_% sem alteração.
+    if "Custo" in exportar_recomendacao.columns and "Menor_Preco" in exportar_recomendacao.columns:
+        custo_num = pd.to_numeric(exportar_recomendacao["Custo"], errors="coerce")
+        menor_preco_num = pd.to_numeric(exportar_recomendacao["Menor_Preco"], errors="coerce")
+        exportar_recomendacao["Margem_%_Menor_Preco"] = np.where(
+            menor_preco_num > 0,
+            ((menor_preco_num - custo_num) / menor_preco_num) * 100,
+            np.nan
+        )
+
     for coluna in [
         "Venda_Preco_Antigo",
+        "Venda_Projetada_Preco_Sugerido",
+        "Custo",
         "Preco_Atual",
         "Preco_Sugerido_Mercado",
-        "Venda_Projetada_Preco_Sugerido",
         "Ganho_Unitario",
         "Ganho_Potencial_Simulador",
         "Menor_Preco",
@@ -8694,6 +15586,9 @@ if not produtos_detalhe.empty:
 
     if "Margem_%" in exportar_recomendacao.columns:
         exportar_recomendacao["Margem_%"] = exportar_recomendacao["Margem_%"].apply(percentual_br)
+
+    if "Margem_%_Menor_Preco" in exportar_recomendacao.columns:
+        exportar_recomendacao["Margem_%_Menor_Preco"] = exportar_recomendacao["Margem_%_Menor_Preco"].apply(percentual_br)
 
     if "Qtd_Vendida_Mes_Anterior" in exportar_recomendacao.columns:
         exportar_recomendacao["Qtd_Vendida_Mes_Anterior"] = (
@@ -8728,14 +15623,21 @@ if not produtos_detalhe.empty:
             "Qtd_Vendida_Mes_Anterior": "Qtd Vendida Mês Anterior",
             "Preco_Medio": "Preço Médio",
             "Margem_%": "Margem %",
+            "Margem_%_Menor_Preco": "Margem % Menor Preço",
             "Lucro_Unitario": "Lucro Unitário"
         }
     )
 
+    # Exportação na mesma ordem oficial da tela
+    exportar_recomendacao = exportar_recomendacao[
+        [c for c in colunas_exibicao if c in exportar_recomendacao.columns]
+    ]
+
     csv_recomendacao = (
         exportar_recomendacao
         .to_csv(
-            index=False
+            index=False,
+            sep=";"
         )
         .encode("utf-8-sig")
     )
@@ -8762,6 +15664,16 @@ else:
 
 st.subheader(
     "📈 Curva ABC"
+)
+
+explicacao_calculo(
+    "Curva ABC do ganho potencial",
+    [
+        "Os produtos são ordenados do maior para o menor Ganho_Potencial.",
+        "Perc_Acum representa a participação acumulada do ganho potencial no total filtrado.",
+        "Classe A concentra aproximadamente os maiores impactos financeiros; B representa impacto intermediário; C representa menor impacto.",
+        "Menor Preço, Rede, Farmácia e Data vêm do histórico de pesquisa, buscando o menor preço concorrente por produto."
+    ]
 )
 
 abc = curva_abc(df_filtrado)
@@ -8947,6 +15859,15 @@ st.subheader(
     "💰 Top Oportunidades"
 )
 
+explicacao_calculo(
+    "Top oportunidades",
+    [
+        "A lista é ordenada pela coluna Ganho_Potencial em ordem decrescente.",
+        "Os primeiros produtos são os que oferecem maior oportunidade financeira estimada dentro dos filtros aplicados.",
+        "Margem, lucro unitário e preço médio são exibidos apenas quando essas colunas existem na base."
+    ]
+)
+
 top_oportunidades = (
     df_filtrado
     .sort_values(
@@ -8976,12 +15897,73 @@ st.dataframe(
     width="stretch"
 )
 
+
+# --------------------------------------------------
+# AJUSTE VISUAL - VALORES VERTICAIS NO MAPA DE CALOR
+# --------------------------------------------------
+
+def adicionar_valores_verticais_heatmap(fig, matriz):
+    """
+    Coloca os valores dentro das barras/células do mapa de calor,
+    na mesma orientação vertical dos nomes do eixo inferior.
+    Evita sobreposição quando existem muitas marcas ou bairros.
+    """
+
+    try:
+        if not isinstance(matriz, pd.DataFrame) or matriz.empty:
+            return fig
+
+        # Remove texto automático do heatmap para evitar duplicidade/sobreposição.
+        fig.update_traces(
+            text=None,
+            texttemplate=None,
+            hovertemplate="%{y}<br>%{x}<br>Quantidade: %{z}<extra></extra>"
+        )
+
+        for y_valor in matriz.index:
+            for x_valor in matriz.columns:
+                valor = matriz.loc[y_valor, x_valor]
+
+                try:
+                    texto = inteiro_br(valor)
+                except Exception:
+                    texto = str(valor)
+
+                fig.add_annotation(
+                    x=x_valor,
+                    y=y_valor,
+                    text=texto,
+                    showarrow=False,
+                    textangle=-90,
+                    font=dict(
+                        size=12,
+                        color="#FFFFFF"
+                    ),
+                    xanchor="center",
+                    yanchor="middle",
+                    align="center"
+                )
+
+        return fig
+
+    except Exception:
+        return fig
+
 # --------------------------------------------------
 # MAPA DE CALOR - MARCAS E BAIRROS POR QUANTIDADE DE PESQUISAS
 # --------------------------------------------------
 
 st.subheader(
     "🔥 Mapa de calor"
+)
+
+explicacao_calculo(
+    "Mapa de calor",
+    [
+        "Por marca/família: conta a quantidade de pesquisas por Família e exibe as 40 maiores.",
+        "Por bairro: conta a quantidade de pesquisas por Bairro e exibe os 40 maiores.",
+        "A intensidade visual aumenta conforme a quantidade de pesquisas encontradas."
+    ]
 )
 
 # --------------------------------------------------
@@ -9015,13 +15997,18 @@ if "Família" in df_filtrado.columns:
     fig = px.imshow(
         heat_pivot,
         aspect="auto",
-        text_auto=True,
+        text_auto=False,
         labels={
             "x": "Marca",
             "y": "",
             "color": "Quantidade de Pesquisas"
         },
         title="Top 40 Marcas por Quantidade de Pesquisas"
+    )
+
+    fig = adicionar_valores_verticais_heatmap(
+        fig,
+        heat_pivot
     )
 
     fig.update_layout(
@@ -9086,13 +16073,18 @@ if (
     fig_bairro = px.imshow(
         heat_bairros_pivot,
         aspect="auto",
-        text_auto=True,
+        text_auto=False,
         labels={
             "x": "Bairro",
             "y": "",
             "color": "Quantidade de Pesquisas"
         },
         title="Top 40 Bairros por Quantidade de Pesquisas"
+    )
+
+    fig_bairro = adicionar_valores_verticais_heatmap(
+        fig_bairro,
+        heat_bairros_pivot
     )
 
     fig_bairro.update_layout(
@@ -9106,9 +16098,8 @@ if (
         }
     )
 
-    fig_bairro = aplicar_layout_heatmap_eirox(fig_bairro)
-
-    st.plotly_chart(fig_bairro,
+    st.plotly_chart(
+        fig_bairro,
         width="stretch",
         key="heatmap_bairros_quantidade"
     )
@@ -9126,6 +16117,15 @@ else:
 if not historico.empty:
 
     st.subheader("📈 Evolução Histórica")
+
+    explicacao_calculo(
+        "Evolução histórica",
+        [
+            "O gráfico filtra um produto/EAN e acompanha a variação do Preço (R$) ao longo da Data Emissão.",
+            "Cada linha representa uma farmácia pesquisada.",
+            "O rótulo de preço aparece no último ponto de cada farmácia para reduzir poluição visual."
+        ]
+    )
 
     # Garantir coluna Descricao_Unica
     if "Descricao_Unica" not in historico.columns:
@@ -9302,6 +16302,15 @@ if (
         "🗺️ Mapa Farmácias"
     )
 
+    explicacao_calculo(
+        "Mapa de farmácias",
+        [
+            "Cada ponto usa as colunas lat e lon do histórico de pesquisa.",
+            "A classificação da loja é feita pelo nome da farmácia: concorrência, Zanol e Thomaz ou Triangulo Drogaria.",
+            "O zoom inicial é calculado pela dispersão das coordenadas encontradas."
+        ]
+    )
+
     mapa_df = historico.copy()
 
     mapa_df["lat"] = pd.to_numeric(
@@ -9467,6 +16476,15 @@ if (
 
     st.subheader("🏪 Monitoramento por Rede")
 
+    explicacao_calculo(
+        "Monitoramento por rede",
+        [
+            "A rede é identificada a partir do nome da farmácia.",
+            "Quantidade de Pesquisas = contagem de preços coletados por rede.",
+            "Preço Médio = média da coluna Preço (R$) por rede."
+        ]
+    )
+
     historico["Rede"] = (
         historico["Farmácia"]
         .apply(identificar_rede)
@@ -9540,6 +16558,16 @@ if (
         "🏆 Ranking Concorrentes"
     )
 
+    explicacao_calculo(
+        "Ranking de concorrentes",
+        [
+            "O ranking agrupa o histórico por Farmácia.",
+            "Quantidade de Pesquisas = número de registros de preço da farmácia.",
+            "Preço Médio = média dos preços pesquisados na farmácia.",
+            "A ordenação prioriza maior quantidade de pesquisas e, em seguida, menor preço médio."
+        ]
+    )
+
     historico["Preço (R$)"] = pd.to_numeric(
         historico["Preço (R$)"],
         errors="coerce"
@@ -9607,6 +16635,15 @@ st.subheader(
 "💊 Famílias"
 )
 
+explicacao_calculo(
+    "Famílias",
+    [
+        "O gráfico soma o Ganho_Potencial por Família.",
+        "As famílias são ordenadas do maior para o menor potencial de captura.",
+        "A visão ajuda a identificar quais categorias concentram maior oportunidade financeira."
+    ]
+)
+
 familias = (
 df_filtrado
 .groupby("Família")
@@ -9638,6 +16675,15 @@ st.plotly_chart(
 
 st.subheader(
     "🏭 Laboratórios"
+)
+
+explicacao_calculo(
+    "Laboratórios",
+    [
+        "Ganho_Potencial = soma das oportunidades dos produtos de cada laboratório.",
+        "Margem_% = média da margem dos produtos do laboratório.",
+        "A tabela é ordenada pelo maior ganho potencial para priorizar negociação e ajuste de preço."
+    ]
 )
 
 laboratorios = (
@@ -9678,6 +16724,16 @@ if not compra.empty:
 
     st.subheader(
         "📦 Curva ABC Financeira"
+    )
+
+    explicacao_calculo(
+        "Curva ABC financeira",
+        [
+            "A base de compra é ordenada pelo Valor_Liquido em ordem decrescente.",
+            "Participação = Valor_Liquido do item dividido pelo total de Valor_Liquido.",
+            "Acumulado = soma progressiva da participação.",
+            "Classe A vai até 80% acumulado, Classe B de 80% a 95%, e Classe C acima de 95%."
+        ]
     )
 
     # Remover Total Geral definitivamente
@@ -9802,26 +16858,110 @@ if not compra.empty:
 # --------------------------------------------------
 
 st.subheader(
-"🤖 Score Eirox"
+    "🤖 Índice de Oportunidade Eirox"
 )
 
+# Cálculo do índice com tratamento seguro para evitar erro caso alguma coluna não exista.
+margem_media_score = 0
+if "Margem_%" in df_filtrado.columns:
+    margem_media_score = pd.to_numeric(
+        df_filtrado["Margem_%"],
+        errors="coerce"
+    ).dropna().mean()
+
+ganho_potencial_score = 0
+if "Ganho_Potencial" in df_filtrado.columns:
+    ganho_potencial_score = pd.to_numeric(
+        df_filtrado["Ganho_Potencial"],
+        errors="coerce"
+    ).fillna(0).sum()
+
 score = round(
-(
-df_filtrado["Margem_%"].mean()
-* 0.6
-)
-+
-(
-df_filtrado["Ganho_Potencial"].sum()
-/ 1000
-)
-* 0.4
+    (margem_media_score * 0.6)
+    +
+    ((ganho_potencial_score / 1000) * 0.4)
 )
 
 st.metric(
-"Score Pricing",
-score
+    "Índice Eirox",
+    score
 )
+
+with st.expander("🎯 Entenda o Índice de Oportunidade Eirox", expanded=False):
+
+    st.markdown("""
+### Como funciona o Índice de Oportunidade Eirox?
+
+O Índice Eirox identifica os produtos com maior potencial de geração de resultado através de ações de Pricing.
+
+---
+
+### 💰 Potencial de Captura
+
+Representa o valor adicional que a empresa poderia faturar ao ajustar o preço do produto até o limite competitivo do mercado, sem ficar mais cara que a concorrência.
+
+#### Como calculamos?
+
+**Espaço para aumento = Preço Máximo Competitivo - Preço Atual**
+
+**Potencial de Captura = Espaço para aumento × Quantidade vendida no mês anterior**
+
+#### Exemplo
+
+- Preço Atual: R$ 10,00
+- Concorrência: R$ 12,00
+- Espaço para aumento: R$ 2,00
+- Quantidade vendida no mês anterior: 1.000 unidades
+
+**Potencial de Captura = R$ 2,00 × 1.000 = R$ 2.000**
+
+Ou seja, existe uma oportunidade de gerar aproximadamente **R$ 2.000 adicionais** sem ultrapassar o preço da concorrência.
+
+---
+
+### 📈 Composição do Índice Eirox
+
+**60% → Rentabilidade Atual**
+
+Representa a qualidade da margem do produto.
+
+**40% → Potencial de Captura**
+
+Representa o tamanho financeiro da oportunidade.
+
+#### Fórmula
+
+**Índice Eirox = (Rentabilidade Atual × 60%) + ((Potencial de Captura ÷ 1.000) × 40%)**
+
+---
+
+### Como interpretar?
+
+🟢 **Acima de 70 pontos**
+
+- Produto altamente rentável.
+- Grande oportunidade de captura de resultado.
+
+🟡 **Entre 40 e 70 pontos**
+
+- Produto com potencial relevante de otimização.
+
+🔴 **Abaixo de 40 pontos**
+
+- Baixo impacto financeiro para ações de Pricing.
+
+---
+
+### Resumo
+
+Quanto maior o Índice Eirox, maior a combinação entre:
+
+✔ Rentabilidade atual
+
+✔ Espaço para aumento de preço
+
+✔ Potencial financeiro de captura de resultado
+""")
 
 
 # --------------------------------------------------
@@ -9836,6 +16976,17 @@ if (
 ):
 
     st.subheader("📊 Comparativo de Redes")
+
+    explicacao_calculo(
+        "Comparativo de redes",
+        [
+            "O produto é filtrado pelo EAN selecionado.",
+            "Preço (R$) = média do preço pesquisado por Rede e Farmácia.",
+            "Menor Mercado = menor preço encontrado entre as lojas para o produto.",
+            "Dif R$ = preço da loja menos o menor preço de mercado.",
+            "Dif % = Dif R$ dividido pelo Menor Mercado."
+        ]
+    )
 
     if "Rede" not in historico.columns:
         historico["Rede"] = historico["Farmácia"].apply(
@@ -9963,7 +17114,14 @@ if (
         else "ACIMA MERCADO"
     )
 
-    ranking["Loja"] = ranking["Rede"].apply(simplificar_nome_rede_eirox)
+    # Exibição limpa no gráfico: manter somente o nome da rede,
+    # sem concatenar o nome jurídico/farmácia.
+    ranking["Loja"] = (
+        ranking["Rede"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+    )
 
     ranking = ranking.sort_values(
         "Preço (R$)",
@@ -10028,18 +17186,42 @@ if (
         "📋 Produtos Filtrados"
     )
 
+    col_data_pesquisa = None
+    for _c in ["Data Emissão", "Data Emissao", "Data Pesquisa", "Data", "Data da Pesquisa", "Dt Pesquisa", "DATA_EMISSAO", "DATA_EMISSÃO"]:
+        if _c in comp_df.columns:
+            col_data_pesquisa = _c
+            break
+
+    colunas_pf = [
+        "Descricao_Unica",
+        "Produto",
+        "Rede"
+    ]
+
+    if col_data_pesquisa:
+        colunas_pf.append(col_data_pesquisa)
+
+    colunas_pf.append("Preço (R$)")
+
     produtos_filtrados = (
-        comp_df[
-            [
-                "Descricao_Unica",
-                "Produto",
-                "Rede",
-                "Farmácia",
-                "Preço (R$)"
-            ]
-        ]
+        comp_df[colunas_pf]
         .copy()
     )
+
+    if col_data_pesquisa:
+        produtos_filtrados = produtos_filtrados.rename(
+            columns={col_data_pesquisa: "Data Pesquisa"}
+        )
+
+        produtos_filtrados["Data Pesquisa"] = (
+            pd.to_datetime(
+                produtos_filtrados["Data Pesquisa"],
+                errors="coerce",
+                dayfirst=True
+            )
+            .dt.strftime("%d/%m/%Y")
+            .fillna(produtos_filtrados["Data Pesquisa"].astype(str))
+        )
 
     produtos_filtrados["Preço (R$)"] = pd.to_numeric(
         produtos_filtrados["Preço (R$)"],
@@ -10111,6 +17293,25 @@ if not simulacao_global.empty:
         moeda_br(simulacao["Ganho_Potencial_Simulador"].sum())
     )
 
+    # Garante que a tela mostre somente o nome comercial da rede.
+    # Se a coluna Rede vier vazia, identifica a rede pela razão social/loja,
+    # mas NÃO exibe a coluna de loja na tabela.
+    for col_rede_tmp, col_loja_tmp in [
+        ("Rede_Preco_Maximo_Competitivo", "Loja_Preco_Maximo_Competitivo"),
+        ("Rede_Menor_Preco", "Loja_Menor_Preco"),
+    ]:
+        if col_rede_tmp in simulacao.columns:
+            if col_loja_tmp in simulacao.columns:
+                simulacao[col_rede_tmp] = [
+                    limpar_nome_rede_eirox(rede, loja)
+                    for rede, loja in zip(simulacao[col_rede_tmp], simulacao[col_loja_tmp])
+                ]
+            else:
+                simulacao[col_rede_tmp] = [
+                    limpar_nome_rede_eirox(rede, "")
+                    for rede in simulacao[col_rede_tmp]
+                ]
+
     colunas_exibir = [
         "EAN"
     ]
@@ -10123,10 +17324,17 @@ if not simulacao_global.empty:
         "Venda_Preco_Antigo",
         "Preco_Atual",
         "Preco_Sugerido_Mercado",
+        "Rede_Preco_Maximo_Competitivo",
+        "Data_Preco_Maximo_Competitivo",
+        "Menor_Preco",
+        "Rede_Menor_Preco",
+        "Data_Menor_Preco",
         "Venda_Projetada_Preco_Sugerido",
         "Ganho_Unitario",
         "Ganho_Potencial_Simulador"
     ]
+
+    colunas_exibir = [c for c in colunas_exibir if c in simulacao.columns]
 
     simulacao_exibir = simulacao[colunas_exibir].copy()
 
@@ -10134,6 +17342,7 @@ if not simulacao_global.empty:
         "Venda_Preco_Antigo",
         "Preco_Atual",
         "Preco_Sugerido_Mercado",
+        "Menor_Preco",
         "Venda_Projetada_Preco_Sugerido",
         "Ganho_Unitario",
         "Ganho_Potencial_Simulador"
@@ -10147,6 +17356,25 @@ if not simulacao_global.empty:
             simulacao_exibir["Qtd_Vendida_Mes_Anterior"]
             .apply(numero_br)
         )
+
+    for coluna_data in ["Data_Preco_Maximo_Competitivo", "Data_Menor_Preco"]:
+        if coluna_data in simulacao_exibir.columns:
+            simulacao_exibir[coluna_data] = simulacao_exibir[coluna_data].apply(data_br)
+
+    simulacao_exibir = simulacao_exibir.rename(columns={
+        "Qtd_Vendida_Mes_Anterior": "Qtd Vendida Mês Anterior",
+        "Venda_Preco_Antigo": "Venda Preço Antigo",
+        "Preco_Atual": "Preço Atual",
+        "Preco_Sugerido_Mercado": "Preço Máximo Competitivo",
+        "Rede_Preco_Maximo_Competitivo": "Rede Preço Máximo Competitivo",
+        "Data_Preco_Maximo_Competitivo": "Data Preço Máximo Competitivo",
+        "Menor_Preco": "Menor Preço",
+        "Rede_Menor_Preco": "Rede Menor Preço",
+        "Data_Menor_Preco": "Data Menor Preço",
+        "Venda_Projetada_Preco_Sugerido": "Venda Projetada Preço Sugerido",
+        "Ganho_Unitario": "Ganho Unitário",
+        "Ganho_Potencial_Simulador": "Ganho Produto"
+    })
 
     st.dataframe(
         simulacao_exibir,
