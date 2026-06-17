@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.40.2-br-valores-score-claro-colunas-v1"
+VERSAO_APP = "v1.40.2-LTS-explicacoes-telas"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -455,6 +455,210 @@ def explicacao_calculo(titulo, itens):
             """,
             unsafe_allow_html=True
         )
+    except Exception:
+        pass
+
+
+
+# --------------------------------------------------
+# EXPLICAÇÕES DAS VISÕES - v1.40.2 LTS
+# --------------------------------------------------
+
+def mostrar_explicacao_visao_eirox(nome_visao):
+    """
+    Mostra a explicação visual dos cálculos em cada visão.
+    Usa a função explicacao_calculo() já existente no projeto.
+    """
+
+    try:
+        nome = str(nome_visao).lower()
+
+        if "dashboard" in nome or "painel" in nome or "executivo" in nome:
+            explicacao_calculo(
+                "Indicadores do Dashboard Executivo",
+                [
+                    "Produtos = quantidade total de EANs/produtos analisados.",
+                    "Margem Média = média da margem atual dos produtos.",
+                    "Lucro Médio = média do lucro unitário calculado.",
+                    "Potencial de Captura = soma do ganho potencial identificado na base.",
+                    "Preço Médio = média dos preços atuais ou pesquisados.",
+                    "Laboratórios = quantidade de laboratórios distintos na base."
+                ]
+            )
+
+        elif "simulador" in nome:
+            explicacao_calculo(
+                "Simulador Inteligente de Ganho",
+                [
+                    "Venda Preço Antigo = quantidade vendida × preço atual.",
+                    "Venda Projetada = quantidade vendida × preço sugerido.",
+                    "Ganho Unitário = preço sugerido - preço atual.",
+                    "Ganho Total = venda projetada - venda atual.",
+                    "Preço Máximo Competitivo = referência calculada a partir dos preços de mercado."
+                ]
+            )
+
+        elif "sugestão" in nome or "sugestao" in nome or "pesquisa" in nome:
+            explicacao_calculo(
+                "Sugestão de Pesquisa",
+                [
+                    "A prioridade de pesquisa considera volume, oportunidade, curva ABC, margem e diferença para o mercado.",
+                    "Produtos com maior potencial de captura ou maior relevância comercial aparecem com prioridade.",
+                    "O objetivo é direcionar a equipe para os itens mais importantes para nova coleta de preços."
+                ]
+            )
+
+        elif "rede/loja" in nome or "concorrente" in nome:
+            explicacao_calculo(
+                "Comparativo Rede/Loja vs Concorrentes",
+                [
+                    "Preço Médio por Rede = média dos preços pesquisados por rede ou estabelecimento.",
+                    "Líder = rede com menor preço identificado no grupo comparado.",
+                    "Competitivo = preço próximo ao menor preço de mercado.",
+                    "Acima Mercado = preço acima da referência competitiva.",
+                    "O gráfico mostra o posicionamento da rede frente aos concorrentes."
+                ]
+            )
+
+        elif "mapa" in nome or "geográfico" in nome or "geografico" in nome:
+            explicacao_calculo(
+                "Mapa Geográfico de Concorrência",
+                [
+                    "Cada ponto representa uma pesquisa com latitude e longitude válidas.",
+                    "A concentração de pontos indica regiões com maior intensidade de pesquisa ou concorrência.",
+                    "O centro do mapa é calculado com base nos pontos filtrados.",
+                    "As informações de rede, produto e data da pesquisa são usadas para contextualizar cada ponto."
+                ]
+            )
+
+        elif "central de alertas" in nome or "alertas" in nome:
+            explicacao_calculo(
+                "Central de Alertas",
+                [
+                    "Alerta de preço = produto acima ou abaixo da referência de mercado.",
+                    "Alerta de margem = produto com margem abaixo do esperado.",
+                    "Alerta de captura = produto com potencial financeiro relevante.",
+                    "Alerta de oportunidade = produto com possibilidade de ajuste comercial."
+                ]
+            )
+
+        elif "motor" in nome or "oportunidade" in nome:
+            explicacao_calculo(
+                "Motor de Oportunidades",
+                [
+                    "Ganho Potencial = estimativa financeira baseada em preço, volume, margem e referência de mercado.",
+                    "Ranking = ordenação dos produtos com maior impacto financeiro.",
+                    "A priorização ajuda a definir quais produtos merecem ação comercial primeiro."
+                ]
+            )
+
+        elif "ia pricing" in nome or "inteligência" in nome or "inteligencia" in nome:
+            explicacao_calculo(
+                "IA Pricing Enterprise",
+                [
+                    "Preço recomendado considera preço atual, custo, margem, concorrência e limites de variação.",
+                    "Score IA prioriza recomendações com maior impacto financeiro e menor risco.",
+                    "Ganho estimado mede o impacto esperado da recomendação de preço.",
+                    "A decisão final pode ser aprovada ou rejeitada no Workflow Comercial."
+                ]
+            )
+
+        elif "workflow" in nome:
+            explicacao_calculo(
+                "Workflow Comercial",
+                [
+                    "Pendentes = recomendações aguardando análise.",
+                    "Em análise = recomendações sendo avaliadas pela equipe.",
+                    "Aprovadas = recomendações aceitas para execução.",
+                    "Rejeitadas = recomendações descartadas com justificativa.",
+                    "Toda decisão registra usuário, data, status e observação."
+                ]
+            )
+
+        elif "negociação" in nome or "negociacao" in nome or "compras" in nome:
+            explicacao_calculo(
+                "Negociação Compras",
+                [
+                    "A visão cruza preço, custo, margem, volume e oportunidade.",
+                    "Produtos com maior potencial financeiro ajudam a direcionar negociações com fornecedores.",
+                    "A margem e o preço de mercado ajudam a definir margem de negociação."
+                ]
+            )
+
+        elif "portal" in nome and "cliente" in nome:
+            explicacao_calculo(
+                "Portal do Cliente",
+                [
+                    "Uso da licença = usuários e lojas utilizados em relação aos limites do plano.",
+                    "Indicadores de uso consideram acessos, produtos monitorados e recomendações geradas.",
+                    "As informações exibidas vêm das bases de cliente, licença e uso da plataforma."
+                ]
+            )
+
+        elif "crm" in nome:
+            explicacao_calculo(
+                "CRM Enterprise",
+                [
+                    "Clientes = quantidade de clientes cadastrados.",
+                    "MRR = soma dos valores mensais cadastrados por cliente.",
+                    "Lojas = soma da quantidade de lojas cadastradas.",
+                    "Status indica a situação comercial ou operacional do cliente."
+                ]
+            )
+
+        elif "licenciamento" in nome or "licença" in nome or "licenca" in nome:
+            explicacao_calculo(
+                "Licenciamento",
+                [
+                    "Plano define limites de usuários, lojas e funcionalidades disponíveis.",
+                    "Licença vencida pode bloquear automaticamente o acesso.",
+                    "Consumo da licença compara uso atual com os limites contratados."
+                ]
+            )
+
+        elif "billing" in nome or "faturamento" in nome:
+            explicacao_calculo(
+                "Billing Enterprise",
+                [
+                    "MRR = soma das mensalidades recorrentes ativas.",
+                    "ARR = MRR × 12.",
+                    "Faturas vencidas = faturas com vencimento expirado e status não pago.",
+                    "Status financeiro pode afetar a licença do cliente."
+                ]
+            )
+
+        elif "saúde" in nome or "saude" in nome:
+            explicacao_calculo(
+                "Saúde do Sistema",
+                [
+                    "Analisa presença, atualização e leitura das bases principais.",
+                    "Status verde indica base encontrada e atualizada.",
+                    "Status amarelo indica atenção.",
+                    "Status vermelho indica ausência ou erro relevante."
+                ]
+            )
+
+        elif "auditoria" in nome:
+            explicacao_calculo(
+                "Central de Auditoria",
+                [
+                    "Acessos por dia = quantidade de eventos registrados por data.",
+                    "Acessos por usuário = quantidade de eventos agrupados por usuário.",
+                    "Tela mais acessada = tela com maior número de registros.",
+                    "Último acesso = evento mais recente registrado nos logs."
+                ]
+            )
+
+        elif "backup" in nome:
+            explicacao_calculo(
+                "Backup Center",
+                [
+                    "O backup compacta código, bases operacionais, logs e arquivos essenciais.",
+                    "O histórico permite identificar data, tamanho e nome de cada backup gerado.",
+                    "A rotina reduz risco de perda em atualizações futuras."
+                ]
+            )
+
     except Exception:
         pass
 
@@ -7323,6 +7527,8 @@ df_filtrado = propagar_ganho_potencial(df_filtrado)
 
 if pagina == "💳 Billing Enterprise":
 
+    mostrar_explicacao_visao_eirox("💳 Billing Enterprise")
+
     if not usuario_pode_ver_billing_enterprise():
         st.error("Acesso não autorizado.")
         st.stop()
@@ -7716,6 +7922,8 @@ if pagina == "💳 Billing Enterprise":
 
 if pagina == "🏢 Portal do Cliente":
 
+    mostrar_explicacao_visao_eirox("🏢 Portal do Cliente")
+
     if not usuario_pode_ver_portal_cliente():
         st.error("Acesso não autorizado.")
         st.stop()
@@ -7910,6 +8118,8 @@ if pagina == "🏢 Portal do Cliente":
 # --------------------------------------------------
 
 if pagina == "🏢 CRM Enterprise":
+
+    mostrar_explicacao_visao_eirox("🏢 CRM Enterprise")
 
     if not usuario_pode_ver_crm_enterprise():
         st.error("Acesso não autorizado.")
@@ -8223,6 +8433,8 @@ if pagina == "🏢 CRM Enterprise":
 
 if pagina == "📋 Workflow Comercial":
 
+    mostrar_explicacao_visao_eirox("📋 Workflow Comercial")
+
     if not usuario_pode_ver_workflow_comercial():
         st.error("Acesso não autorizado.")
         st.stop()
@@ -8357,6 +8569,8 @@ if pagina == "📋 Workflow Comercial":
 
 if pagina == "🤖 IA Pricing Enterprise":
 
+    mostrar_explicacao_visao_eirox("🤖 IA Pricing Enterprise")
+
     if not usuario_pode_ver_ia_pricing():
         st.error("Acesso não autorizado.")
         st.stop()
@@ -8460,6 +8674,8 @@ if pagina == "🤖 IA Pricing Enterprise":
 
 if pagina == "🏁 Release Candidate":
 
+    mostrar_explicacao_visao_eirox("🏁 Release Candidate")
+
     if not usuario_pode_ver_release_candidate():
         st.error("Acesso não autorizado.")
         st.stop()
@@ -8546,6 +8762,8 @@ if pagina == "🏁 Release Candidate":
 # --------------------------------------------------
 
 if pagina == "👥 Controle de Usuários":
+
+    mostrar_explicacao_visao_eirox("👥 Controle de Usuários")
 
     if not usuario_pode_gerenciar_usuarios():
         st.error("Acesso não autorizado.")
@@ -8834,6 +9052,8 @@ if pagina == "👥 Controle de Usuários":
 
 if pagina == "📌 Sobre o Eirox":
 
+    mostrar_explicacao_visao_eirox("📌 Sobre o Eirox")
+
     if not usuario_pode_ver_multiempresa():
         st.error("Acesso não autorizado.")
         st.stop()
@@ -8900,6 +9120,8 @@ if pagina == "📌 Sobre o Eirox":
 # --------------------------------------------------
 
 if pagina == "🧭 Roadmap do Produto":
+
+    mostrar_explicacao_visao_eirox("🧭 Roadmap do Produto")
 
     if not usuario_pode_ver_multiempresa():
         st.error("Acesso não autorizado.")
@@ -8970,6 +9192,8 @@ if pagina == "🧭 Roadmap do Produto":
 # --------------------------------------------------
 
 if pagina == "💰 Motor de Oportunidades":
+
+    mostrar_explicacao_visao_eirox("💰 Motor de Oportunidades")
 
     if not usuario_pode_ver_motor_oportunidades():
         st.error("Acesso não autorizado.")
@@ -9089,6 +9313,8 @@ if pagina == "💰 Motor de Oportunidades":
 # --------------------------------------------------
 
 if pagina == "🚨 Alertas Inteligentes":
+
+    mostrar_explicacao_visao_eirox("🚨 Alertas Inteligentes")
 
     if not usuario_pode_ver_alertas_inteligentes():
         st.error("Acesso não autorizado.")
@@ -9215,6 +9441,8 @@ if pagina == "🚨 Alertas Inteligentes":
 # --------------------------------------------------
 
 if pagina == "💼 Licenciamento Real":
+
+    mostrar_explicacao_visao_eirox("💼 Licenciamento Real")
 
     if not usuario_pode_ver_licenciamento_real():
         st.error("Acesso não autorizado.")
@@ -9393,6 +9621,8 @@ if pagina == "💼 Licenciamento Real":
 
 if pagina == "💼 Licenciamento Multiempresa":
 
+    mostrar_explicacao_visao_eirox("💼 Licenciamento Multiempresa")
+
     if not usuario_pode_ver_multiempresa():
         st.error("Acesso não autorizado.")
         st.stop()
@@ -9451,6 +9681,8 @@ if pagina == "💼 Licenciamento Multiempresa":
 # --------------------------------------------------
 
 if pagina == "🏢 Multiempresa":
+
+    mostrar_explicacao_visao_eirox("🏢 Multiempresa")
 
     if not usuario_pode_ver_multiempresa():
         st.error("Acesso não autorizado.")
@@ -9631,6 +9863,8 @@ if pagina == "🏢 Multiempresa":
 
 if pagina == "📦 Backup Center":
 
+    mostrar_explicacao_visao_eirox("📦 Backup Center")
+
     if not usuario_pode_ver_auditoria():
         st.error("Acesso não autorizado.")
         st.stop()
@@ -9782,6 +10016,8 @@ if pagina == "📦 Backup Center":
 
 if pagina == "🟢 Saúde do Sistema":
 
+    mostrar_explicacao_visao_eirox("🟢 Saúde do Sistema")
+
     if not usuario_pode_ver_auditoria():
         st.error("Acesso não autorizado.")
         st.stop()
@@ -9916,6 +10152,8 @@ if pagina == "🟢 Saúde do Sistema":
 # --------------------------------------------------
 
 if pagina == "🔐 Central de Auditoria":
+
+    mostrar_explicacao_visao_eirox("🔐 Central de Auditoria")
 
     if not usuario_pode_ver_auditoria():
         st.error("Acesso não autorizado.")
@@ -10415,6 +10653,8 @@ if pagina == "🔐 Central de Auditoria":
 # --------------------------------------------------
 
 if pagina == "🎯 Sugestão de Pesquisa":
+
+    mostrar_explicacao_visao_eirox("🎯 Sugestão de Pesquisa")
 
     st.markdown(
         """
@@ -10927,6 +11167,8 @@ if pagina == "🎯 Sugestão de Pesquisa":
 
 if pagina == "🧪 Diagnóstico":
 
+    mostrar_explicacao_visao_eirox("🧪 Diagnóstico")
+
     st.markdown(
         """
         <div class="eirox-hero">
@@ -11210,6 +11452,8 @@ if pagina == "🧪 Diagnóstico":
 # --------------------------------------------------
 
 if pagina == "📈 Simulador Inteligente":
+
+    mostrar_explicacao_visao_eirox("📈 Simulador Inteligente")
 
     st.markdown(
         """
@@ -12299,6 +12543,8 @@ if pagina == "📈 Simulador Inteligente":
 
 if pagina == "🏢 Dashboard Executivo":
 
+    mostrar_explicacao_visao_eirox("🏢 Dashboard Executivo")
+
     st.markdown(
         """
         <div class="eirox-hero">
@@ -12462,6 +12708,8 @@ if pagina == "🏢 Dashboard Executivo":
 # --------------------------------------------------
 
 if pagina == "🌎 Mapa Geográfico de Concorrência":
+
+    mostrar_explicacao_visao_eirox("🌎 Mapa Geográfico de Concorrência")
 
     st.markdown(
         """
@@ -12718,6 +12966,8 @@ paper_bgcolor="rgba(0,0,0,0)"
 # --------------------------------------------------
 
 if pagina == "🔎 Rede/Loja vs Concorrentes":
+
+    mostrar_explicacao_visao_eirox("🔎 Rede/Loja vs Concorrentes")
 
     st.subheader(
         "🔎 Rede/Loja vs Concorrentes"
@@ -13230,6 +13480,8 @@ if pagina == "🔎 Rede/Loja vs Concorrentes":
 # --------------------------------------------------
 
 if pagina == "🛒 Negociação Compras":
+
+    mostrar_explicacao_visao_eirox("🛒 Negociação Compras")
 
     st.subheader(
         "🛒 Negociação Compras"
@@ -13952,6 +14204,8 @@ if pagina == "🛒 Negociação Compras":
 # --------------------------------------------------
 
 if pagina == "🚨 Central de Alertas":
+
+    mostrar_explicacao_visao_eirox("🚨 Central de Alertas")
 
     st.subheader(
         "🚨 Central de Alertas Inteligentes"
