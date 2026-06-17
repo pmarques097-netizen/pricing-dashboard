@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.40.9-lts-margem-menor-concorrencia"
+VERSAO_APP = "v1.41.0-lts-header-margem-fix"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -6790,7 +6790,7 @@ def carregar():
 
     return pd.read_excel(
         "Analise_Pricing.xlsx"
-    )
+    , unsafe_allow_html=True)
 
 df = carregar()
 
