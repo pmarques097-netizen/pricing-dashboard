@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.40.2-LTS-explicacoes-telas"
+VERSAO_APP = "v1.40.2-LTS-master-paulo-vanderlei-ubiratan"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -3020,16 +3020,19 @@ EMPRESAS_ARQUIVO = Path("EMPRESAS_EIROX.csv")
 
 def usuario_master():
     """
-    Usuário master da plataforma.
+    Usuários master da plataforma.
     """
 
     try:
-        return (
-            str(st.session_state.get("usuario", ""))
-            .strip()
-            .lower()
-            == "paulomarques"
-        )
+        usuarios_master = [
+            "paulomarques",
+            "vanderlei",
+            "ubiratan"
+        ]
+
+        return str(
+            st.session_state.get("usuario", "")
+        ).strip().lower() in usuarios_master
 
     except Exception:
         return False
@@ -9091,7 +9094,7 @@ if pagina == "📌 Sobre o Eirox":
 
     card_enterprise(
         "Governança",
-        "Módulos administrativos restritos ao usuário master paulomarques, com logs, rastreabilidade, controle de acesso e proteção operacional.",
+        "Módulos administrativos restritos aos usuários master autorizados, com logs, rastreabilidade, controle de acesso e proteção operacional.",
         "🔐"
     )
 
@@ -9657,7 +9660,7 @@ if pagina == "💼 Licenciamento Multiempresa":
     regras = pd.DataFrame(
         [
             {"Regra": "Isolamento de dados", "Descrição": "Cada empresa visualiza apenas seus próprios dados e usuários."},
-            {"Regra": "Usuário master", "Descrição": "Apenas paulomarques ou administradores autorizados podem acessar módulos administrativos."},
+            {"Regra": "Usuário master", "Descrição": "Apenas usuários master autorizados podem acessar módulos administrativos."},
             {"Regra": "Backup por cliente", "Descrição": "Backups separados por empresa para segurança e recuperação."},
             {"Regra": "Auditoria por cliente", "Descrição": "Logs vinculados a empresa, usuário, tela e evento."},
             {"Regra": "Módulos por plano", "Descrição": "Funcionalidades liberadas conforme pacote contratado."}
