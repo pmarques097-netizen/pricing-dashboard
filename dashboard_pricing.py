@@ -34,12 +34,12 @@ st.caption("Monitoramento executivo de preços, concorrência, margem, alertas e
 @st.cache_data(show_spinner=False)
 def carregar():
     """
-    Leitura segura da base principal.
-    Compatível com Excel e CSV, evitando argumentos inválidos no pd.read_excel.
+    Carregamento definitivo e seguro da base Analise_Pricing.
+    Não usa argumentos inválidos no read_excel.
     """
 
     try:
-        caminhos = [
+        candidatos = [
             Path("Analise_Pricing.xlsx"),
             Path("ANALISE_PRICING.xlsx"),
             Path("analise_pricing.xlsx"),
@@ -50,33 +50,35 @@ def carregar():
 
         arquivo = None
 
-        for caminho in caminhos:
+        for caminho in candidatos:
             if caminho.exists():
                 arquivo = caminho
                 break
 
         if arquivo is None:
-            candidatos = []
-            candidatos.extend(list(Path(".").rglob("Analise_Pricing.xlsx")))
-            candidatos.extend(list(Path(".").rglob("ANALISE_PRICING.xlsx")))
-            candidatos.extend(list(Path(".").rglob("analise_pricing.xlsx")))
-            candidatos.extend(list(Path(".").rglob("Analise_Pricing.csv")))
-            candidatos.extend(list(Path(".").rglob("ANALISE_PRICING.csv")))
-            candidatos.extend(list(Path(".").rglob("analise_pricing.csv")))
+            encontrados = []
+            for nome in [
+                "Analise_Pricing.xlsx",
+                "ANALISE_PRICING.xlsx",
+                "analise_pricing.xlsx",
+                "Analise_Pricing.csv",
+                "ANALISE_PRICING.csv",
+                "analise_pricing.csv"
+            ]:
+                encontrados.extend(list(Path(".").rglob(nome)))
 
-            candidatos = [
-                c for c in candidatos
-                if ".git" not in c.parts
-                and "__pycache__" not in c.parts
-                and ".venv" not in c.parts
-                and "venv" not in c.parts
+            encontrados = [
+                p for p in encontrados
+                if ".git" not in p.parts
+                and "__pycache__" not in p.parts
+                and ".venv" not in p.parts
+                and "venv" not in p.parts
             ]
 
-            if candidatos:
-                arquivo = candidatos[0]
+            if encontrados:
+                arquivo = encontrados[0]
 
         if arquivo is None:
-            st.error("Base Analise_Pricing não encontrada.")
             return pd.DataFrame()
 
         if arquivo.suffix.lower() == ".csv":
@@ -87,29 +89,32 @@ def carregar():
         else:
             base = pd.read_excel(arquivo, engine="openpyxl")
 
+        if not isinstance(base, pd.DataFrame):
+            return pd.DataFrame()
+
         base.columns = base.columns.astype(str).str.strip()
 
         if "Ganho_Potencial" in base.columns:
-            base["Ganho_Potencial"] = pd.to_numeric(
-                base["Ganho_Potencial"],
-                errors="coerce"
-            ).fillna(0)
+            base["Ganho_Potencial"] = pd.to_numeric(base["Ganho_Potencial"], errors="coerce").fillna(0)
 
         return base
 
     except Exception as erro:
-        st.error(f"Erro ao carregar Analise_Pricing: {erro}")
+        st.error(f"Erro ao carregar base principal: {erro}")
         return pd.DataFrame()
+
+
+df = carregar()
+if not isinstance(df, pd.DataFrame):
+    df = pd.DataFrame()
+
+if not df.empty:
+    df.columns = df.columns.astype(str).str.strip()
 
 # --------------------------------------------------
 # PADRONIZAR COLUNAS
 # --------------------------------------------------
 
-if callable(df):
-    df = df()
-if not isinstance(df, pd.DataFrame):
-    df = pd.DataFrame()
-df.columns = df.columns.astype(str).str.strip()
 
 if not historico.empty:
     historico.columns = historico.columns.astype(str).str.strip()
