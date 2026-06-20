@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.40.4-LTS-mapa-cluster-2km"
+VERSAO_APP = "v1.40.5-LTS-cluster-regra-custo"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -1993,6 +1993,45 @@ def _cluster2_preparar_base(base):
         return pd.DataFrame()
 
 
+
+def _cluster2_escolher_preco_por_custo(precos_concorrencia, custo):
+    """
+    Regra:
+    - Tenta seguir o menor preço da concorrência.
+    - Se o menor preço não cobrir o custo, tenta o segundo menor.
+    - Segue para o próximo preço até encontrar um preço acima do custo.
+    - Se nenhum preço cobrir o custo, sinaliza revisão.
+    """
+
+    try:
+        precos = pd.to_numeric(pd.Series(precos_concorrencia), errors="coerce").dropna()
+        precos = sorted(set([float(p) for p in precos if p > 0]))
+
+        if not precos:
+            return np.nan, "Sem preço concorrente válido", "Revisar pesquisa"
+
+        try:
+            custo = float(custo)
+        except Exception:
+            custo = np.nan
+
+        if pd.isna(custo) or custo <= 0:
+            return precos[0], "Sem custo informado: usando menor preço concorrente", "Cadastrar custo para validar margem"
+
+        for idx, preco in enumerate(precos):
+            if preco > custo:
+                if idx == 0:
+                    return preco, "Seguir menor preço concorrente", "Pode acompanhar o menor preço"
+                if idx == 1:
+                    return preco, "Menor preço não cobre custo: usar 2º menor preço", "Não acompanhar menor preço; usar 2º menor"
+                return preco, f"Preços anteriores não cobrem custo: usar {idx + 1}º menor preço", f"Não acompanhar preços abaixo do custo; usar {idx + 1}º menor"
+
+        return precos[-1], "Nenhum preço concorrente cobre o custo", "Não acompanhar concorrência; revisar custo/margem"
+
+    except Exception:
+        return np.nan, "Erro ao aplicar regra de custo", "Revisar dados"
+
+
 def _cluster2_calcular_sugestoes(base_cluster, loja_ref, raio_km=2.0):
     try:
         if not isinstance(base_cluster, pd.DataFrame) or base_cluster.empty:
@@ -2097,6 +2136,66 @@ def _cluster2_calcular_sugestoes(base_cluster, loja_ref, raio_km=2.0):
 
         sugestao["Margem_Nominal_Menor_Preço_2KM"] = sugestao["Menor_Preço_Concorrente_2KM"] - sugestao["Custo"]
 
+        # Regra oficial do cluster:
+        # seguir o menor preço concorrente somente se cobrir o custo.
+        # Caso contrário, usar o segundo menor, terceiro menor e assim sucessivamente.
+        precos_por_ean = (
+            concorrentes
+            .groupby("EAN")["Preço"]
+            .apply(lambda s: sorted(set(pd.to_numeric(s, errors="coerce").dropna().astype(float).tolist())))
+            .to_dict()
+        )
+
+        regras_aplicadas = []
+        acoes_recomendadas = []
+        precos_regra = []
+
+        for _, linha in sugestao.iterrows():
+            ean_linha = linha.get("EAN", "")
+            custo_linha = linha.get("Custo", np.nan)
+            preco_regra, regra, acao = _cluster2_escolher_preco_por_custo(
+                precos_por_ean.get(ean_linha, []),
+                custo_linha
+            )
+            precos_regra.append(preco_regra)
+            regras_aplicadas.append(regra)
+            acoes_recomendadas.append(acao)
+
+        sugestao["Preço_Sugerido_Regra_Custo_2KM"] = precos_regra
+        sugestao["Regra_Aplicada_Cluster_2KM"] = regras_aplicadas
+        sugestao["Ação_Necessária_Cluster_2KM"] = acoes_recomendadas
+
+        # O preço sugerido final passa a respeitar a regra de custo.
+        sugestao["Preço_Sugerido_Cluster_2KM"] = sugestao["Preço_Sugerido_Regra_Custo_2KM"]
+        sugestao["Ganho_Unitário_Cluster_2KM"] = sugestao["Preço_Sugerido_Cluster_2KM"] - sugestao["Preço_Atual_Principal"]
+        sugestao["Diferença_%_Cluster_2KM"] = (
+            sugestao["Ganho_Unitário_Cluster_2KM"]
+            / sugestao["Preço_Atual_Principal"].replace(0, np.nan)
+        ) * 100
+
+        sugestao["Margem_%_Preço_Sugerido_2KM"] = (
+            (sugestao["Preço_Sugerido_Cluster_2KM"] - sugestao["Custo"])
+            / sugestao["Preço_Sugerido_Cluster_2KM"].replace(0, np.nan)
+        ) * 100
+
+        sugestao["Margem_Nominal_Preço_Sugerido_2KM"] = (
+            sugestao["Preço_Sugerido_Cluster_2KM"] - sugestao["Custo"]
+        )
+
+        sugestao["Recomendação_Cluster_2KM"] = np.select(
+            [
+                sugestao["Ação_Necessária_Cluster_2KM"].astype(str).str.contains("Não acompanhar concorrência", case=False, na=False),
+                sugestao["Ganho_Unitário_Cluster_2KM"] > 0.05,
+                sugestao["Ganho_Unitário_Cluster_2KM"] < -0.05
+            ],
+            [
+                "REVISAR CUSTO/MARGEM",
+                "SUBIR PREÇO",
+                "BAIXAR PREÇO"
+            ],
+            default="MANTER"
+        )
+
         for col in [
             "Menor_Preço_Concorrente_2KM",
             "Preço_Médio_Concorrente_2KM",
@@ -2108,7 +2207,10 @@ def _cluster2_calcular_sugestoes(base_cluster, loja_ref, raio_km=2.0):
             "Distância_Mínima_KM",
             "Custo",
             "Margem_%_Menor_Preço_2KM",
-            "Margem_Nominal_Menor_Preço_2KM"
+            "Margem_Nominal_Menor_Preço_2KM",
+            "Preço_Sugerido_Regra_Custo_2KM",
+            "Margem_%_Preço_Sugerido_2KM",
+            "Margem_Nominal_Preço_Sugerido_2KM"
         ]:
             if col in sugestao.columns:
                 sugestao[col] = pd.to_numeric(sugestao[col], errors="coerce").round(2)
@@ -2205,6 +2307,10 @@ def renderizar_cluster_2km_mapa(mapa_filtrado_base):
                 "Preço_Médio_Concorrente_2KM",
                 "Preço_Máximo_Competitivo_2KM",
                 "Preço_Sugerido_Cluster_2KM",
+                "Regra_Aplicada_Cluster_2KM",
+                "Ação_Necessária_Cluster_2KM",
+                "Margem_%_Preço_Sugerido_2KM",
+                "Margem_Nominal_Preço_Sugerido_2KM",
                 "Ganho_Unitário_Cluster_2KM",
                 "Diferença_%_Cluster_2KM",
                 "Recomendação_Cluster_2KM",
