@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.40.2-LTS-master-paulo-vanderlei-ubiratan"
+VERSAO_APP = "v1.40.2-LTS-login-persistente"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -5901,6 +5901,76 @@ def faturamento_por_cliente():
 
 
 
+
+# --------------------------------------------------
+# LOGIN PERSISTENTE - v1.40.2 LTS
+# --------------------------------------------------
+
+SESSAO_EIROX_ARQUIVO = Path(".sessao_eirox_login.csv")
+
+
+def salvar_sessao_login_eirox(usuario, nome="", perfil=""):
+    try:
+        base = pd.DataFrame(
+            [
+                {
+                    "Usuario": str(usuario).strip().lower(),
+                    "Nome": str(nome).strip(),
+                    "Perfil": str(perfil).strip(),
+                    "Logado": "Sim",
+                    "Atualizado_Em": horario_brasil_formatado() if "horario_brasil_formatado" in globals() else datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                }
+            ]
+        )
+        base.to_csv(SESSAO_EIROX_ARQUIVO, index=False, sep=";", encoding="utf-8-sig")
+        return True
+    except Exception:
+        return False
+
+
+def carregar_sessao_login_eirox():
+    try:
+        if st.session_state.get("logado", False):
+            return True
+
+        if not SESSAO_EIROX_ARQUIVO.exists():
+            return False
+
+        base = pd.read_csv(SESSAO_EIROX_ARQUIVO, sep=";", encoding="utf-8-sig", dtype=str).fillna("")
+
+        if base.empty:
+            return False
+
+        row = base.iloc[-1].to_dict()
+
+        if str(row.get("Logado", "")).strip().lower() != "sim":
+            return False
+
+        usuario = str(row.get("Usuario", "")).strip().lower()
+
+        if not usuario:
+            return False
+
+        st.session_state["logado"] = True
+
+        salvar_sessao_login_eirox(st.session_state.get("usuario", ""), st.session_state.get("nome_usuario", ""), st.session_state.get("perfil_usuario", ""))
+        st.session_state["usuario"] = usuario
+        st.session_state["nome_usuario"] = str(row.get("Nome", "")).strip()
+        st.session_state["perfil_usuario"] = str(row.get("Perfil", "")).strip()
+
+        return True
+    except Exception:
+        return False
+
+
+def limpar_sessao_login_eirox():
+    try:
+        if SESSAO_EIROX_ARQUIVO.exists():
+            SESSAO_EIROX_ARQUIVO.unlink()
+    except Exception:
+        pass
+
+
 # --------------------------------------------------
 # LOGIN E CONTROLE DE ACESSO
 # --------------------------------------------------
@@ -6814,6 +6884,7 @@ def tela_login():
 def exigir_login():
 
     if "logado" not in st.session_state:
+        limpar_sessao_login_eirox()
         st.session_state["logado"] = False
 
     if not st.session_state["logado"]:
