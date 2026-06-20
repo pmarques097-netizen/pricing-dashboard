@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.40.2-LTS-login-persistente"
+VERSAO_APP = "v1.40.3-LTS-performance-fastload"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -404,6 +404,8 @@ def aplicar_formatacao_brasileira_streamlit():
     def dataframe_br(data=None, *args, **kwargs):
         try:
             if isinstance(data, pd.DataFrame):
+                aviso_fastload_tabela(data)
+                data = dataframe_tela_fastload(data)
                 data = formatar_dataframe_br(data)
         except Exception:
             pass
@@ -872,11 +874,7 @@ def carregar_base_recursiva_por_colunas(
         "*.csv"
     ]:
 
-        arquivos.extend(
-            list(
-                Path(".").rglob(ext)
-            )
-        )
+        arquivos.extend(list(Path(".").glob(ext)))
 
     bases = []
     erros = []
@@ -1816,6 +1814,83 @@ def criar_simulacao_por_historico(historico_base):
             simulacao[c] = simulacao[c].round(2)
 
     return simulacao
+
+
+
+# --------------------------------------------------
+# PERFORMANCE FASTLOAD - v1.40.3 LTS
+# --------------------------------------------------
+
+FASTLOAD_MAX_LINHAS_TELA = 800
+FASTLOAD_TTL_SEGUNDOS = 600
+
+
+@st.cache_data(ttl=FASTLOAD_TTL_SEGUNDOS, show_spinner=False)
+def ler_excel_csv_cacheado_eirox(caminho_arquivo, aba=None):
+    """
+    Leitura cacheada para reduzir tempo de entrada e troca de tela.
+    """
+
+    try:
+        caminho = Path(caminho_arquivo)
+
+        if not caminho.exists():
+            return pd.DataFrame()
+
+        if caminho.suffix.lower() == ".csv":
+            try:
+                base = pd.read_csv(caminho, sep=";", encoding="utf-8-sig")
+            except Exception:
+                base = pd.read_csv(caminho, encoding="utf-8-sig")
+        else:
+            if aba:
+                base = pd.read_excel(caminho, sheet_name=aba, engine="openpyxl")
+            else:
+                base = pd.read_excel(caminho, engine="openpyxl")
+
+        if isinstance(base, pd.DataFrame):
+            base.columns = base.columns.astype(str).str.strip()
+            return base
+
+        return pd.DataFrame()
+
+    except Exception:
+        return pd.DataFrame()
+
+
+def dataframe_tela_fastload(base, limite=FASTLOAD_MAX_LINHAS_TELA):
+    """
+    Exibe apenas parte da base na tela para melhorar performance.
+    A exportação pode continuar usando a base completa.
+    """
+
+    try:
+        if not isinstance(base, pd.DataFrame) or base.empty:
+            return base
+
+        if len(base) > limite:
+            return base.head(limite).copy()
+
+        return base
+
+    except Exception:
+        return base
+
+
+def aviso_fastload_tabela(base, limite=FASTLOAD_MAX_LINHAS_TELA):
+    try:
+        if isinstance(base, pd.DataFrame) and len(base) > limite:
+            st.caption(f"⚡ Exibindo {limite} de {len(base)} registros para manter a tela rápida. Use exportação para base completa.")
+    except Exception:
+        pass
+
+
+def limpar_cache_eirox_performance():
+    try:
+        st.cache_data.clear()
+        st.success("Cache limpo com sucesso. Recarregue a página se necessário.")
+    except Exception:
+        st.warning("Não foi possível limpar o cache.")
 
 
 # --------------------------------------------------
@@ -7038,9 +7113,7 @@ st.markdown(
 @st.cache_data
 def carregar():
 
-    return pd.read_excel(
-        "Analise_Pricing.xlsx"
-    )
+    return ler_excel_csv_cacheado_eirox("Analise_Pricing.xlsx")
 
 df = carregar()
 
@@ -7260,6 +7333,15 @@ try:
 
 except Exception:
 
+    pass
+
+
+try:
+    with st.sidebar.expander("⚡ Performance", expanded=False):
+        st.caption("Use apenas se atualizar arquivos e quiser forçar recarga.")
+        if st.button("⚡ Limpar cache", use_container_width=True):
+            limpar_cache_eirox_performance()
+except Exception:
     pass
 
 st.sidebar.markdown(
