@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.40.6-LTS-cluster-margem-nominal-fix"
+VERSAO_APP = "v1.40.7-LTS-cluster-valor-margem-fix"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -2230,6 +2230,54 @@ def _cluster2_calcular_sugestoes(base_cluster, loja_ref, raio_km=2.0):
         return pd.DataFrame(), pd.DataFrame()
 
 
+
+def formatar_valores_cluster_2km_para_exibicao(base):
+    """
+    Corrige formatação da tabela do cluster:
+    colunas de valor/margem nominal devem aparecer em R$, não em %.
+    """
+
+    try:
+        if not isinstance(base, pd.DataFrame) or base.empty:
+            return base
+
+        base = base.copy()
+
+        colunas_moeda = [
+            "Valor_Margem_Preço_Sugerido_2KM",
+            "Valor_Margem_Menor_Preço_2KM",
+            "Margem_Nominal_Preço_Sugerido_2KM",
+            "Margem_Nominal_Menor_Preço_2KM",
+            "Ganho_Unitário_Cluster_2KM",
+            "Preço_Sugerido_Cluster_2KM",
+            "Preço_Sugerido_Regra_Custo_2KM",
+            "Preço_Atual_Principal",
+            "Menor_Preço_Concorrente_2KM",
+            "Preço_Médio_Concorrente_2KM",
+            "Preço_Máximo_Competitivo_2KM",
+            "Custo"
+        ]
+
+        colunas_percentual = [
+            "Margem_%_Preço_Sugerido_2KM",
+            "Margem_%_Menor_Preço_2KM",
+            "Diferença_%_Cluster_2KM"
+        ]
+
+        for col in colunas_moeda:
+            if col in base.columns:
+                base[col] = pd.to_numeric(base[col], errors="coerce").apply(moeda_br)
+
+        for col in colunas_percentual:
+            if col in base.columns:
+                base[col] = pd.to_numeric(base[col], errors="coerce").apply(percentual_br)
+
+        return base
+
+    except Exception:
+        return base
+
+
 def renderizar_cluster_2km_mapa(mapa_filtrado_base):
     try:
         st.markdown("---")
@@ -2327,8 +2375,10 @@ def renderizar_cluster_2km_mapa(mapa_filtrado_base):
 
             colunas = [c for c in colunas if c in sugestao.columns]
 
+            sugestao_exibir = formatar_valores_cluster_2km_para_exibicao(sugestao[colunas])
+
             st.dataframe(
-                sugestao[colunas],
+                sugestao_exibir,
                 use_container_width=True,
                 hide_index=True,
                 height=420
