@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.40.4-LTS-cluster-concorrente-proximo"
+VERSAO_APP = "v1.40.4-LTS-mapa-cluster-2km"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -1895,141 +1895,391 @@ def limpar_cache_eirox_performance():
 
 
 # --------------------------------------------------
-# CLUSTER CONCORRENTE PRÓXIMO - v1.40.4 LTS
+# CLUSTER LOCAL 2KM NO MAPA GEOGRÁFICO - v1.40.4 LTS
 # --------------------------------------------------
 
-def cluster_achar_coluna(base, exatos, contem):
+def _cluster2_coluna(base, exatos, contem):
     try:
         if not isinstance(base, pd.DataFrame) or base.empty:
             return None
+
         for alvo in exatos:
             for col in base.columns:
                 if str(col).strip().lower() == str(alvo).strip().lower():
                     return col
+
         for termo in contem:
+            termo = str(termo).lower()
             for col in base.columns:
-                if str(termo).lower() in str(col).lower():
+                if termo in str(col).lower():
                     return col
+
         return None
     except Exception:
         return None
 
 
-def cluster_distancia_km(lat1, lon1, lat2, lon2):
+def _cluster2_distancia_km(lat_ref, lon_ref, lat, lon):
     try:
-        r = 6371.0
-        lat1 = np.radians(float(lat1))
-        lon1 = np.radians(float(lon1))
-        lat2 = np.radians(pd.to_numeric(lat2, errors="coerce"))
-        lon2 = np.radians(pd.to_numeric(lon2, errors="coerce"))
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-        a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
-        return r * 2 * np.arcsin(np.sqrt(a))
+        raio = 6371.0
+        lat_ref = np.radians(float(lat_ref))
+        lon_ref = np.radians(float(lon_ref))
+        lat = np.radians(pd.to_numeric(lat, errors="coerce"))
+        lon = np.radians(pd.to_numeric(lon, errors="coerce"))
+
+        dlat = lat - lat_ref
+        dlon = lon - lon_ref
+
+        a = (
+            np.sin(dlat / 2) ** 2
+            + np.cos(lat_ref) * np.cos(lat) * np.sin(dlon / 2) ** 2
+        )
+
+        return raio * 2 * np.arcsin(np.sqrt(a))
     except Exception:
         return np.nan
 
 
-def montar_base_cluster_local(df_base):
+def _cluster2_preparar_base(base):
     try:
-        bases = []
-        if isinstance(df_base, pd.DataFrame) and not df_base.empty:
-            bases.append(df_base.copy())
-        for nome in ["historico", "historico_base", "df_historico", "base_historico"]:
-            if nome in globals() and isinstance(globals()[nome], pd.DataFrame) and not globals()[nome].empty:
-                bases.append(globals()[nome].copy())
+        if not isinstance(base, pd.DataFrame) or base.empty:
+            return pd.DataFrame()
 
-        for base in bases:
-            base.columns = base.columns.astype(str).str.strip()
-            c_lat = cluster_achar_coluna(base, ["Latitude", "Lat"], ["latitude", "lat"])
-            c_lon = cluster_achar_coluna(base, ["Longitude", "Lon", "Lng"], ["longitude", "lon", "lng"])
-            c_preco = cluster_achar_coluna(base, ["Preço (R$)", "Preco (R$)", "Preço", "Preco", "Preço Atual", "Preco_Atual"], ["preço", "preco", "valor"])
-            if not (c_lat and c_lon and c_preco):
-                continue
+        base = base.copy()
+        base.columns = base.columns.astype(str).str.strip()
 
-            c_ean = cluster_achar_coluna(base, ["EAN", "EAN (GTIN)", "GTIN", "Código de Barras", "Codigo de Barras"], ["ean", "gtin", "barras"])
-            c_prod = cluster_achar_coluna(base, ["Produto", "Descrição", "Descricao", "Termo Pesquisado"], ["produto", "descr", "termo"])
-            c_rede = cluster_achar_coluna(base, ["Rede", "Rede Concorrente", "Bandeira", "Grupo", "Concorrente"], ["rede", "bandeira", "grupo", "concorr"])
-            c_loja = cluster_achar_coluna(base, ["Farmácia", "Farmacia", "Loja", "Estabelecimento", "Razão Social", "Razao Social"], ["farm", "loja", "estab", "razao", "razão"])
-            c_data = cluster_achar_coluna(base, ["Data", "Data Emissão", "Data_Emissao", "Data Pesquisa", "Data da Pesquisa"], ["data", "emissao", "emissão"])
+        c_lat = _cluster2_coluna(base, ["Latitude", "Lat", "latitude", "lat"], ["latitude", "lat"])
+        c_lon = _cluster2_coluna(base, ["Longitude", "Lon", "Lng", "longitude", "lon", "lng"], ["longitude", "lon", "lng"])
+        c_preco = _cluster2_coluna(base, ["Preço (R$)", "Preco (R$)", "Preço", "Preco", "Preço Atual", "Preco_Atual"], ["preço", "preco", "valor"])
 
-            out = pd.DataFrame(index=base.index)
-            out["Latitude"] = pd.to_numeric(base[c_lat], errors="coerce")
-            out["Longitude"] = pd.to_numeric(base[c_lon], errors="coerce")
-            out["Preço"] = converter_numero_brasil(base[c_preco]) if "converter_numero_brasil" in globals() else pd.to_numeric(base[c_preco], errors="coerce")
-            out["EAN"] = base[c_ean].astype(str).str.replace(".0", "", regex=False).str.strip() if c_ean else ""
-            out["Produto"] = base[c_prod].astype(str) if c_prod else ""
-            if "serie_nome_rede_eirox" in globals():
-                out["Rede"] = serie_nome_rede_eirox(base, c_rede, c_loja)
-            else:
-                out["Rede"] = base[c_rede].astype(str) if c_rede else ""
-            out["Loja"] = base[c_loja].astype(str) if c_loja else out["Rede"]
-            out["Data"] = base[c_data] if c_data else ""
+        if not c_lat or not c_lon or not c_preco:
+            return pd.DataFrame()
 
-            out = out.dropna(subset=["Latitude", "Longitude", "Preço"])
-            out = out[(out["Preço"] > 0) & (out["Preço"] <= 5000)].copy()
-            if not out.empty:
-                return out
+        c_ean = _cluster2_coluna(base, ["EAN", "EAN (GTIN)", "GTIN", "Código de Barras", "Codigo de Barras"], ["ean", "gtin", "barras"])
+        c_produto = _cluster2_coluna(base, ["Produto", "Descrição", "Descricao", "Termo Pesquisado", "Descricao_Unica"], ["produto", "descr", "termo"])
+        c_rede = _cluster2_coluna(base, ["Rede", "Rede Concorrente", "Bandeira", "Grupo", "Concorrente"], ["rede", "bandeira", "grupo", "concorr"])
+        c_loja = _cluster2_coluna(base, ["Farmácia", "Farmacia", "Loja", "Estabelecimento", "Razão Social", "Razao Social"], ["farm", "loja", "estabelec", "razão", "razao", "social"])
+        c_data = _cluster2_coluna(base, ["Data", "Data Emissão", "Data_Emissao", "Data Pesquisa", "Data da Pesquisa", "Dt Pesquisa"], ["data", "emissao", "emissão", "dt"])
 
-        return pd.DataFrame()
+        out = pd.DataFrame(index=base.index)
+        out["Latitude"] = pd.to_numeric(base[c_lat], errors="coerce")
+        out["Longitude"] = pd.to_numeric(base[c_lon], errors="coerce")
+        out["Preço"] = converter_numero_brasil(base[c_preco]) if "converter_numero_brasil" in globals() else pd.to_numeric(base[c_preco], errors="coerce")
+
+        out["EAN"] = (
+            base[c_ean]
+            .astype(str)
+            .str.replace(".0", "", regex=False)
+            .str.strip()
+            if c_ean else ""
+        )
+
+        out["Produto"] = base[c_produto].astype(str) if c_produto else ""
+
+        if "serie_nome_rede_eirox" in globals():
+            out["Rede"] = serie_nome_rede_eirox(base, c_rede, c_loja)
+        else:
+            out["Rede"] = base[c_rede].astype(str) if c_rede else ""
+
+        out["Loja"] = base[c_loja].astype(str) if c_loja else out["Rede"]
+        out["Data"] = base[c_data] if c_data else ""
+
+        out = out.dropna(subset=["Latitude", "Longitude", "Preço"])
+        out = out[(out["Preço"] > 0) & (out["Preço"] <= 5000)].copy()
+
+        return out
+
     except Exception:
         return pd.DataFrame()
 
 
-def calcular_cluster_local(base_cluster, loja_ref, raio_km):
+def _cluster2_calcular_sugestoes(base_cluster, loja_ref, raio_km=2.0):
     try:
-        base = base_cluster.copy()
-        lat_ref = float(loja_ref["Latitude"])
-        lon_ref = float(loja_ref["Longitude"])
-        loja_nome = str(loja_ref["Loja"])
-
-        base["Distância KM"] = cluster_distancia_km(lat_ref, lon_ref, base["Latitude"], base["Longitude"])
-        pontos = base[(base["Distância KM"] <= float(raio_km)) & (base["Distância KM"] >= 0)].copy()
-        if pontos.empty:
+        if not isinstance(base_cluster, pd.DataFrame) or base_cluster.empty:
             return pd.DataFrame(), pd.DataFrame()
 
-        concorr = pontos.copy()
-        if (concorr["Loja"].astype(str) != loja_nome).any():
-            concorr = concorr[concorr["Loja"].astype(str) != loja_nome].copy()
+        base = base_cluster.copy()
 
-        sugestoes = (
-            concorr.groupby("EAN", dropna=False)
+        lat_ref = float(loja_ref["Latitude"])
+        lon_ref = float(loja_ref["Longitude"])
+        loja_nome = str(loja_ref["Loja"]).strip()
+
+        base["Distância KM"] = _cluster2_distancia_km(
+            lat_ref,
+            lon_ref,
+            base["Latitude"],
+            base["Longitude"]
+        )
+
+        pontos_raio = base[
+            (base["Distância KM"] <= float(raio_km))
+            & (base["Distância KM"] >= 0)
+        ].copy()
+
+        if pontos_raio.empty:
+            return pd.DataFrame(), pd.DataFrame()
+
+        principal = pontos_raio[
+            pontos_raio["Loja"].astype(str).str.strip().eq(loja_nome)
+        ].copy()
+
+        concorrentes = pontos_raio[
+            ~pontos_raio["Loja"].astype(str).str.strip().eq(loja_nome)
+        ].copy()
+
+        if concorrentes.empty:
+            return pd.DataFrame(), pontos_raio
+
+        sugestao = (
+            concorrentes
+            .groupby("EAN", dropna=False)
             .agg(
                 Produto=("Produto", lambda x: x.mode().iloc[0] if not x.mode().empty else x.iloc[0]),
-                Menor_Preço_Local=("Preço", "min"),
-                Preço_Médio_Local=("Preço", "mean"),
-                Preço_Máximo_Competitivo_Local=("Preço", lambda s: float(pd.to_numeric(s, errors="coerce").quantile(0.75))),
-                Concorrentes_Próximos=("Loja", "nunique"),
-                Redes_Próximas=("Rede", lambda x: ", ".join(sorted(set([str(v) for v in x if str(v).strip()]))[:8])),
+                Menor_Preço_Concorrente_2KM=("Preço", "min"),
+                Preço_Médio_Concorrente_2KM=("Preço", "mean"),
+                Preço_Máximo_Competitivo_2KM=("Preço", lambda s: float(pd.to_numeric(s, errors="coerce").quantile(0.75))),
+                Concorrentes_2KM=("Loja", "nunique"),
+                Redes_Concorrentes_2KM=("Rede", lambda x: ", ".join(sorted(set([str(v) for v in x if str(v).strip()]))[:8])),
                 Distância_Mínima_KM=("Distância KM", "min")
             )
             .reset_index()
         )
 
-        atual = (
-            pontos[pontos["Loja"].astype(str) == loja_nome]
-            .groupby("EAN", dropna=False)
-            .agg(Preço_Atual=("Preço", "mean"))
-            .reset_index()
-        )
+        if not principal.empty:
+            atual = (
+                principal
+                .groupby("EAN", dropna=False)
+                .agg(Preço_Atual_Principal=("Preço", "mean"))
+                .reset_index()
+            )
 
-        sugestoes = sugestoes.merge(atual, on="EAN", how="left")
-        sugestoes["Preço_Sugerido_Cluster"] = sugestoes["Preço_Máximo_Competitivo_Local"]
-        sugestoes["Diferença_Unitária"] = sugestoes["Preço_Sugerido_Cluster"] - sugestoes["Preço_Atual"]
-        sugestoes["Diferença_%"] = (sugestoes["Diferença_Unitária"] / sugestoes["Preço_Atual"].replace(0, np.nan)) * 100
-        sugestoes["Recomendação_Cluster"] = np.select(
-            [sugestoes["Diferença_Unitária"] > 0.05, sugestoes["Diferença_Unitária"] < -0.05],
-            ["SUBIR PREÇO", "BAIXAR PREÇO"],
+            sugestao = sugestao.merge(atual, on="EAN", how="left")
+        else:
+            sugestao["Preço_Atual_Principal"] = np.nan
+
+        sugestao["Preço_Sugerido_Cluster_2KM"] = sugestao["Preço_Máximo_Competitivo_2KM"]
+        sugestao["Ganho_Unitário_Cluster_2KM"] = sugestao["Preço_Sugerido_Cluster_2KM"] - sugestao["Preço_Atual_Principal"]
+        sugestao["Diferença_%_Cluster_2KM"] = (
+            sugestao["Ganho_Unitário_Cluster_2KM"]
+            / sugestao["Preço_Atual_Principal"].replace(0, np.nan)
+        ) * 100
+
+        sugestao["Recomendação_Cluster_2KM"] = np.select(
+            [
+                sugestao["Ganho_Unitário_Cluster_2KM"] > 0.05,
+                sugestao["Ganho_Unitário_Cluster_2KM"] < -0.05
+            ],
+            [
+                "SUBIR PREÇO",
+                "BAIXAR PREÇO"
+            ],
             default="MANTER"
         )
 
-        for c in ["Menor_Preço_Local", "Preço_Médio_Local", "Preço_Máximo_Competitivo_Local", "Preço_Atual", "Preço_Sugerido_Cluster", "Diferença_Unitária", "Diferença_%", "Distância_Mínima_KM"]:
-            sugestoes[c] = pd.to_numeric(sugestoes[c], errors="coerce").round(2)
+        # Custo e margem seguindo menor preço do cluster, quando o custo existir na base principal.
+        custo_base = globals().get("df", pd.DataFrame())
+        sugestao["Custo"] = np.nan
 
-        return sugestoes, pontos
+        if isinstance(custo_base, pd.DataFrame) and not custo_base.empty and "EAN" in custo_base.columns:
+            c_custo = _cluster2_coluna(custo_base, ["Custo", "Custo Médio", "Custo_Medio", "Custo Atual"], ["custo"])
+
+            if c_custo:
+                custos = custo_base[["EAN", c_custo]].copy()
+                custos["EAN"] = custos["EAN"].astype(str).str.replace(".0", "", regex=False).str.strip()
+                custos["Custo"] = converter_numero_brasil(custos[c_custo]) if "converter_numero_brasil" in globals() else pd.to_numeric(custos[c_custo], errors="coerce")
+                custos = custos.groupby("EAN", as_index=False)["Custo"].mean()
+                sugestao = sugestao.drop(columns=["Custo"]).merge(custos, on="EAN", how="left")
+
+        sugestao["Margem_%_Menor_Preço_2KM"] = (
+            (sugestao["Menor_Preço_Concorrente_2KM"] - sugestao["Custo"])
+            / sugestao["Menor_Preço_Concorrente_2KM"].replace(0, np.nan)
+        ) * 100
+
+        sugestao["Margem_Nominal_Menor_Preço_2KM"] = sugestao["Menor_Preço_Concorrente_2KM"] - sugestao["Custo"]
+
+        for col in [
+            "Menor_Preço_Concorrente_2KM",
+            "Preço_Médio_Concorrente_2KM",
+            "Preço_Máximo_Competitivo_2KM",
+            "Preço_Atual_Principal",
+            "Preço_Sugerido_Cluster_2KM",
+            "Ganho_Unitário_Cluster_2KM",
+            "Diferença_%_Cluster_2KM",
+            "Distância_Mínima_KM",
+            "Custo",
+            "Margem_%_Menor_Preço_2KM",
+            "Margem_Nominal_Menor_Preço_2KM"
+        ]:
+            if col in sugestao.columns:
+                sugestao[col] = pd.to_numeric(sugestao[col], errors="coerce").round(2)
+
+        ordem = {"SUBIR PREÇO": 1, "BAIXAR PREÇO": 2, "MANTER": 3}
+        sugestao["_ordem"] = sugestao["Recomendação_Cluster_2KM"].map(ordem).fillna(9)
+        sugestao = sugestao.sort_values(["_ordem", "Ganho_Unitário_Cluster_2KM"], ascending=[True, False]).drop(columns=["_ordem"])
+
+        return sugestao, pontos_raio
+
     except Exception as erro:
-        st.error(f"Erro no cluster local: {erro}")
+        st.error(f"Erro ao calcular sugestão do cluster 2 km: {erro}")
         return pd.DataFrame(), pd.DataFrame()
+
+
+def renderizar_cluster_2km_mapa(mapa_filtrado_base):
+    try:
+        st.markdown("---")
+        st.markdown("### 🎯 Cluster da loja selecionada — raio de concorrência")
+
+        base_cluster = _cluster2_preparar_base(mapa_filtrado_base)
+
+        if base_cluster.empty:
+            st.warning("Não foi possível montar o cluster. A base precisa ter loja, latitude, longitude e preço.")
+            return
+
+        lojas = (
+            base_cluster
+            .groupby(["Rede", "Loja"], dropna=False)
+            .agg(
+                Latitude=("Latitude", "median"),
+                Longitude=("Longitude", "median"),
+                Produtos=("EAN", "nunique"),
+                Preço_Médio=("Preço", "mean")
+            )
+            .reset_index()
+        )
+
+        lojas["Seleção"] = lojas["Rede"].astype(str) + " - " + lojas["Loja"].astype(str)
+
+        c1, c2, c3 = st.columns([2.2, 0.8, 1])
+
+        loja_sel = c1.selectbox(
+            "Loja principal",
+            sorted(lojas["Seleção"].dropna().astype(str).tolist()),
+            help="A loja escolhida será a principal. As demais lojas dentro do raio serão tratadas como concorrentes."
+        )
+
+        raio_km = c2.number_input(
+            "Raio KM",
+            min_value=0.5,
+            max_value=10.0,
+            value=2.0,
+            step=0.5
+        )
+
+        filtro_rec = c3.selectbox(
+            "Recomendação",
+            ["Todas", "SUBIR PREÇO", "BAIXAR PREÇO", "MANTER"],
+            key="cluster_2km_filtro_recomendacao"
+        )
+
+        loja_ref = lojas[lojas["Seleção"].astype(str).eq(str(loja_sel))].iloc[0].to_dict()
+
+        sugestao, pontos_raio = _cluster2_calcular_sugestoes(
+            base_cluster,
+            loja_ref,
+            raio_km=raio_km
+        )
+
+        if pontos_raio.empty:
+            st.info("Nenhuma farmácia encontrada dentro do raio selecionado.")
+            return
+
+        if not sugestao.empty and filtro_rec != "Todas":
+            sugestao = sugestao[sugestao["Recomendação_Cluster_2KM"].astype(str).eq(filtro_rec)].copy()
+
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("Lojas no raio", int(pontos_raio["Loja"].nunique()))
+        k2.metric("Redes no raio", int(pontos_raio["Rede"].nunique()))
+        k3.metric("Produtos sugeridos", int(sugestao["EAN"].nunique()) if not sugestao.empty else 0)
+        k4.metric("Raio aplicado", f"{raio_km:.1f} km")
+
+        st.markdown("#### 📋 Sugestão de ajuste de preço considerando concorrentes próximos")
+
+        if sugestao.empty:
+            st.info("Existem lojas no raio, mas não há produtos comparáveis suficientes para gerar sugestão.")
+        else:
+            colunas = [
+                "EAN",
+                "Produto",
+                "Preço_Atual_Principal",
+                "Menor_Preço_Concorrente_2KM",
+                "Preço_Médio_Concorrente_2KM",
+                "Preço_Máximo_Competitivo_2KM",
+                "Preço_Sugerido_Cluster_2KM",
+                "Ganho_Unitário_Cluster_2KM",
+                "Diferença_%_Cluster_2KM",
+                "Recomendação_Cluster_2KM",
+                "Concorrentes_2KM",
+                "Redes_Concorrentes_2KM",
+                "Distância_Mínima_KM",
+                "Custo",
+                "Margem_%_Menor_Preço_2KM",
+                "Margem_Nominal_Menor_Preço_2KM"
+            ]
+
+            colunas = [c for c in colunas if c in sugestao.columns]
+
+            st.dataframe(
+                sugestao[colunas],
+                use_container_width=True,
+                hide_index=True,
+                height=420
+            )
+
+            st.download_button(
+                "📥 Exportar sugestão cluster 2 km",
+                data=sugestao.to_csv(index=False, sep=";", encoding="utf-8-sig"),
+                file_name="sugestao_cluster_2km.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+
+        st.markdown("#### 🗺️ Seleção no mapa")
+
+        pontos_mapa = pontos_raio.copy()
+        loja_nome = str(loja_ref.get("Loja", "")).strip()
+
+        pontos_mapa["Tipo"] = np.where(
+            pontos_mapa["Loja"].astype(str).str.strip().eq(loja_nome),
+            "Loja principal",
+            "Concorrente no raio"
+        )
+
+        centro = {
+            "lat": float(pd.to_numeric(pontos_mapa["Latitude"], errors="coerce").median()),
+            "lon": float(pd.to_numeric(pontos_mapa["Longitude"], errors="coerce").median())
+        }
+
+        fig_cluster = px.scatter_mapbox(
+            pontos_mapa,
+            lat="Latitude",
+            lon="Longitude",
+            color="Tipo",
+            hover_name="Loja",
+            hover_data={
+                "Rede": True,
+                "Produto": True,
+                "Preço": ":.2f",
+                "Distância KM": ":.2f",
+                "Data": True,
+                "Latitude": False,
+                "Longitude": False
+            },
+            center=centro,
+            zoom=15,
+            height=620,
+            title=f"Cluster local: {loja_sel} | raio {raio_km:.1f} km"
+        )
+
+        fig_cluster.update_layout(
+            mapbox_style="open-street-map",
+            margin=dict(l=0, r=0, t=50, b=0),
+            legend_title_text="Tipo"
+        )
+
+        st.plotly_chart(fig_cluster, use_container_width=True)
+
+    except Exception as erro:
+        st.error(f"Erro ao renderizar cluster 2 km: {erro}")
 
 
 # --------------------------------------------------
@@ -7629,10 +7879,6 @@ st.sidebar.markdown(
     unsafe_allow_html=True
 )
 
-if "🎯 Cluster Concorrente Próximo" not in paginas_cliente_menu:
-    paginas_cliente_menu.append("🎯 Cluster Concorrente Próximo")
-
-
 pagina = None
 
 if paginas_cliente_menu:
@@ -7823,137 +8069,6 @@ df_filtrado = propagar_ganho_potencial(df_filtrado)
 # --------------------------------------------------
 # BILLING ENTERPRISE
 # --------------------------------------------------
-
-
-# --------------------------------------------------
-# CLUSTER CONCORRENTE PRÓXIMO
-# --------------------------------------------------
-
-if pagina == "🎯 Cluster Concorrente Próximo":
-
-    st.markdown(
-        """
-        <div class="eirox-hero">
-            <div class="eirox-section-title">Pricing Local Intelligence</div>
-            <h1>🎯 Cluster Concorrente Próximo</h1>
-            <p>Sugestões de preço considerando apenas concorrentes próximos da farmácia selecionada.</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    if "explicacao_calculo" in globals():
-        explicacao_calculo(
-            "Cluster por concorrente próximo",
-            [
-                "Selecione uma farmácia de referência e defina o raio de análise.",
-                "Somente concorrentes dentro do raio entram no cálculo.",
-                "Menor Preço Local = menor preço encontrado entre concorrentes próximos.",
-                "Preço Máximo Competitivo Local = percentil 75 dos preços locais.",
-                "Preço Sugerido Cluster = referência local usada para sugerir SUBIR, BAIXAR ou MANTER.",
-                "O mapa abaixo mostra a farmácia selecionada e os concorrentes considerados."
-            ]
-        )
-
-    base_cluster = montar_base_cluster_local(df if "df" in globals() else pd.DataFrame())
-
-    if base_cluster.empty:
-        st.warning("Não encontrei latitude, longitude e preço na base para montar o cluster.")
-        st.stop()
-
-    lojas = (
-        base_cluster
-        .groupby(["Rede", "Loja"], dropna=False)
-        .agg(
-            Latitude=("Latitude", "median"),
-            Longitude=("Longitude", "median"),
-            Produtos=("EAN", "nunique"),
-            Preço_Médio=("Preço", "mean")
-        )
-        .reset_index()
-    )
-
-    lojas["Seleção"] = lojas["Rede"].astype(str) + " - " + lojas["Loja"].astype(str)
-
-    c1, c2, c3 = st.columns([2, 1, 1])
-    loja_sel = c1.selectbox("Farmácia de referência", sorted(lojas["Seleção"].tolist()))
-    raio = c2.slider("Raio do cluster em km", 0.5, 10.0, 3.0, 0.5)
-    filtro_rec = c3.selectbox("Recomendação", ["Todas", "SUBIR PREÇO", "BAIXAR PREÇO", "MANTER"])
-
-    loja_ref = lojas[lojas["Seleção"] == loja_sel].iloc[0].to_dict()
-
-    sugestoes, pontos = calcular_cluster_local(base_cluster, loja_ref, raio)
-
-    if sugestoes.empty or pontos.empty:
-        st.info("Nenhum concorrente próximo encontrado para essa seleção.")
-        st.stop()
-
-    if filtro_rec != "Todas":
-        sugestoes = sugestoes[sugestoes["Recomendação_Cluster"].eq(filtro_rec)].copy()
-
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Concorrentes no raio", int(pontos["Loja"].nunique()))
-    k2.metric("Redes no raio", int(pontos["Rede"].nunique()))
-    k3.metric("Produtos analisados", int(sugestoes["EAN"].nunique()) if not sugestoes.empty else 0)
-    k4.metric("Raio", f"{raio} km")
-
-    st.markdown("### 📋 Sugestões de ajuste pelo cluster local")
-    st.dataframe(sugestoes, use_container_width=True, hide_index=True, height=480)
-
-    st.download_button(
-        "📥 Exportar sugestões do cluster",
-        data=sugestoes.to_csv(index=False, sep=";", encoding="utf-8-sig"),
-        file_name="sugestoes_cluster_concorrente_proximo.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
-
-    st.markdown("### 🗺️ Mapa geográfico do cluster selecionado")
-
-    pontos_mapa = pontos.copy()
-    pontos_mapa["Tipo"] = np.where(
-        pontos_mapa["Loja"].astype(str).eq(str(loja_ref["Loja"])),
-        "Farmácia selecionada",
-        "Concorrente próximo"
-    )
-
-    centro = {
-        "lat": float(pd.to_numeric(pontos_mapa["Latitude"], errors="coerce").median()),
-        "lon": float(pd.to_numeric(pontos_mapa["Longitude"], errors="coerce").median())
-    }
-
-    fig_cluster = px.scatter_mapbox(
-        pontos_mapa,
-        lat="Latitude",
-        lon="Longitude",
-        color="Tipo",
-        hover_name="Loja",
-        hover_data={
-            "Rede": True,
-            "Produto": True,
-            "Preço": ":.2f",
-            "Distância KM": ":.2f",
-            "Data": True,
-            "Latitude": False,
-            "Longitude": False
-        },
-        center=centro,
-        zoom=14,
-        height=650,
-        title=f"Cluster local: {loja_sel} | raio {raio} km"
-    )
-
-    fig_cluster.update_layout(
-        mapbox_style="open-street-map",
-        margin=dict(l=0, r=0, t=50, b=0),
-        legend_title_text="Seleção"
-    )
-
-    st.plotly_chart(fig_cluster, use_container_width=True)
-
-    st.stop()
-
-
 
 if pagina == "💳 Billing Enterprise":
 
@@ -13357,6 +13472,8 @@ paper_bgcolor="rgba(0,0,0,0)"
     )
 
     st.plotly_chart(fig_mapa, use_container_width=True, key="mapa_geografico_concorrencia")
+
+    renderizar_cluster_2km_mapa(mapa_filtrado)
 
     st.markdown("### 🏆 Ranking de lojas por quantidade de pesquisas")
 
