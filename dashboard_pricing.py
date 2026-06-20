@@ -150,7 +150,7 @@ st.markdown(
 # VERSÃO DE DEPURAÇÃO / CONTROLE DE DEPLOY
 # --------------------------------------------------
 
-VERSAO_APP = "v1.40.5-LTS-cluster-regra-custo"
+VERSAO_APP = "v1.40.6-LTS-cluster-margem-nominal-fix"
 
 # --------------------------------------------------
 # FORMATACAO BRASIL
@@ -266,6 +266,10 @@ def data_br(valor):
 
 def _eirox_tipo_coluna_br(nome_coluna):
     nome = str(nome_coluna).lower().strip()
+
+    # Margem nominal é valor financeiro, não percentual.
+    if "nominal" in nome or "valor_margem" in nome:
+        return "moeda"
 
     if any(t in nome for t in [
         "margem", "percent", "particip", "%", "variação", "variacao",
@@ -2134,7 +2138,7 @@ def _cluster2_calcular_sugestoes(base_cluster, loja_ref, raio_km=2.0):
             / sugestao["Menor_Preço_Concorrente_2KM"].replace(0, np.nan)
         ) * 100
 
-        sugestao["Margem_Nominal_Menor_Preço_2KM"] = sugestao["Menor_Preço_Concorrente_2KM"] - sugestao["Custo"]
+        sugestao["Valor_Margem_Menor_Preço_2KM"] = sugestao["Menor_Preço_Concorrente_2KM"] - sugestao["Custo"]
 
         # Regra oficial do cluster:
         # seguir o menor preço concorrente somente se cobrir o custo.
@@ -2178,7 +2182,7 @@ def _cluster2_calcular_sugestoes(base_cluster, loja_ref, raio_km=2.0):
             / sugestao["Preço_Sugerido_Cluster_2KM"].replace(0, np.nan)
         ) * 100
 
-        sugestao["Margem_Nominal_Preço_Sugerido_2KM"] = (
+        sugestao["Valor_Margem_Preço_Sugerido_2KM"] = (
             sugestao["Preço_Sugerido_Cluster_2KM"] - sugestao["Custo"]
         )
 
@@ -2207,10 +2211,10 @@ def _cluster2_calcular_sugestoes(base_cluster, loja_ref, raio_km=2.0):
             "Distância_Mínima_KM",
             "Custo",
             "Margem_%_Menor_Preço_2KM",
-            "Margem_Nominal_Menor_Preço_2KM",
+            "Valor_Margem_Menor_Preço_2KM",
             "Preço_Sugerido_Regra_Custo_2KM",
             "Margem_%_Preço_Sugerido_2KM",
-            "Margem_Nominal_Preço_Sugerido_2KM"
+            "Valor_Margem_Preço_Sugerido_2KM"
         ]:
             if col in sugestao.columns:
                 sugestao[col] = pd.to_numeric(sugestao[col], errors="coerce").round(2)
@@ -2307,10 +2311,9 @@ def renderizar_cluster_2km_mapa(mapa_filtrado_base):
                 "Preço_Médio_Concorrente_2KM",
                 "Preço_Máximo_Competitivo_2KM",
                 "Preço_Sugerido_Cluster_2KM",
-                "Regra_Aplicada_Cluster_2KM",
                 "Ação_Necessária_Cluster_2KM",
                 "Margem_%_Preço_Sugerido_2KM",
-                "Margem_Nominal_Preço_Sugerido_2KM",
+                "Valor_Margem_Preço_Sugerido_2KM",
                 "Ganho_Unitário_Cluster_2KM",
                 "Diferença_%_Cluster_2KM",
                 "Recomendação_Cluster_2KM",
@@ -2319,7 +2322,7 @@ def renderizar_cluster_2km_mapa(mapa_filtrado_base):
                 "Distância_Mínima_KM",
                 "Custo",
                 "Margem_%_Menor_Preço_2KM",
-                "Margem_Nominal_Menor_Preço_2KM"
+                "Valor_Margem_Menor_Preço_2KM"
             ]
 
             colunas = [c for c in colunas if c in sugestao.columns]
